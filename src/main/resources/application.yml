@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: duty-scheduler
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/duty}
+    username: ${DATABASE_USER:duty}
+    password: ${DATABASE_PASSWORD:duty_local_dev}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false # off by default here; it hides N+1 queries behind lazy loads
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
