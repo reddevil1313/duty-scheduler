@@ -1,16 +1,18 @@
 package com.sagarsamay.duty.rules;
 
+import com.sagarsamay.duty.domain.Absence;
 import com.sagarsamay.duty.domain.DutyDay;
 import com.sagarsamay.duty.domain.DutyRules;
 import com.sagarsamay.duty.domain.Trooper;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * How many hours each ST is meant to do on a sheet, before anyone is placed on a
+ * How many hours each Trooper is meant to do on a sheet, before anyone is placed on a
  * post.
  *
  * <p>With a target per man, placing someone is a
@@ -58,7 +60,7 @@ public record HourTargets(Map<Trooper, Integer> hours, int nightDemand, int dayD
         return hours.values().stream().allMatch(h -> h <= DutyRules.HOUR_CAP);
     }
 
-    /**
+     /**
      * Splits a sheet's demand between the night group and everyone else, and
      * shares each half out evenly.
      *
@@ -74,13 +76,65 @@ public record HourTargets(Map<Trooper, Integer> hours, int nightDemand, int dayD
                                        List<Trooper> nightGroup,
                                        List<Trooper> dayGroup,
                                        Map<Trooper, Integer> history) {
-        int nightDemand = Availability.demandWithin(day, Availability.silentSlots(day));
-        int dayDemand = Availability.demandWithin(day, Availability.daySlots(day));
+        return allocate(day, nightGroup, dayGroup, List.of(), history);
+    }
+
+    public static HourTargets allocate(DutyDay day,
+                                       List<Trooper> nightGroup,
+                                       List<Trooper> dayGroup,
+                                       List<Absence> absences,
+                                       Map<Trooper, Integer> history) {
+        boolean[] silent = Availability.silentSlots(day);
+        boolean[] daytime = Availability.daySlots(day);
+        int nightDemand = Availability.demandWithin(day, silent);
+        int dayDemand = Availability.demandWithin(day, daytime);
 
         Map<Trooper, Integer> out = new LinkedHashMap<>();
-        out.putAll(distribute(nightDemand, nightGroup, history));
-        out.putAll(distribute(dayDemand, dayGroup, history));
+        out.putAll(share(nightDemand, nightGroup, day, silent, absences, history));
+        out.putAll(share(dayDemand, dayGroup, day, daytime, absences, history));
         return new HourTargets(out, nightDemand, dayDemand);
+    }
+
+    /**
+     * An even share, except that nobody is given more hours than he has room for.
+     *
+     */
+    private static Map<Trooper, Integer> share(int total,
+                                               List<Trooper> group,
+                                               DutyDay day,
+                                               boolean[] window,
+                                               List<Absence> absences,
+                                               Map<Trooper, Integer> history) {
+        Map<Trooper, Integer> room = new LinkedHashMap<>();
+        for (Trooper trooper : group) {
+            int capacity = Math.min(DutyRules.HOUR_CAP,
+                    Availability.capacityWithin(Availability.mask(trooper, day, absences), window));
+            if (capacity > 0) {
+                room.put(trooper, capacity);
+            }
+        }
+
+        Map<Trooper, Integer> out = new LinkedHashMap<>();
+        List<Trooper> pool = new ArrayList<>(room.keySet());
+        int left = total;
+        while (!pool.isEmpty()) {
+            Map<Trooper, Integer> proposed = distribute(left, pool, history);
+            // If any trooper is proposed more than he has room for, give him his max and
+            // redistribute the rest.
+            List<Trooper> overflowing = pool.stream()
+                    .filter(t -> proposed.get(t) > room.get(t))
+                    .toList();
+            if (overflowing.isEmpty()) {
+                out.putAll(proposed);
+                return out;
+            }
+            for (Trooper trooper : overflowing) {
+                out.put(trooper, room.get(trooper));
+                left -= room.get(trooper);
+            }
+            pool.removeAll(overflowing);
+        }
+        return out;
     }
 
     /**
@@ -98,19 +152,15 @@ public record HourTargets(Map<Trooper, Integer> hours, int nightDemand, int dayD
         if (group.isEmpty()) {
             return Map.of();
         }
-
         int base = total / group.size();
         int extra = total % group.size();
 
-        // Sort the group by cumulative history, then by name to break ties.
         List<Trooper> order = group.stream()
                 .sorted(Comparator
                         .comparingInt((Trooper t) -> history.getOrDefault(t, 0))
                         .thenComparing(Trooper::name))
                 .toList();
 
-        // The first {@code extra} people in the sorted order get one more hour than
-        // the rest, so the spread is at most one.
         Map<Trooper, Integer> out = new LinkedHashMap<>();
         for (int i = 0; i < order.size(); i++) {
             out.put(order.get(i), base + (i < extra ? 1 : 0));

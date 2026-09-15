@@ -22,6 +22,9 @@ public record DayDemand(DutyDay day, List<Map<Post, Integer>> byHour) {
         byHour = List.copyOf(byHour);
     }
 
+    /**
+     * Creates a {@link DayDemand} for the given {@link DutyDay}.
+     */
     public static DayDemand of(DutyDay day) {
         List<Map<Post, Integer>> hours = new ArrayList<>(DutyDay.SLOT_COUNT);
         for (Slot s : day.slots()) {
