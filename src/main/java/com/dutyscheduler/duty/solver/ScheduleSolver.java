@@ -46,12 +46,58 @@ import java.util.Set;
  */
 public final class ScheduleSolver {
 
+    /** How far a single candidate split may search before it is abandoned.*/
+    private static final long NODE_BUDGET = 200_000;
+
     /** One post at one hour. */
     private record Position(int slot, Post post, int copy) {
     }
 
+    /**
+     * Solves a sheet and returns the best arrangement it found.
+     *
+     * <p>It tries every crossover from zero to the maximum that could be absorbed
+     * by the crossover window, and returns the best schedule it finds.
+     * If none of the crossovers yield a solution, it returns a failure.
+     * The returned schedule is legal.
+     */
     public SolveResult solve(SolveRequest request) {
-        return new Run(request).go();
+        SolveResult best = null;
+        ScheduleScore bestScore = null;
+        String firstReason = null;
+        long nodes = 0;
+
+        for (int crossover : crossoverCandidates(request)) {
+            SolveResult candidate = new Run(request, crossover).go();
+            nodes += candidate.nodes();
+            if (!candidate.isSolved()) {
+                if (firstReason == null) {
+                    firstReason = candidate.reason();
+                }
+                continue;
+            }
+            ScheduleScore score = ScheduleScore.of(candidate.schedule());
+            if (score.isBetterThan(bestScore)) {
+                bestScore = score;
+                best = candidate;
+            }
+        }
+        if (best == null) {
+            return SolveResult.failed(firstReason == null ? "No solution." : firstReason, null, nodes);
+        }
+        return new SolveResult(best.schedule(), best.targets(), null, nodes);
+    }
+
+    /**
+     * How many day hours to consider handing to the night group.
+     */
+    private static List<Integer> crossoverCandidates(SolveRequest request) {
+        List<Integer> out = new ArrayList<>();
+        int ceiling = Run.crossoverCeiling(request.day());
+        for (int x = 0; x <= ceiling; x++) {
+            out.add(x);
+        }
+        return out;
     }
 
     // -----------------------------------------------------------------------
@@ -61,6 +107,8 @@ public final class ScheduleSolver {
     private static final class Run {
 
         private final SolveRequest request;
+        private final int crossover;
+        private final boolean[] crossSlots;
         private final DutyDay day;
         private final List<Trooper> troopers;
         private final HourTargets targets;
@@ -74,13 +122,16 @@ public final class ScheduleSolver {
         private final int[] filledBy;           // [position] -> trooper index, -1 unset
 
         private long nodes;
+        private boolean exhausted;
 
-        Run(SolveRequest request) {
+        Run(SolveRequest request, int crossover) {
             this.request = request;
+            this.crossover = crossover;
             this.day = request.day();
+            this.crossSlots = HourTargets.crossoverWindow(request.day());
             this.troopers = request.roster();
             this.targets = HourTargets.allocate(day, request.nightGroup(), request.dayGroup(),
-                    request.absences(), request.history());
+                    request.absences(), request.history(), crossover);
 
             int n = troopers.size();
             this.silent = Availability.silentSlots(day);
@@ -122,11 +173,17 @@ public final class ScheduleSolver {
             if (impossible != null) {
                 return SolveResult.failed(impossible, targets, 0);
             }
-            if (search(0)) { // found a legal arrangement of hours
+            if (search(0)) {
+                // Improve a legal schedule by swapping segments between rows to reduce wasted span.
+                Post[][] improved = new SpanImprover(troopers, this::eligible).improve(grid);
+                for (int t = 0; t < troopers.size(); t++) {
+                    grid[t] = improved[t];
+                }
                 return SolveResult.solved(toSchedule(), targets, nodes);
             }
-            return SolveResult.failed(
-                    "No legal arrangement of these hours exists for this manpower.", targets, nodes);
+            return SolveResult.failed(exhausted
+                    ? "Gave up looking for an arrangement of this split."
+                    : "No legal arrangement of these hours exists for this manpower.", targets, nodes);
         }
 
         /**
@@ -156,9 +213,6 @@ public final class ScheduleSolver {
                 if (owed[t] == 0) {
                     continue;
                 }
-                /*
-                 * Check if the trooper has enough room for the required hours.
-                 */
                 int room = capacityFrom(t, 0);
                 if (room < owed[t]) {
                     return troopers.get(t).name() + " is down for " + owed[t]
@@ -175,7 +229,6 @@ public final class ScheduleSolver {
                 }
                 int bodies = 0;
                 for (int t = 0; t < troopers.size(); t++) {
-                    // Possible Fault -> Night Group should be available for earlier day slots.
                     if (owed[t] > 0 && available[t][slot] && rightGroup(t, slot)) {
                         bodies++;
                     }
@@ -188,12 +241,28 @@ public final class ScheduleSolver {
             return null;
         }
 
+        /**
+         * Night men take the silent hours, day men take the rest — except that a
+         * night man may also be given one of the first few day hours, which is
+         * what "crossover" buys.
+         */
         private boolean rightGroup(int trooper, int slot) {
-            return onNight[trooper] == silent[slot];
+            if (onNight[trooper]) {
+                return silent[slot] || (crossover > 0 && crossSlots[slot]);
+            }
+            return !silent[slot];
+        }
+
+        /** The most day hours the crossover window could absorb. */
+        static int crossoverCeiling(DutyDay day) {
+            return Availability.demandWithin(day, HourTargets.crossoverWindow(day));
         }
 
         private boolean search(int index) {
-            nodes++;
+            if (++nodes > NODE_BUDGET) {
+                exhausted = true;
+                return false;
+            }
             if (index == positions.size()) {
                 return true;
             }
@@ -247,7 +316,6 @@ public final class ScheduleSolver {
             if (owed[t] <= 0 || !available[t][slot] || grid[t][slot] != null) {
                 return false;
             }
-
             if (!rightGroup(t, slot)) {
                 return false;
             }
@@ -263,11 +331,10 @@ public final class ScheduleSolver {
             if (run > DutyRules.MAX_STINT) {
                 return false;
             }
-
             if (slot > 0 && grid[t][slot - 1] != null) {
                 Post previous = grid[t][slot - 1];
                 // The "free after" rule is a hard limit, so if the previous post forbids this one
-
+                // this branch is dead.
                 if (previous != post
                         && !DutyRules.FREE_AFTER.getOrDefault(previous, Set.of()).contains(post)) {
                     return false;
@@ -304,6 +371,11 @@ public final class ScheduleSolver {
                 }
             }
             return total + DutyRules.stintCapacity(run);
+        }
+
+        /** Availability and group in one question, for the improver. */
+        private boolean eligible(int trooper, int slot) {
+            return available[trooper][slot] && rightGroup(trooper, slot);
         }
 
         /** Generate a copyof the schedule with the hours filled in. */
