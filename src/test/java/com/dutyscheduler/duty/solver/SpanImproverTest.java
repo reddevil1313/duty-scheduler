@@ -24,7 +24,9 @@ class SpanImproverTest {
     private static final Trooper B = Trooper.of("B");
     private static final List<Trooper> BOTH = List.of(A, B);
 
-    /** Everything allowed, so only the improver's own legality checks are in play. */
+    /**
+     * Everything allowed, so only the improver's own legality checks are in play.
+     */
     private static final SpanImprover.Eligibility ANYWHERE = (trooper, slot) -> true;
 
     private static Post[] cells(int... slots) {
@@ -77,7 +79,7 @@ class SpanImproverTest {
     void tightensWithoutChangingHourCounts() {
         // A is strung out across the whole afternoon for two hours' work; B is
         // compact. Trading one of A's hours for one of B's helps both.
-        Post[][] before = { cells(10, 22), cells(12, 14) };
+        Post[][] before = { cells(10, 14), cells(11, 12) };
         int hoursA = hours(before[0]);
         int hoursB = hours(before[1]);
 
@@ -116,7 +118,7 @@ class SpanImproverTest {
                     Post previous = row[slot - 1];
                     Post current = row[slot];
                     assertTrue(previous == current
-                                    || DutyRules.FREE_AFTER.getOrDefault(previous, Set.of()).contains(current),
+                            || DutyRules.FREE_AFTER.getOrDefault(previous, Set.of()).contains(current),
                             previous + " into " + current + " with no break");
                 }
             }
