@@ -12,23 +12,29 @@ import java.util.Optional;
 /**
  * A finished schedule for a day. Each row is one trooper's duty for that day.
  * 
- * @param day The day of the schedule.
- * @param rows The rows of the schedule, each row is one trooper's duty for that day.
+ * @param day  The day of the schedule.
+ * @param rows The rows of the schedule, each row is one trooper's duty for that
+ *             day.
  */
 public record Schedule(DutyDay day, List<Row> rows) {
 
+    /**
+     * One Trooper's line across the sheet. A null entry means off duty that hour.
+     */
     public record Row(Trooper trooper, List<Post> posts) {
+
         public Row {
             if (posts.size() != DutyDay.SLOT_COUNT) {
-                throw new IllegalArgumentException(trooper.name() + " has " + posts.size() + " cells, expected " + DutyDay.SLOT_COUNT);
+                throw new IllegalArgumentException(
+                        trooper.name() + " has " + posts.size() + " cells, expected " + DutyDay.SLOT_COUNT);
             }
 
             // posts can contain nulls
             posts = Collections.unmodifiableList(new ArrayList<>(posts));
         }
 
-        public Post at(int index) {
-            return posts.get(index);
+        public Post at(int slot) {
+            return posts.get(slot);
         }
 
         /** Hours worked */
@@ -36,31 +42,12 @@ public record Schedule(DutyDay day, List<Row> rows) {
             return (int) posts.stream().filter(Objects::nonNull).count();
         }
 
-        /**
-         * The span of hours worked, including any gaps of less than {@link DutyRules#REST_GAP} hours.
-         */
         public int span() {
-            int first = -1;
-            int previous = -1;
-            int total = 0;
-            for (int slot = 0; slot < DutyDay.SLOT_COUNT; slot++) {
-                if (posts.get(slot) == null) {
-                    continue;
-                }
-                if (first < 0) {
-                    first = slot;
-                } else if (slot - previous - 1 >= DutyRules.REST_GAP) {
-                    total += previous - first + 1;      // that turnout is over
-                    first = slot;
-                }
-                previous = slot;
-            }
-            return first < 0 ? 0 : total + previous - first + 1;
+            return DutyRules.spanOf(posts.toArray(new Post[0]));
         }
 
-        /** Span beyond what these hours could possibly have been done in. */
         public int excessSpan() {
-            return Math.max(0, span() - DutyRules.tightestSpan(hours()));
+            return DutyRules.excessSpan(posts.toArray(new Post[0]));
         }
     }
 
@@ -76,7 +63,10 @@ public record Schedule(DutyDay day, List<Row> rows) {
         return row(trooper).map(Row::hours).orElse(0);
     }
 
-     /** Which Posts are manned at a given slot, and how many troopers are manning each */
+    /**
+     * Which Posts are manned at a given slot, and how many troopers are manning
+     * each
+     */
     public Map<Post, Integer> manningAt(int slot) {
         Map<Post, Integer> out = new LinkedHashMap<>();
         for (Row r : rows) {
@@ -88,7 +78,9 @@ public record Schedule(DutyDay day, List<Row> rows) {
         return Map.copyOf(out);
     }
 
-    /** Generate a copyof the schedule with one cell changed. For testing purposes. */
+    /**
+     * Generate a copyof the schedule with one cell changed. For testing purposes.
+     */
     public Schedule with(Trooper trooper, int slot, Post post) {
         List<Row> next = new ArrayList<>();
         for (Row r : rows) {
@@ -107,18 +99,22 @@ public record Schedule(DutyDay day, List<Row> rows) {
         return new Builder(day);
     }
 
-    public static class Builder {
+    public static final class Builder {
+
         private final DutyDay day;
         private final List<Row> rows = new ArrayList<>();
 
-        public Builder(DutyDay day) {
+        private Builder(DutyDay day) {
             this.day = day;
         }
 
         /**
-         * A row for a trooper, with a string of 24 cells, each cell being either a post name or "." for off.
+         * A row for a trooper, with a string of 24 cells, each cell being either a post
+         * name or "." for off.
          * 
-         * <pre>{@code ". . GG GG . AP AP AP . . . . . . . . . . . . . . . ."}</pre>
+         * <pre>{@code
+         * ". . GG GG . AP AP AP . . . . . . . . . . . . . . . ."
+         * }</pre>
          */
         public Builder row(Trooper trooper, String spec) {
             String[] tokens = spec.trim().split("\\s+");
@@ -160,5 +156,4 @@ public record Schedule(DutyDay day, List<Row> rows) {
             return new Schedule(day, rows);
         }
     }
-    
 }

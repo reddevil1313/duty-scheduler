@@ -3,7 +3,6 @@ package com.dutyscheduler.duty.solver;
 import com.dutyscheduler.duty.domain.DutyDay;
 import com.dutyscheduler.duty.domain.DutyRules;
 import com.dutyscheduler.duty.domain.Post;
-import com.dutyscheduler.duty.domain.Schedule;
 import com.dutyscheduler.duty.domain.Trooper;
 
 import java.util.ArrayList;
@@ -15,15 +14,18 @@ import java.util.Set;
  *
  * It takes the finished sheet and hill-climbs on it.
  *
- * <p>The move is a swap of two equal-length segments between two men.
- * Every candidate swap is re-checked for stint length, legal transitions, 
+ * <p>
+ * The move is a swap of two equal-length segments between two men.
+ * Every candidate swap is re-checked for stint length, legal transitions,
  * availability and group before it is taken, and it is only taken if
- * the score strictly improves — so the sheet that comes out is still legal 
+ * the score strictly improves — so the sheet that comes out is still legal
  * and never worse than the one that went in.
  */
 final class SpanImprover {
 
-    /** Whether a man may stand a post at an hour at all — availability and group. */
+    /**
+     * Whether a man may stand a post at an hour at all — availability and group.
+     */
     interface Eligibility {
         boolean allows(int trooper, int slot);
     }
@@ -39,8 +41,9 @@ final class SpanImprover {
         this.eligibility = eligibility;
     }
 
-    /** 
-     * Improves the schedule by swapping segments of duty between troopers, hill-climbing on wasted span.
+    /**
+     * Improves the schedule by swapping segments of duty between troopers,
+     * hill-climbing on wasted span.
      */
     Post[][] improve(Post[][] original) {
         Post[][] grid = copy(original);
@@ -70,7 +73,7 @@ final class SpanImprover {
     private boolean trySwap(Post[][] grid, Segment a, Segment b) {
         int before = pairCost(grid, a.trooper, b.trooper);
         if (before == 0) {
-            return false;                      // nothing to gain between these two
+            return false; // nothing to gain between these two
         }
         Post[] rowA = grid[a.trooper].clone();
         Post[] rowB = grid[b.trooper].clone();
@@ -84,7 +87,7 @@ final class SpanImprover {
         // Move the segments into the other row, checking that they are free and legal.
         for (int k = 0; k < a.length; k++) {
             if (rowA[b.from + k] != null || rowB[a.from + k] != null) {
-                return false;                  // the slots they would move into are taken
+                return false; // the slots they would move into are taken
             }
             rowA[b.from + k] = grid[b.trooper][b.from + k];
             rowB[a.from + k] = grid[a.trooper][a.from + k];
@@ -109,16 +112,8 @@ final class SpanImprover {
         return cost(a, grid[a]) + cost(b, grid[b]);
     }
 
-    /** Wasted span for one row, or zero for a stay-out, who is on camp regardless. */
     private int cost(int trooper, Post[] row) {
-        if (troopers.get(trooper).stayOut()) { // stay-out troopers don't count toward excess span
-            return 0;
-        }
-        Schedule.Row scheduleRow = new Schedule.Row(troopers.get(trooper), List.of(row));
-        int span = scheduleRow.span();
-        int hours = scheduleRow.hours();
-        
-        return Math.max(0, span - DutyRules.tightestSpan(hours));
+        return troopers.get(trooper).stayOut() ? 0 : DutyRules.excessSpan(row);
     }
 
     /** Re-checks every hard rule a swap could have broken. */
@@ -154,7 +149,10 @@ final class SpanImprover {
         return true;
     }
 
-    /** Every contiguous block of duty, and every sub-block of it, as a swappable unit. */
+    /**
+     * Every contiguous block of duty, and every sub-block of it, as a swappable
+     * unit.
+     */
     private List<Segment> segments(Post[][] grid) {
         List<Segment> out = new ArrayList<>();
         for (int t = 0; t < grid.length; t++) {

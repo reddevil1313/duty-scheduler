@@ -19,34 +19,37 @@ import java.util.Set;
 /**
  * Backtracking search that fills every post on a sheet.
  *
- * <p>One job: come back with a schedule that breaks no rule. It
+ * <p>
+ * One job: come back with a schedule that breaks no rule. It
  * does not care whether the result is a good schedule.
  * 
- * <p> The search walks positions in
+ * <p>
+ * The search walks positions in
  * time order, and for each one tries every trooper who could legally take it,
  * recursing after each and undoing on the way back out.
  *
- * <p>To keep the search from wandering into dead ends, it uses four
+ * <p>
+ * To keep the search from wandering into dead ends, it uses four
  * pruning techniques:
  *
  * <ul>
- *   <li><b>Hour targets as a budget.</b> Each man arrives with an exact number of
- *       hours to do. A position can only go to someone with hours left, so the
- *       search cannot wander into schedules where one man does everything.
- *   <li><b>The night/day partition.</b> The night group takes the silent hours
- *       and nobody else can; everyone else takes the rest. This halves the
- *       branching and, more importantly, is what stops a man being given 2200 and
- *       1800 on the same sheet.
- *   <li><b>Symmetry breaking on PAC.</b> The two PAC positions at an hour are
- *       interchangeable, so putting A on the first and B on the second is the
- *       same schedule as the reverse. Only the ordered pair is explored.
- *   <li><b>A capacity prune.</b> Before recursing, every man who still owes hours
- *       must have somewhere left to do them. If not, the branch is abandoned.
+ * <li><b>Hour targets as a budget.</b> Each man arrives with an exact number of
+ * hours to do. A position can only go to someone with hours left, so the
+ * search cannot wander into schedules where one man does everything.
+ * <li><b>The night/day partition.</b> The night group takes the silent hours
+ * and nobody else can; everyone else takes the rest. This halves the
+ * branching and, more importantly, is what stops a man being given 2200 and
+ * 1800 on the same sheet.
+ * <li><b>Symmetry breaking on PAC.</b> The two PAC positions at an hour are
+ * interchangeable, so putting A on the first and B on the second is the
+ * same schedule as the reverse. Only the ordered pair is explored.
+ * <li><b>A capacity prune.</b> Before recursing, every man who still owes hours
+ * must have somewhere left to do them. If not, the branch is abandoned.
  * </ul>
  */
 public final class ScheduleSolver {
 
-    /** How far a single candidate split may search before it is abandoned.*/
+    /** How far a single candidate split may search before it is abandoned. */
     private static final long NODE_BUDGET = 200_000;
 
     /** One post at one hour. */
@@ -56,7 +59,8 @@ public final class ScheduleSolver {
     /**
      * Solves a sheet and returns the best arrangement it found.
      *
-     * <p>It tries every crossover from zero to the maximum that could be absorbed
+     * <p>
+     * It tries every crossover from zero to the maximum that could be absorbed
      * by the crossover window, and returns the best schedule it finds.
      * If none of the crossovers yield a solution, it returns a failure.
      * The returned schedule is legal.
@@ -114,12 +118,12 @@ public final class ScheduleSolver {
         private final HourTargets targets;
 
         private final boolean[] silent;
-        private final boolean[][] available;    // [trooper][slot]
-        private final boolean[] onNight;        // [trooper]
-        private final Post[][] grid;            // [trooper][slot], null = off
-        private final int[] owed;               // hours each man still has to do
+        private final boolean[][] available; // [trooper][slot]
+        private final boolean[] onNight; // [trooper]
+        private final Post[][] grid; // [trooper][slot], null = off
+        private final int[] owed; // hours each man still has to do
         private final List<Position> positions;
-        private final int[] filledBy;           // [position] -> trooper index, -1 unset
+        private final int[] filledBy; // [position] -> trooper index, -1 unset
 
         private long nodes;
         private boolean exhausted;
@@ -155,11 +159,13 @@ public final class ScheduleSolver {
             DayDemand demand = DayDemand.of(day);
             List<Position> out = new ArrayList<>();
             for (int slot = 0; slot < DutyDay.SLOT_COUNT; slot++) {
-                // The demand map is a multiset: PAC=2, BUS=1, etc. Each copy is a separate position.
+                // The demand map is a multiset: PAC=2, BUS=1, etc. Each copy is a separate
+                // position.
                 Map<Post, Integer> need = demand.at(slot);
                 for (Post post : Post.values()) {
                     int count = need.getOrDefault(post, 0);
-                    // Each copy of a post is a separate position, so PAC=2 means two positions at that hour.
+                    // Each copy of a post is a separate position, so PAC=2 means two positions at
+                    // that hour.
                     for (int copy = 0; copy < count; copy++) {
                         out.add(new Position(slot, post, copy));
                     }
@@ -174,7 +180,8 @@ public final class ScheduleSolver {
                 return SolveResult.failed(impossible, targets, 0);
             }
             if (search(0)) {
-                // Improve a legal schedule by swapping segments between rows to reduce wasted span.
+                // Improve a legal schedule by swapping segments between rows to reduce wasted
+                // span.
                 Post[][] improved = new SpanImprover(troopers, this::eligible).improve(grid);
                 for (int t = 0; t < troopers.size(); t++) {
                     grid[t] = improved[t];
@@ -278,7 +285,8 @@ public final class ScheduleSolver {
                 grid[t][slot] = position.post();
                 owed[t]--;
                 filledBy[index] = t;
-                // If the trooper can take this position and the rest of the sheet can still be filled, recurse.
+                // If the trooper can take this position and the rest of the sheet can still be
+                // filled, recurse.
                 if (capacityOk(slot) && search(index + 1)) {
                     return true;
                 }
@@ -296,7 +304,8 @@ public final class ScheduleSolver {
          * the most hours still owed puts the tightest constraint at the top of the
          * tree, where failing is cheap.
          * 
-         * @param floor The lowest trooper index to consider, for symmetry breaking on PAC.
+         * @param floor The lowest trooper index to consider, for symmetry breaking on
+         *              PAC.
          */
         private List<Integer> candidates(int slot, Post post, int floor) {
             List<Integer> out = new ArrayList<>();
@@ -333,7 +342,8 @@ public final class ScheduleSolver {
             }
             if (slot > 0 && grid[t][slot - 1] != null) {
                 Post previous = grid[t][slot - 1];
-                // The "free after" rule is a hard limit, so if the previous post forbids this one
+                // The "free after" rule is a hard limit, so if the previous post forbids this
+                // one
                 // this branch is dead.
                 if (previous != post
                         && !DutyRules.FREE_AFTER.getOrDefault(previous, Set.of()).contains(post)) {
