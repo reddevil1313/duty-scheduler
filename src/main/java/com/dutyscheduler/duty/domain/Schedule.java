@@ -35,6 +35,33 @@ public record Schedule(DutyDay day, List<Row> rows) {
         public int hours() {
             return (int) posts.stream().filter(Objects::nonNull).count();
         }
+
+        /**
+         * The span of hours worked, including any gaps of less than {@link DutyRules#REST_GAP} hours.
+         */
+        public int span() {
+            int first = -1;
+            int previous = -1;
+            int total = 0;
+            for (int slot = 0; slot < DutyDay.SLOT_COUNT; slot++) {
+                if (posts.get(slot) == null) {
+                    continue;
+                }
+                if (first < 0) {
+                    first = slot;
+                } else if (slot - previous - 1 >= DutyRules.REST_GAP) {
+                    total += previous - first + 1;      // that turnout is over
+                    first = slot;
+                }
+                previous = slot;
+            }
+            return first < 0 ? 0 : total + previous - first + 1;
+        }
+
+        /** Span beyond what these hours could possibly have been done in. */
+        public int excessSpan() {
+            return Math.max(0, span() - DutyRules.tightestSpan(hours()));
+        }
     }
 
     public Schedule {

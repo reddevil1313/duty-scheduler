@@ -84,15 +84,53 @@ public record HourTargets(Map<Trooper, Integer> hours, int nightDemand, int dayD
                                        List<Trooper> dayGroup,
                                        List<Absence> absences,
                                        Map<Trooper, Integer> history) {
+        return allocate(day, nightGroup, dayGroup, absences, history, 0);
+    }
+
+    public static HourTargets allocate(DutyDay day,
+                                       List<Trooper> nightGroup,
+                                       List<Trooper> dayGroup,
+                                       List<Absence> absences,
+                                       Map<Trooper, Integer> history,
+                                       int crossover) {
         boolean[] silent = Availability.silentSlots(day);
         boolean[] daytime = Availability.daySlots(day);
-        int nightDemand = Availability.demandWithin(day, silent);
-        int dayDemand = Availability.demandWithin(day, daytime);
+        int nightDemand = Availability.demandWithin(day, silent) + crossover;
+        int dayDemand = Availability.demandWithin(day, daytime) -  crossover;
 
         Map<Trooper, Integer> out = new LinkedHashMap<>();
-        out.putAll(share(nightDemand, nightGroup, day, silent, absences, history));
+        // The night group's window widens by the crossover hours, or their extra
+        // budget would have nowhere to go.
+        boolean[] nightWindow = silent;
+        if (crossover > 0) {
+            nightWindow = silent.clone();
+            boolean[] cross = crossoverWindow(day);
+            for (int slot = 0; slot < DutyDay.SLOT_COUNT; slot++) {
+                nightWindow[slot] = nightWindow[slot] || cross[slot];
+            }
+        }
+        out.putAll(share(nightDemand, nightGroup, day, nightWindow, absences, history));
         out.putAll(share(dayDemand, dayGroup, day, daytime, absences, history));
         return new HourTargets(out, nightDemand, dayDemand);
+    }
+
+     /** The few hours immediately after the silent block ends. */
+    public static boolean[] crossoverWindow(DutyDay day) {
+        boolean[] silent = Availability.silentSlots(day);
+        boolean[] out = new boolean[DutyDay.SLOT_COUNT];
+        int last = -1;
+        for (int slot = 0; slot < DutyDay.SLOT_COUNT; slot++) {
+            if (silent[slot]) {
+                last = slot;
+            }
+        }
+        for (int k = 1; k <= DutyRules.CROSS_WINDOW; k++) {
+            int slot = last + k;
+            if (slot < DutyDay.SLOT_COUNT && !silent[slot]) {
+                out[slot] = true;
+            }
+        }
+        return out;
     }
 
     /**
