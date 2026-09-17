@@ -120,6 +120,22 @@ public class DutySheetStore {
         return out;
     }
 
+    /**
+     * How many hours each man has done recently, keyed by the domain object the
+     * solver uses.
+     */
+    public static final int HISTORY_DAYS = 90;
+
+    @Transactional(readOnly = true)
+    public Map<Trooper, Integer> history(LocalDate upTo) {
+        Map<String, Integer> byName = hoursSince(upTo.minusDays(HISTORY_DAYS), upTo.minusDays(1));
+        Map<Trooper, Integer> out = new LinkedHashMap<>();
+        for (TrooperEntity entity : troopers.findAllByOrderByIdAsc()) {
+            out.put(entity.toDomain(), byName.getOrDefault(entity.getName(), 0));
+        }
+        return out;
+    }
+
     /** Every booking that could reach the given sheet, as domain objects. */
     @Transactional(readOnly = true)
     public List<Absence> absencesTouching(DutyDay day) {
