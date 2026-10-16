@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { ApiError, api } from '../api/client'
-import type { Post, Schedule, SheetCheck, Trooper } from '../api/types'
+import type { Post, Schedule, SheetCheck } from '../api/types'
 import { useReport } from '../api/useReport'
 import { useSession } from '../auth/session-context'
-import { RosterPanel } from '../roster/RosterPanel'
+import type { RosterState } from '../roster/useRoster'
 import { setCell, swapRows } from './edit'
 import { SheetGrid, type Mode } from './SheetGrid'
 
@@ -13,14 +13,14 @@ interface Props {
   /** Held by the app, so the records can open a day here. */
   date: string
   onDateChange: (date: string) => void
+  /** Held by the app: the Roster tab edits and ticks, the board generates from it. */
+  rosterState: RosterState
 }
 
-export function ScheduleBoard({ date, onDateChange }: Props) {
+export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
   const { session } = useSession()
   const isAdmin = session?.role === 'ADMIN'
-
-  const [roster, setRoster] = useState<Trooper[]>([])
-  const [nightGroup, setNightGroup] = useState<string[]>([])
+  const { roster, nightGroup, ticks, toggleNight } = rosterState
   // The sheet as it came — generated or logged — and the sheet as it now is.
   // They are the same object until someone edits, which is all "edited" means.
   const [original, setOriginal] = useState<Schedule | null>(null)
@@ -50,18 +50,6 @@ export function ScheduleBoard({ date, onDateChange }: Props) {
     setMode('view')
     setSwapPick(null)
   }
-
-  useEffect(() => {
-    let cancelled = false
-    api.troopers()
-      .then((list) => {
-        if (cancelled) return
-        setRoster(list)
-        setNightGroup(list.filter((t) => t.onNight).map((t) => t.name))
-      })
-      .catch((e: unknown) => { void report(e) })
-    return () => { cancelled = true }
-  }, [report])
 
   // Clearing the banners happens in the branches below rather than at the top of
   // the effect. Setting state synchronously as an effect opens schedules a second
@@ -98,7 +86,9 @@ export function ScheduleBoard({ date, onDateChange }: Props) {
     if (!schedule) return
     let stale = false
     const timer = setTimeout(() => {
-      api.check(date, schedule)
+      // Ticks go too, so someone ticked out shows greyed and is flagged if
+      // posted — exactly as they would be with a booked MC.
+      api.check(date, schedule, ticks)
         .then((result) => { if (!stale) setCheck({ of: schedule, result }) })
         .catch((e: unknown) => { if (!stale) void report(e) })
     }, 200)
@@ -106,48 +96,16 @@ export function ScheduleBoard({ date, onDateChange }: Props) {
       stale = true
       clearTimeout(timer)
     }
-  }, [date, schedule, report])
-
-  const trooperAdded = (trooper: Trooper) => {
-    setRoster((current) => [...current, trooper])
-    if (trooper.onNight) {
-      setNightGroup((current) => [...current, trooper.name])
-    }
-    setError(null)
-    setNote(`${trooper.name} added to the roster.`)
-  }
-
-  const trooperUpdated = (before: Trooper, after: Trooper) => {
-    setRoster((current) => current.map((t) => (t.id === after.id ? after : t)))
-    // The night group is ticked by name, so a rename has to carry the tick
-    // across, and someone who has become a stay-out can no longer hold it.
-    setNightGroup((current) => {
-      const without = current.filter((n) => n !== before.name)
-      const wasTicked = without.length !== current.length
-      return wasTicked && !after.stayOut ? [...without, after.name] : without
-    })
-    setError(null)
-    setNote(`${after.name} updated.`)
-  }
-
-  const trooperRemoved = (trooper: Trooper) => {
-    setRoster((current) => current.filter((t) => t.id !== trooper.id))
-    setNightGroup((current) => current.filter((n) => n !== trooper.name))
-    setError(null)
-    setNote(`${trooper.name} removed from the roster.`)
-  }
-
-  const toggleNight = (name: string) => {
-    setNightGroup((current) =>
-      current.includes(name) ? current.filter((n) => n !== name) : [...current, name])
-  }
+  }, [date, schedule, ticks, report])
 
   const generate = async () => {
     setBusy(true)
     setError(null)
     setNote(null)
     try {
-      show(await api.generate(date, nightGroup), 'generated')
+      // Someone ticked out stays out of the night group sent; the server drops
+      // them too, but sending it right keeps the request saying what it means.
+      show(await api.generate(date, nightGroup.filter((n) => !(n in ticks)), ticks), 'generated')
     } catch (e) {
       await report(e)
     } finally {
@@ -221,13 +179,17 @@ export function ScheduleBoard({ date, onDateChange }: Props) {
           <fieldset className="night">
             <legend>Night group</legend>
             {roster.filter((t) => !t.stayOut).map((t) => (
-              <label key={t.name} className="pill">
+              // Ticked out on the roster: shown, so the gap is explained, but
+              // not tickable for the night while the tick stands.
+              <label key={t.name} className={`pill${t.name in ticks ? ' ticked' : ''}`}>
                 <input
                   type="checkbox"
-                  checked={nightGroup.includes(t.name)}
+                  checked={nightGroup.includes(t.name) && !(t.name in ticks)}
+                  disabled={t.name in ticks}
                   onChange={() => toggleNight(t.name)}
                 />
                 {t.name}
+                {t.name in ticks && <span className="tag">{ticks[t.name]}</span>}
               </label>
             ))}
           </fieldset>
@@ -235,7 +197,11 @@ export function ScheduleBoard({ date, onDateChange }: Props) {
 
         {isAdmin && (
           <div className="actions">
-            <button type="button" onClick={generate} disabled={busy || nightGroup.length === 0}>
+            <button
+              type="button"
+              onClick={generate}
+              disabled={busy || nightGroup.filter((n) => !(n in ticks)).length === 0}
+            >
               {busy ? 'Working…' : 'Generate'}
             </button>
             <button
@@ -253,13 +219,12 @@ export function ScheduleBoard({ date, onDateChange }: Props) {
       </div>
 
       {isAdmin && (
-        <RosterPanel
-          roster={roster}
-          onAdded={trooperAdded}
-          onUpdated={trooperUpdated}
-          onRemoved={trooperRemoved}
-          onError={report}
-        />
+        Object.keys(ticks).length > 0 && (
+          <p className="ticks note">
+            Ticked out on the Roster tab, for generating only — not booked:{' '}
+            {Object.entries(ticks).map(([name, kind]) => `${name} (${kind})`).join(', ')}
+          </p>
+        )
       )}
 
       {/* Always rendered, one line tall, so a message arriving or clearing

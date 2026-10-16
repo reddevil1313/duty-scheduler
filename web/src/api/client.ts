@@ -1,5 +1,5 @@
 import type {
-  Absence, AbsenceReach, AbsenceRequest, ProblemDetail, Records, Schedule, Session, SheetCheck, Trooper,
+  Absence, AbsenceReach, AbsenceRequest, ProblemDetail, Records, Schedule, Session, SheetCheck, Ticks, Trooper,
   TrooperParticulars,
 } from './types'
 
@@ -125,17 +125,24 @@ export const api = {
     return api.session()
   },
 
-  generate: (date: string, nightGroup: string[]) =>
+  /** Ticks shape this one sheet and are not stored; see `Ticks`. */
+  generate: (date: string, nightGroup: string[], ticks: Ticks = {}) =>
     request<Schedule>('/api/schedules/generate', {
       method: 'POST',
-      body: JSON.stringify({ date, nightGroup }),
+      body: JSON.stringify({
+        date,
+        nightGroup,
+        out: Object.entries(ticks).map(([trooper, kind]) => ({ trooper, kind })),
+      }),
     }),
 
   schedule: (date: string) => request<Schedule>(`/api/schedules/${date}`),
 
   /** What a sheet breaks, saving nothing. Called after every hand edit. */
-  check: (date: string, schedule: Schedule) =>
-    request<SheetCheck>(`/api/schedules/${date}/check`, {
+  check: (date: string, schedule: Schedule, ticks: Ticks = {}) =>
+    // Ticks travel as out=NAME:KIND, because the body is the sheet itself.
+    request<SheetCheck>(`/api/schedules/${date}/check?${new URLSearchParams(
+      Object.entries(ticks).map(([name, kind]) => ['out', `${name}:${kind}`]))}`, {
       method: 'POST',
       body: JSON.stringify(schedule),
     }),

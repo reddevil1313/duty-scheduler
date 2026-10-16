@@ -1,9 +1,11 @@
 package com.dutyscheduler.duty.api;
 
 import com.dutyscheduler.duty.api.dto.GenerateRequest;
+import com.dutyscheduler.duty.api.dto.QuickLeave;
 import com.dutyscheduler.duty.api.dto.ScheduleResponse;
 import com.dutyscheduler.duty.api.dto.SheetCheck;
 import com.dutyscheduler.duty.domain.Absence;
+import com.dutyscheduler.duty.domain.AbsenceKind;
 import com.dutyscheduler.duty.domain.DutyDay;
 import com.dutyscheduler.duty.domain.Schedule;
 import com.dutyscheduler.duty.domain.Trooper;
@@ -55,12 +57,18 @@ public class ScheduleController {
         DutyDay day = DutyDay.of(request.date());
         List<Trooper> roster = troopers.findByActiveTrueOrderByIdAsc().stream()
                 .map(TrooperEntity::toDomain).toList();
+        List<Absence> ticked = ticked(day, request.out());
+        // Someone ticked out cannot hold the silent hours, whatever box was left
+        // ticked for them on the board.
         List<Trooper> night = roster.stream()
                 .filter(t -> request.nightGroup().contains(t.name()))
+                .filter(t -> ticked.stream().noneMatch(a -> a.trooper().equals(t)))
                 .toList();
+        List<Absence> absences = new ArrayList<>(store.absencesTouching(day));
+        absences.addAll(ticked);
 
         SolveResult result = solver.solve(
-                new SolveRequest(day, roster, night, store.absencesTouching(day), store.history(day.date())));
+                new SolveRequest(day, roster, night, absences, store.history(day.date())));
 
         if (!result.isSolved()) {
             throw new UnsolvableException(result.reason());
@@ -87,10 +95,57 @@ public class ScheduleController {
      * Saves nothing, so any signed-in user may ask.
      */
     @PostMapping("/{date}/check")
-    public SheetCheck check(@PathVariable LocalDate date, @Valid @RequestBody ScheduleResponse body) {
+    public SheetCheck check(@PathVariable LocalDate date, @Valid @RequestBody ScheduleResponse body,
+            @RequestParam(name = "out", required = false) List<String> out) {
         Schedule schedule = ScheduleAssembler.toDomain(date, body, troopers);
-        List<Absence> absences = store.absencesTouching(schedule.day());
+        List<Absence> absences = new ArrayList<>(store.absencesTouching(schedule.day()));
+        absences.addAll(ticked(schedule.day(), parseTicks(out)));
         return SheetCheck.of(schedule, validator.validate(schedule), leaveClashes(schedule, absences), absences);
+    }
+
+    /**
+     * Ticks from the roster as leave covering the whole sheet: from midnight on
+     * its date, past 2000 the next evening when it ends. Never saved; they live
+     * as long as the request.
+     */
+    private List<Absence> ticked(DutyDay day, List<QuickLeave> out) {
+        if (out == null) {
+            return List.of();
+        }
+        List<Absence> absences = new ArrayList<>();
+        for (QuickLeave tick : out) {
+            if (tick.kind() == AbsenceKind.MA) {
+                throw new IllegalArgumentException(
+                        "A tick is MC, OL or AL. Book an appointment in the leave register.");
+            }
+            // The roster's own Trooper, not one built from the name: the solver
+            // matches leave to a Trooper by name and stay-out together.
+            Trooper trooper = troopers.findByNameAndActiveTrue(tick.trooper())
+                    .orElseThrow(() -> new IllegalArgumentException(tick.trooper() + " is not on the roster."))
+                    .toDomain();
+            absences.add(Absence.fullDays(trooper, tick.kind(), day.date(), day.date().plusDays(1)));
+        }
+        return absences;
+    }
+
+    /**
+     * Ticks on a check arrive as {@code out=NAME:KIND} query parameters, because
+     * the body is the sheet itself. Split on the last colon, so a colon in a
+     * name cannot shift the kind.
+     */
+    private static List<QuickLeave> parseTicks(List<String> out) {
+        if (out == null) {
+            return List.of();
+        }
+        List<QuickLeave> ticks = new ArrayList<>();
+        for (String tick : out) {
+            int colon = tick.lastIndexOf(':');
+            if (colon <= 0) {
+                throw new IllegalArgumentException("A tick is NAME:KIND, such as TROOPER_D:MC; got " + tick);
+            }
+            ticks.add(new QuickLeave(tick.substring(0, colon), AbsenceKind.valueOf(tick.substring(colon + 1))));
+        }
+        return ticks;
     }
 
     /**

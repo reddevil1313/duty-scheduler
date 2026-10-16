@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { ApiError, api } from '../api/client'
-import type { Absence, AbsenceKind, AbsenceReach, AbsenceSpan, Trooper } from '../api/types'
+import type { Absence, AbsenceKind, AbsenceReach, AbsenceSpan, Ticks, Trooper } from '../api/types'
 import { useReport } from '../api/useReport'
 import { useSession } from '../auth/session-context'
 import { shortDate, shortInstant, today } from '../dates'
@@ -26,6 +26,8 @@ type Preview = { reach: AbsenceReach } | { problem: string } | null
 interface Props {
   /** True while the tab is showing. The roster is re-read on each showing, so a Trooper added on the board is there to book. */
   active: boolean
+  /** Roster ticks: shown here so they are visible, and so it is plain they are not bookings. */
+  ticks: Ticks
 }
 
 /**
@@ -33,7 +35,7 @@ interface Props {
  * appointments. Anyone signed in can read it; only an ADMIN can book or
  * cancel, and the server refuses anyone else regardless.
  */
-export function LeaveRegister({ active }: Props) {
+export function LeaveRegister({ active, ticks }: Props) {
   const { session } = useSession()
   const isAdmin = session?.role === 'ADMIN'
 
@@ -83,6 +85,14 @@ export function LeaveRegister({ active }: Props) {
         <BookingForm roster={roster} onBooked={booked} onError={report} />
       ) : (
         <p className="note">You have view-only access. Ask an ADMIN to record leave.</p>
+      )}
+
+      {Object.keys(ticks).length > 0 && (
+        <p className="ticks note">
+          Ticked out on the Roster tab, for generating only — not booked, and not counted in the records:{' '}
+          {Object.entries(ticks).map(([name, kind]) => `${name} (${kind})`).join(', ')}.
+          {isAdmin && ' To make one stick, book it here.'}
+        </p>
       )}
 
       {error && <p className="error" role="alert">{error}</p>}

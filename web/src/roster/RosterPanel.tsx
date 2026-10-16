@@ -1,12 +1,18 @@
 import { useState, type FormEvent } from 'react'
 import { api } from '../api/client'
-import type { Trooper } from '../api/types'
+import type { TickKind, Ticks, Trooper } from '../api/types'
 import { AddTrooperForm } from './AddTrooperForm'
 import { draftOf, particularsOf, type Draft } from './draft'
 import { TrooperFields } from './TrooperFields'
 
+const TICK_KINDS: TickKind[] = ['MC', 'OL', 'AL']
+
 interface Props {
   roster: Trooper[]
+  /** False for a USER: the roster is shown, nothing can be changed or ticked. */
+  canEdit: boolean
+  ticks: Ticks
+  onTick: (name: string, kind: TickKind | null) => void
   onAdded: (trooper: Trooper) => void
   onUpdated: (before: Trooper, after: Trooper) => void
   onRemoved: (trooper: Trooper) => void
@@ -14,13 +20,13 @@ interface Props {
 }
 
 /**
- * The roster, for an ADMIN to add to, edit and remove from. Nobody else sees
- * it, and the server refuses every change from anyone else regardless.
+ * The roster: for an ADMIN to add to, edit, remove from and tick out; for
+ * anyone else, to read. The server refuses every change from a USER
+ * regardless of what this renders.
  */
-export function RosterPanel({ roster, onAdded, onUpdated, onRemoved, onError }: Props) {
+export function RosterPanel({ roster, canEdit, ticks, onTick, onAdded, onUpdated, onRemoved, onError }: Props) {
   return (
     <section className="roster" aria-label="Roster">
-      <h2>Roster</h2>
       <table>
         <thead>
           <tr>
@@ -28,7 +34,8 @@ export function RosterPanel({ roster, onAdded, onUpdated, onRemoved, onError }: 
             <th>Rank</th>
             <th>Stay-out</th>
             <th>Night</th>
-            <th aria-label="Actions" />
+            {canEdit && TICK_KINDS.map((k) => <th key={k} className="tick">{k}</th>)}
+            {canEdit && <th aria-label="Actions" />}
           </tr>
         </thead>
         <tbody>
@@ -36,6 +43,9 @@ export function RosterPanel({ roster, onAdded, onUpdated, onRemoved, onError }: 
             <RosterRow
               key={trooper.id}
               trooper={trooper}
+              canEdit={canEdit}
+              tick={ticks[trooper.name] ?? null}
+              onTick={onTick}
               onUpdated={onUpdated}
               onRemoved={onRemoved}
               onError={onError}
@@ -43,7 +53,7 @@ export function RosterPanel({ roster, onAdded, onUpdated, onRemoved, onError }: 
           ))}
         </tbody>
       </table>
-      <AddTrooperForm onAdded={onAdded} onError={onError} />
+      {canEdit && <AddTrooperForm onAdded={onAdded} onError={onError} />}
     </section>
   )
 }
@@ -52,12 +62,15 @@ type Mode = { kind: 'view' } | { kind: 'edit'; draft: Draft } | { kind: 'confirm
 
 interface RowProps {
   trooper: Trooper
+  canEdit: boolean
+  tick: TickKind | null
+  onTick: (name: string, kind: TickKind | null) => void
   onUpdated: (before: Trooper, after: Trooper) => void
   onRemoved: (trooper: Trooper) => void
   onError: (e: unknown) => Promise<void>
 }
 
-function RosterRow({ trooper, onUpdated, onRemoved, onError }: RowProps) {
+function RosterRow({ trooper, canEdit, tick, onTick, onUpdated, onRemoved, onError }: RowProps) {
   const [mode, setMode] = useState<Mode>({ kind: 'view' })
   const [busy, setBusy] = useState(false)
 
@@ -90,7 +103,7 @@ function RosterRow({ trooper, onUpdated, onRemoved, onError }: RowProps) {
     const { draft } = mode
     return (
       <tr className="editing">
-        <td colSpan={5}>
+        <td colSpan={8}>
           <form onSubmit={(e) => void save(e, draft)}>
             <TrooperFields draft={draft} onChange={(next) => setMode({ kind: 'edit', draft: next })} />
             <button type="submit" disabled={busy || draft.name.trim() === ''}>
@@ -111,7 +124,18 @@ function RosterRow({ trooper, onUpdated, onRemoved, onError }: RowProps) {
       <td>{trooper.rank ?? ''}</td>
       <td>{trooper.stayOut ? 'Yes' : ''}</td>
       <td>{trooper.onNight ? 'Yes' : ''}</td>
-      <td className="row-actions">
+      {canEdit && TICK_KINDS.map((kind) => (
+        <td key={kind} className="tick">
+          <input
+            type="checkbox"
+            aria-label={`${trooper.name} ${kind}`}
+            checked={tick === kind}
+            // One reason at a time: ticking MC clears an OL tick.
+            onChange={(e) => onTick(trooper.name, e.target.checked ? kind : null)}
+          />
+        </td>
+      ))}
+      {canEdit && <td className="row-actions">
         {mode.kind === 'confirm-remove' ? (
           // Asked in the row rather than with window.confirm, which blocks the
           // page and cannot say what removal will actually do.
@@ -136,7 +160,7 @@ function RosterRow({ trooper, onUpdated, onRemoved, onError }: RowProps) {
             </button>
           </>
         )}
-      </td>
+      </td>}
     </tr>
   )
 }

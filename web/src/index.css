@@ -340,3 +340,14 @@ input.hours { width: 5rem; }
 .row.head .hour { color: #b4b9bf; font-weight: 500; }
 .controls { row-gap: 0.8rem; }
 .section-hd h2, .roster h2 { letter-spacing: 0.02em; }
+
+/* ---- roster tab and ticks ---- */
+.roster-view .roster table { margin-bottom: 1rem; }
+.roster th.tick, .roster td.tick { text-align: center; padding-left: 0.4rem; padding-right: 0.4rem; }
+.pill.ticked { color: var(--dim); }
+.pill .tag { margin-left: 0.15rem; }
+p.ticks {
+  border: 1px dashed var(--line); border-radius: 6px;
+  padding: 0.45rem 0.7rem; margin: 0.6rem 0;
+}
+.error.banner { margin: 0.6rem 1.25rem 0; }

@@ -25,9 +25,11 @@ Both ship together as a single image.
 - **Records**: per Trooper, hours worked, credited and in total, duties, nights,
   BUS runs and leave taken, with opening hours from before the tracker; and a
   line per day logged, where hours can be credited for a day not stood.
-- **Roster** of Troopers, each marked as living in or staying out, with a
+- **Roster** tab: Troopers, each marked as living in or staying out, with a
   default night group. Troopers can be added, edited and removed. Removing
   someone who stood a logged sheet archives them, so past sheets stay intact.
+  MC, OL and AL tickboxes take someone out of the sheets you generate without
+  booking anything, for trying out a sheet before the leave is confirmed.
 - **Leave register** for MCs, off-in-lieu, annual leave and medical
   appointments: full days, half days or a time window. Each entry shows the
   duty sheets it affects, before and after booking, and is taken into account
@@ -130,7 +132,7 @@ that is well formed but cannot be fulfilled returns `422`.
 | `POST` | `/troopers` | `ADMIN` | Add a Trooper; 409 when the name is taken |
 | `PUT` | `/troopers/{id}` | `ADMIN` | Edit a Trooper's particulars |
 | `DELETE` | `/troopers/{id}` | `ADMIN` | Remove a Trooper; archived if they stood a logged sheet |
-| `POST` | `/schedules/generate` | `ADMIN` | Generate a sheet; 422 when it cannot be covered |
+| `POST` | `/schedules/generate` | `ADMIN` | Generate a sheet, optionally with roster ticks; 422 when it cannot be covered |
 | `GET` | `/schedules/{date}` | signed in | The logged sheet; 404 when none |
 | `POST` | `/schedules/{date}/check` | signed in | What a sheet breaks, and each hour's demand; saves nothing |
 | `PUT` | `/schedules/{date}` | `ADMIN` | Log the sheet actually used |

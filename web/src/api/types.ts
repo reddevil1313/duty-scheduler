@@ -82,6 +82,15 @@ export interface Records {
 }
 
 export type AbsenceKind = 'MC' | 'OL' | 'AL' | 'MA'
+
+/** What a roster tick can say. An appointment is hours, not a sheet, so it is booked instead. */
+export type TickKind = 'MC' | 'OL' | 'AL'
+
+/**
+ * Troopers ticked out on the roster, by name. Not leave bookings: held in the
+ * browser only, sent with each generate and check, and gone on sign-out.
+ */
+export type Ticks = Record<string, TickKind>
 export type AbsenceSpan = 'FULL' | 'DAY_HALF' | 'NIGHT_HALF' | 'WINDOW'
 
 export interface Absence {
