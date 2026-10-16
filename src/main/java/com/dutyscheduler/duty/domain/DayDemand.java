@@ -8,7 +8,9 @@ import java.util.Map;
  * {@link Demand} resolved across one whole sheet: what each of the twenty-four
  * slots needs, and what that adds up to.
  *
- * <p>{@link #postHours()} is the number of Trooper-hours the sheet has to absorb, and
+ * <p>
+ * {@link #postHours()} is the number of Trooper-hours the sheet has to absorb,
+ * and
  * it is the first number worth knowing about any day — 47 on a weekday, 44 on a
  * Friday, 48 on a Saturday, 51 on a Sunday.
  */

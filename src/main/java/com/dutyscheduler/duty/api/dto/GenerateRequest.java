@@ -10,7 +10,7 @@ import java.util.List;
  * Ask for a sheet.
  */
 public record GenerateRequest(
-                @NotNull(message = "A duty date is required.") LocalDate date,
+        @NotNull(message = "A duty date is required.") LocalDate date,
 
-                @NotEmpty(message = "Name at least one Trooper for the night group.") List<String> nightGroup) {
+        @NotEmpty(message = "Name at least one Trooper for the night group.") List<String> nightGroup) {
 }
