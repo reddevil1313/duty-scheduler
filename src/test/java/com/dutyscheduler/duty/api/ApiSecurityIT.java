@@ -14,14 +14,17 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
-import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.List;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -47,7 +50,7 @@ class ApiSecurityIT {
 
     @Container
     @ServiceConnection
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
+    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:16-alpine");
 
     @Autowired
     MockMvc mvc;
@@ -97,6 +100,68 @@ class ApiSecurityIT {
         mvc.perform(post("/api/schedules/generate").with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content(GENERATE_BODY))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("the session endpoint answers an anonymous caller, and hands out a token")
+    void anonymousStillGetsACsrfToken() throws Exception {
+        // The one endpoint that must work signed out. The login POST is itself
+        // CSRF-protected, so a client with no token cannot sign in — and a 401
+        // here would leave it with no way to get one.
+        mvc.perform(get("/api/session"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.authenticated").value(false))
+                .andExpect(jsonPath("$.username").value(nullValue()))
+                .andExpect(jsonPath("$.csrfToken").isNotEmpty());
+    }
+
+    @Test
+    @DisplayName("the session endpoint names the signed-in user and their role")
+    void sessionNamesTheUser() throws Exception {
+        mvc.perform(get("/api/session").with(user("admin").roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.authenticated").value(true))
+                .andExpect(jsonPath("$.username").value("admin"))
+                // ADMIN, not ROLE_ADMIN. The prefix is Spring's business, not the client's.
+                .andExpect(jsonPath("$.role").value("ADMIN"));
+    }
+
+    @Test
+    @DisplayName("a POST to the session endpoint is not permitted by the anonymous rule")
+    void onlyGetIsOpen() throws Exception {
+        // The permitAll rule names GET explicitly. If it were written as a bare
+        // path it would open every method on it, and this test is what would
+        // notice.
+        mvc.perform(post("/api/session").with(csrf())).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(username = "trooper_d", roles = "USER")
+    @DisplayName("a Trooper can read the roster")
+    void trooperCanReadRoster() throws Exception {
+        mvc.perform(get("/api/troopers"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$[0].name").value("TROOPER_A"));
+    }
+
+    @Test
+    @DisplayName("the roster is not public")
+    void rosterNeedsAnAccount() throws Exception {
+        mvc.perform(get("/api/troopers")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("a wrong password is a 401 with a problem body, not a redirect")
+    void badSignInIsUnauthorized() throws Exception {
+        // Left at its default, formLogin answers with a 302 to /login?error.
+        // fetch() follows redirects silently, so the browser would see a 200 and
+        // report a successful sign-in. This is the test that pins the status.
+        mvc.perform(post("/api/session/login").with(csrf())
+                .param("username", "admin")
+                .param("password", "not-the-password"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.title").value("Sign-in failed"));
     }
 
     @Test
