@@ -15,8 +15,16 @@ Both ship together as a single image.
 
 - **Generate a sheet** for any date from the roster, the leave register and the
   night group. The solver balances hours across the team within the rules.
-- **Log the sheet actually used**, including any edits made by hand, and look
-  up past sheets by date.
+- **Edit a sheet by hand**: click an hour to change its post, or swap two
+  Troopers' whole days. Every edit is checked against the rules as you make it,
+  with an hour-by-hour coverage row and a list of what the sheet breaks,
+  including anyone put on duty during their own leave.
+- **Log the sheet actually used**, edits included. A sheet that breaks a rule
+  can still be logged, after a warning, because the log records what was used.
+  Past sheets can be looked up by date.
+- **Records**: per Trooper, hours worked, credited and in total, duties, nights,
+  BUS runs and leave taken, with opening hours from before the tracker; and a
+  line per day logged, where hours can be credited for a day not stood.
 - **Roster** of Troopers, each marked as living in or staying out, with a
   default night group. Troopers can be added, edited and removed. Removing
   someone who stood a logged sheet archives them, so past sheets stay intact.
@@ -124,11 +132,15 @@ that is well formed but cannot be fulfilled returns `422`.
 | `DELETE` | `/troopers/{id}` | `ADMIN` | Remove a Trooper; archived if they stood a logged sheet |
 | `POST` | `/schedules/generate` | `ADMIN` | Generate a sheet; 422 when it cannot be covered |
 | `GET` | `/schedules/{date}` | signed in | The logged sheet; 404 when none |
+| `POST` | `/schedules/{date}/check` | signed in | What a sheet breaks, and each hour's demand; saves nothing |
 | `PUT` | `/schedules/{date}` | `ADMIN` | Log the sheet actually used |
+| `PUT` | `/schedules/{date}/credits` | `ADMIN` | Set a logged day's credited hours |
 | `GET` | `/absences` | signed in | The leave register |
 | `POST` | `/absences` | `ADMIN` | Record leave |
 | `POST` | `/absences/preview` | signed in | The interval and sheets a booking would affect; saves nothing |
 | `DELETE` | `/absences/{id}` | `ADMIN` | Remove leave |
+| `GET` | `/records` | signed in | Totals per Trooper, and the days logged |
+| `PUT` | `/records/opening` | `ADMIN` | Set opening hours |
 
 Write requests must send the CSRF token from `GET /api/session` in an
 `X-XSRF-TOKEN` header. The token changes on sign-in and sign-out.

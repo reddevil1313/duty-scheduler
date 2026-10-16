@@ -25,6 +25,57 @@ export interface Schedule {
   totalHours: number
 }
 
+/** One thing a sheet gets wrong. `rule` is a validator rule name, or ON_LEAVE. */
+export interface SheetIssue {
+  rule: string
+  trooper: string | null
+  /** The first hour it concerns, when it concerns one. */
+  slot: number | null
+  message: string
+}
+
+/** The server's verdict on a sheet, from the same validator that checks the solver. */
+export interface SheetCheck {
+  issues: SheetIssue[]
+  /** Per slot, how many Troopers each post needs. An hour with no posts is `{}`. */
+  demand: Partial<Record<Post, number>>[]
+  /** The sheet as checked, with hours and span worked out again by the server. */
+  sheet: Schedule
+}
+
+export interface TrooperRecord {
+  name: string
+  active: boolean
+  opening: number
+  worked: number
+  credited: number
+  total: number
+  duties: number
+  nights: number
+  bus: number
+  mc: number
+  ol: number
+  al: number
+  ma: number
+}
+
+export interface DayRecord {
+  date: string
+  worked: number
+  credited: number
+  /** Hours credited that day, by Trooper. */
+  credits: Record<string, number>
+  night: string[]
+  bus: string[]
+  /** How many rules the day as logged breaks. Non-zero only for a sheet logged anyway. */
+  issues: number
+}
+
+export interface Records {
+  troopers: TrooperRecord[]
+  days: DayRecord[]
+}
+
 export type AbsenceKind = 'MC' | 'OL' | 'AL' | 'MA'
 export type AbsenceSpan = 'FULL' | 'DAY_HALF' | 'NIGHT_HALF' | 'WINDOW'
 

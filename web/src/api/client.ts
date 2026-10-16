@@ -1,5 +1,6 @@
 import type {
-  Absence, AbsenceReach, AbsenceRequest, ProblemDetail, Schedule, Session, Trooper, TrooperParticulars,
+  Absence, AbsenceReach, AbsenceRequest, ProblemDetail, Records, Schedule, Session, SheetCheck, Trooper,
+  TrooperParticulars,
 } from './types'
 
 /**
@@ -131,6 +132,29 @@ export const api = {
     }),
 
   schedule: (date: string) => request<Schedule>(`/api/schedules/${date}`),
+
+  /** What a sheet breaks, saving nothing. Called after every hand edit. */
+  check: (date: string, schedule: Schedule) =>
+    request<SheetCheck>(`/api/schedules/${date}/check`, {
+      method: 'POST',
+      body: JSON.stringify(schedule),
+    }),
+
+  /** ADMIN only. Replaces the day's credited hours; a name left out or at 0 has none. */
+  credit: (date: string, hours: Record<string, number>) =>
+    request<void>(`/api/schedules/${date}/credits`, {
+      method: 'PUT',
+      body: JSON.stringify(hours),
+    }),
+
+  records: () => request<Records>('/api/records'),
+
+  /** ADMIN only. Names left out keep what they had. */
+  setOpening: (hours: Record<string, number>) =>
+    request<Records>('/api/records/opening', {
+      method: 'PUT',
+      body: JSON.stringify(hours),
+    }),
 
   log: (date: string, schedule: Schedule) =>
     request<Schedule>(`/api/schedules/${date}`, {

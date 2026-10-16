@@ -229,3 +229,66 @@ button.danger { border-color: var(--bad); color: var(--bad); }
 .kind.OL { background: #45391a; color: #e3b341; }
 .kind.AL { background: #1f3350; color: var(--accent); }
 .kind.MA { background: #173d38; color: #56d4c0; }
+
+/* ---- editing the board ---- */
+.sheet-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem; }
+.sheet-bar .status { margin: 0.4rem 0; }
+button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+
+.grid.editing .cell { cursor: pointer; }
+.grid.editing .cell:hover { box-shadow: inset 0 0 0 2px var(--accent); }
+.grid.swapping .name.pickable { cursor: pointer; }
+.grid.swapping .name.pickable:hover, .name.picked { background: #1f3350; color: var(--accent); }
+.name.picked { font-weight: 700; }
+.row.spare .name { color: var(--dim); font-style: italic; }
+
+/* A cell an issue names by Trooper and hour. */
+.cell.flag { box-shadow: inset 0 0 0 2px var(--bad); }
+
+.row.cover { background: var(--panel); }
+.row.cover .name { color: var(--dim); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; }
+.cell.cov { color: var(--dim); font-size: 0.68rem; }
+.cell.cov.full { color: #5fc292; }
+.cell.cov.short { color: #e3b341; background: #3b2f12; font-weight: 600; }
+.cell.cov.over { color: var(--bad); background: #3d201e; font-weight: 600; }
+
+/* Absolute in page coordinates: no ancestor of the menu is positioned, so it
+   is placed against the document and scrolls with the cell it belongs to. */
+.cell-menu {
+  position: absolute;
+  z-index: 20;
+  min-width: 8rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.25rem;
+  box-shadow: 0 8px 22px -12px rgba(0, 0, 0, 0.7);
+}
+.cell-menu button {
+  display: flex; align-items: center; gap: 0.45rem; width: 100%;
+  background: transparent; border-color: transparent; text-align: left; font-size: 0.8rem;
+}
+.cell-menu button:hover { background: #2b3038; }
+.menu-hd { font-size: 0.68rem; color: var(--dim); padding: 0.25rem 0.5rem; text-transform: uppercase; letter-spacing: 0.06em; }
+.menu-none { font-size: 0.75rem; color: var(--dim); padding: 0.25rem 0.5rem; }
+.dot { width: 0.9rem; height: 0.6rem; border-radius: 2px; flex: none; }
+.dot.on.ap { background: #2f4858; }
+.dot.on.gg { background: #3d4a2f; }
+.dot.on.pac { background: #4a3a52; }
+.dot.on.bus { background: #573f2c; }
+.dot.off { border: 1px dashed var(--line); }
+
+.issues { list-style: none; padding: 0; margin: 0.8rem 0 0; display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.82rem; }
+.issues li { display: flex; gap: 0.6rem; align-items: baseline; }
+.issues b { font-size: 0.65rem; letter-spacing: 0.05em; padding: 0.1rem 0.4rem; border-radius: 3px; flex: none; }
+.issues .breaks b { background: #3d201e; color: var(--bad); }
+.issues .leave b { background: #3b2f12; color: #e3b341; }
+
+/* ---- records ---- */
+.records .section-hd { margin-top: 1.2rem; }
+.records .section-hd:first-child { margin-top: 0; }
+.register th.n, .register td.n { text-align: right; font-variant-numeric: tabular-nums; }
+.register td.total { font-weight: 600; }
+.register tr.editing td { padding: 0.5rem 0; }
+.register .tag { margin-left: 0.5rem; }
+input.hours { width: 5rem; }
