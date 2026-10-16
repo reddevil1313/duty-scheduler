@@ -9,6 +9,8 @@ client.
 
 Both ship together as a single image.
 
+![The duty board: a generated Thursday sheet, with the roster above it](docs/screenshot.png)
+
 ## Features
 
 - **Generate a sheet** for any date from the roster, the leave register and the
