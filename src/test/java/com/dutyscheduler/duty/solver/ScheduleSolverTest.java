@@ -36,6 +36,11 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class ScheduleSolverTest {
 
+    // The letters are not in roster order, and that is deliberate. HourTargets
+    // breaks a tie on Trooper::name, so these names decide who gets the spare
+    // hour when nobody has more history than anyone else. They were assigned so
+    // that alphabetical order is exactly what it was before the roster was
+    // anonymised — change a letter and you change a schedule.
     private static final Trooper TROOPER_E = Trooper.of("TROOPER_E");
     private static final Trooper TROOPER_C = Trooper.of("TROOPER_C");
     private static final Trooper TROOPER_J = Trooper.of("TROOPER_J");
@@ -49,7 +54,8 @@ class ScheduleSolverTest {
     private static final Trooper TROOPER_A = Trooper.of("TROOPER_A");
 
     private static final List<Trooper> ROSTER = List.of(
-            TROOPER_E, TROOPER_C, TROOPER_J, TROOPER_B, TROOPER_I, TROOPER_K, TROOPER_H, TROOPER_F, TROOPER_G, TROOPER_D, TROOPER_A);
+            TROOPER_E, TROOPER_C, TROOPER_J, TROOPER_B, TROOPER_I, TROOPER_K,
+            TROOPER_H, TROOPER_F, TROOPER_G, TROOPER_D, TROOPER_A);
     private static final List<Trooper> NIGHT = List.of(TROOPER_E, TROOPER_C, TROOPER_J);
 
     private final ScheduleSolver solver = new ScheduleSolver();
