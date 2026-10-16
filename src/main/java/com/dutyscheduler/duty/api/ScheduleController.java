@@ -89,8 +89,8 @@ public class ScheduleController {
     @PostMapping("/{date}/check")
     public SheetCheck check(@PathVariable LocalDate date, @Valid @RequestBody ScheduleResponse body) {
         Schedule schedule = ScheduleAssembler.toDomain(date, body, troopers);
-        return SheetCheck.of(schedule, validator.validate(schedule),
-                leaveClashes(schedule, store.absencesTouching(schedule.day())));
+        List<Absence> absences = store.absencesTouching(schedule.day());
+        return SheetCheck.of(schedule, validator.validate(schedule), leaveClashes(schedule, absences), absences);
     }
 
     /**

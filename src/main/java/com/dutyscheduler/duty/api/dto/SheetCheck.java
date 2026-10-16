@@ -1,5 +1,6 @@
 package com.dutyscheduler.duty.api.dto;
 
+import com.dutyscheduler.duty.domain.Absence;
 import com.dutyscheduler.duty.domain.DayDemand;
 import com.dutyscheduler.duty.domain.DutyDay;
 import com.dutyscheduler.duty.domain.Post;
@@ -7,7 +8,10 @@ import com.dutyscheduler.duty.domain.Schedule;
 import com.dutyscheduler.duty.rules.ValidationResult;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -22,8 +26,13 @@ import java.util.Map;
  * @param sheet  the sheet as checked, with hours and span worked out again.
  *               Span is rest-aware, which is domain logic the board should
  *               show rather than copy.
+ * @param away   per Trooper on leave during this sheet, 24 entries: the kind
+ *               of leave covering that hour, or null where they are free.
+ *               Troopers with no leave on the sheet are left out. The board
+ *               greys these hours, or the whole row when every hour is away.
  */
-public record SheetCheck(List<Issue> issues, List<Map<Post, Integer>> demand, ScheduleResponse sheet) {
+public record SheetCheck(List<Issue> issues, List<Map<Post, Integer>> demand, ScheduleResponse sheet,
+        Map<String, List<String>> away) {
 
     /**
      * @param rule    a validator {@code Rule} name, or {@code ON_LEAVE}
@@ -35,7 +44,8 @@ public record SheetCheck(List<Issue> issues, List<Map<Post, Integer>> demand, Sc
 
     public static final String ON_LEAVE = "ON_LEAVE";
 
-    public static SheetCheck of(Schedule schedule, ValidationResult result, List<Issue> leaveClashes) {
+    public static SheetCheck of(Schedule schedule, ValidationResult result, List<Issue> leaveClashes,
+            List<Absence> absences) {
         DutyDay day = schedule.day();
         List<Issue> issues = new ArrayList<>();
         result.violations().forEach(v -> issues.add(
@@ -49,6 +59,28 @@ public record SheetCheck(List<Issue> issues, List<Map<Post, Integer>> demand, Sc
             needs.putAll(demand.at(slot));
             bySlot.add(needs);
         }
-        return new SheetCheck(List.copyOf(issues), List.copyOf(bySlot), ScheduleResponse.from(schedule));
+        return new SheetCheck(List.copyOf(issues), List.copyOf(bySlot), ScheduleResponse.from(schedule),
+                away(day, absences));
+    }
+
+    /** Which hours each Trooper is away, and why. Where two bookings overlap, the first listed wins. */
+    static Map<String, List<String>> away(DutyDay day, List<Absence> absences) {
+        Map<String, String[]> byName = new LinkedHashMap<>();
+        for (Absence absence : absences) {
+            for (int slot = 0; slot < DutyDay.SLOT_COUNT; slot++) {
+                if (!absence.covers(day.slot(slot))) {
+                    continue;
+                }
+                String[] hours = byName.computeIfAbsent(absence.trooper().name(),
+                        n -> new String[DutyDay.SLOT_COUNT]);
+                if (hours[slot] == null) {
+                    hours[slot] = absence.kind().name();
+                }
+            }
+        }
+        Map<String, List<String>> out = new LinkedHashMap<>();
+        // Arrays.asList, not List.of: List.of refuses the nulls that mean "free".
+        byName.forEach((name, hours) -> out.put(name, Collections.unmodifiableList(Arrays.asList(hours))));
+        return Collections.unmodifiableMap(out);
     }
 }

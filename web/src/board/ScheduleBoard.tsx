@@ -38,6 +38,9 @@ export function ScheduleBoard({ date, onDateChange }: Props) {
 
   const edited = schedule !== original
   const current = check && check.of === schedule ? check.result : null
+  // The most recent check for this date, even if of an earlier edit: what the
+  // grid shows while a newer one is on its way, so nothing blanks and reflows.
+  const latest = check && schedule && check.of.date === schedule.date ? check.result : null
 
   /** A fresh sheet on the board: nothing edited, nothing picked. */
   const show = (sheet: Schedule | null, from: Source | null) => {
@@ -198,7 +201,9 @@ export function ScheduleBoard({ date, onDateChange }: Props) {
       .map((t) => ({ name: t.name, stayOut: t.stayOut }))
     : []
 
-  const issues = current?.issues ?? []
+  // From the latest check, dimmed while a newer one is on its way, so the list
+  // does not vanish and reappear around every edit.
+  const issues = latest?.issues ?? []
   const canLog = !!schedule && (source === 'generated' || edited)
   const logLabel = !canLog ? 'Logged'
     : issues.length > 0 ? `Log anyway (${issues.length} issue${issues.length === 1 ? '' : 's'})`
@@ -235,7 +240,7 @@ export function ScheduleBoard({ date, onDateChange }: Props) {
             </button>
             <button
               type="button"
-              className={issues.length > 0 && canLog ? 'danger' : undefined}
+              className={`log${issues.length > 0 && canLog ? ' danger' : ''}`}
               onClick={log}
               // Not while a check is on its way: logging a sheet nobody has
               // looked at yet would skip the warning this button exists to give.
@@ -257,8 +262,11 @@ export function ScheduleBoard({ date, onDateChange }: Props) {
         />
       )}
 
-      {error && <p className="error" role="alert">{error}</p>}
-      {note && !error && <p className="note">{note}</p>}
+      {/* Always rendered, one line tall, so a message arriving or clearing
+          never moves the board below it. */}
+      <p className={`message${error ? ' error' : ' note'}`} role={error ? 'alert' : 'status'}>
+        {error ?? note ?? ''}
+      </p>
 
       {schedule && (
         <>
@@ -271,22 +279,38 @@ export function ScheduleBoard({ date, onDateChange }: Props) {
             </p>
             {isAdmin && (
               <div className="actions">
-                <button type="button" aria-pressed={mode === 'edit'} onClick={() => toggleMode('edit')}>
+                {/* Fixed widths, and Undo kept in place but hidden, so the
+                    buttons do not slide about as their labels change. */}
+                <button type="button" className="mode" aria-pressed={mode === 'edit'} onClick={() => toggleMode('edit')}>
                   {mode === 'edit' ? 'Done editing' : 'Edit'}
                 </button>
-                <button type="button" aria-pressed={mode === 'swap'} onClick={() => toggleMode('swap')}>
+                <button type="button" className="mode wide" aria-pressed={mode === 'swap'} onClick={() => toggleMode('swap')}>
                   {mode !== 'swap' ? 'Swap two Troopers' : swapPick ? 'Pick the second' : 'Pick the first'}
                 </button>
-                {edited && <button type="button" onClick={undo}>Undo my edits</button>}
+                <button
+                  type="button"
+                  className={edited ? undefined : 'placeholder'}
+                  onClick={undo}
+                  disabled={!edited}
+                  aria-hidden={!edited}
+                  tabIndex={edited ? undefined : -1}
+                >
+                  Undo my edits
+                </button>
               </div>
             )}
           </div>
-          {mode === 'edit' && <p className="note">Click any hour to change its post.</p>}
-          {mode === 'swap' && <p className="note">Click two names to trade their whole day.</p>}
+          {/* The hint line is always there, empty outside the modes, so
+              entering one does not push the grid down a line. */}
+          <p className="hint note">
+            {mode === 'edit' ? 'Click any hour to change its post.'
+              : mode === 'swap' ? 'Click two names to trade their whole day.' : ''}
+          </p>
 
           <SheetGrid
             sheet={schedule}
-            check={current}
+            check={latest}
+            fresh={current !== null}
             mode={mode}
             spare={spare}
             swapPick={swapPick}
@@ -295,7 +319,7 @@ export function ScheduleBoard({ date, onDateChange }: Props) {
           />
 
           {issues.length > 0 && (
-            <ul className="issues" aria-label="What this sheet breaks">
+            <ul className={`issues${current ? '' : ' stale'}`} aria-label="What this sheet breaks">
               {issues.map((issue, i) => (
                 // Issues have no id, and the list is rebuilt whole on every
                 // check, so position is a stable enough key here.

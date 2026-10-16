@@ -41,6 +41,11 @@ export interface SheetCheck {
   demand: Partial<Record<Post, number>>[]
   /** The sheet as checked, with hours and span worked out again by the server. */
   sheet: Schedule
+  /**
+   * Per Trooper with leave on this sheet, 24 entries: the kind of leave
+   * covering that hour, or null where they are free.
+   */
+  away: Record<string, (AbsenceKind | null)[]>
 }
 
 export interface TrooperRecord {

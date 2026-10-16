@@ -1,7 +1,7 @@
 import { useEffect, useState, type MouseEvent } from 'react'
 import type { Post, Schedule, ScheduleRow, SheetCheck } from '../api/types'
 import { coverage } from './edit'
-import { SLOT_COUNT, isCrossover, isSilent, labelAt } from './slots'
+import { SLOT_COUNT, isCrossover, labelAt } from './slots'
 
 export type Mode = 'view' | 'edit' | 'swap'
 
@@ -13,8 +13,14 @@ export interface SpareTrooper {
 
 interface Props {
   sheet: Schedule
-  /** The latest check of exactly this sheet, or null while one is on its way. */
+  /**
+   * The latest check for this date, possibly of an earlier edit. Its numbers
+   * are shown while a newer check is on its way, so nothing blanks and reflows
+   * on every edit; only what points at particular hours waits for `fresh`.
+   */
   check: SheetCheck | null
+  /** Whether `check` was made of exactly this sheet. */
+  fresh: boolean
   mode: Mode
   spare: SpareTrooper[]
   /** The first Trooper picked for a swap, waiting for the second. */
@@ -40,7 +46,7 @@ const MENU_ROW = 32
 const MENU_PAD = 12
 const MENU_WIDTH = 160
 
-export function SheetGrid({ sheet, check, mode, spare, swapPick, onSetCell, onPickRow }: Props) {
+export function SheetGrid({ sheet, check, fresh, mode, spare, swapPick, onSetCell, onPickRow }: Props) {
   const [menu, setMenu] = useState<Menu | null>(null)
 
   // A click elsewhere, Escape, or a resize closes the menu. A scroll does not:
@@ -71,14 +77,15 @@ export function SheetGrid({ sheet, check, mode, spare, swapPick, onSetCell, onPi
       }))]
     : sheet.rows
 
-  // Hours and span as the server worked them out for this sheet; until it
-  // answers, the local count of hours, and no span.
+  // Hours as counted here, span as the server last worked it out — dimmed
+  // while a newer answer is on its way, but never blanked.
   const checked = new Map((check?.sheet.rows ?? []).map((r) => [r.trooper, r]))
   const cover = check ? coverage(sheet, check.demand) : null
 
   // Cells a rule names by Trooper and hour get outlined, so the eye goes
-  // straight to the hour a message is about.
-  const flagged = new Set((check?.issues ?? [])
+  // straight to the hour a message is about. Only from a fresh check: an old
+  // one may point at an hour that has since been changed.
+  const flagged = new Set((fresh ? check?.issues ?? [] : [])
     .filter((i) => i.trooper !== null && i.slot !== null)
     .map((i) => `${i.trooper}@${i.slot}`))
 
@@ -118,11 +125,7 @@ export function SheetGrid({ sheet, check, mode, spare, swapPick, onSetCell, onPi
         <div className="row head" role="row">
           <div className="name" role="columnheader">Trooper</div>
           {Array.from({ length: SLOT_COUNT }, (_, slot) => (
-            <div
-              key={slot}
-              role="columnheader"
-              className={isSilent(slot) ? 'hour silent' : isCrossover(slot) ? 'hour cross' : 'hour'}
-            >
+            <div key={slot} role="columnheader" className={isCrossover(slot) ? 'hour cross' : 'hour'}>
               {labelAt(slot).slice(0, 2)}
             </div>
           ))}
@@ -133,19 +136,34 @@ export function SheetGrid({ sheet, check, mode, spare, swapPick, onSetCell, onPi
         {rows.map((row) => {
           const server = checked.get(row.trooper)
           const isSpare = !sheet.rows.some((r) => r.trooper === row.trooper)
-          const nameClass = `name${mode === 'swap' && !isSpare ? ' pickable' : ''}` +
+          const away = check?.away[row.trooper]
+          // Away every hour: the row is one greyed band saying why, rather than
+          // twenty-four empty cells that look like a Trooper nobody posted.
+          // While editing it shows its cells, greyed, so it can still be posted
+          // — which the check will then flag.
+          const outAllSheet = !!away && away.every((k) => k !== null)
+          const asBand = outAllSheet && mode !== 'edit'
+          const nameClass = `name${mode === 'swap' && !isSpare && !asBand ? ' pickable' : ''}` +
             `${swapPick === row.trooper ? ' picked' : ''}`
           return (
-            <div className={`row${isSpare ? ' spare' : ''}`} role="row" key={row.trooper}>
+            <div
+              className={`row${isSpare ? ' spare' : ''}${outAllSheet ? ' out' : ''}`}
+              role="row"
+              key={row.trooper}
+            >
               <div
                 className={nameClass}
                 role="rowheader"
-                onClick={mode === 'swap' && !isSpare ? () => onPickRow(row.trooper) : undefined}
+                onClick={mode === 'swap' && !isSpare && !asBand ? () => onPickRow(row.trooper) : undefined}
               >
                 {row.trooper}
                 {row.stayOut && <span className="tag">SO</span>}
               </div>
-              {row.posts.map((post, slot) => (
+              {asBand ? (
+                <div className="band" role="cell">
+                  <span className="why">{away[0]}</span>
+                </div>
+              ) : row.posts.map((post, slot) => (
                 <div
                   // The index is the slot, and a slot is a fixed position on
                   // the board — it is not a list that reorders, so it is a
@@ -154,17 +172,20 @@ export function SheetGrid({ sheet, check, mode, spare, swapPick, onSetCell, onPi
                   role="cell"
                   className={
                     `cell${post ? ` on ${post.toLowerCase()}` : ''}` +
-                    `${isSilent(slot) ? ' silent' : ''}` +
+                    `${away?.[slot] ? ' away' : ''}` +
                     `${flagged.has(`${row.trooper}@${slot}`) ? ' flag' : ''}`
                   }
-                  title={`${labelAt(slot)} — ${post ?? 'off'}`}
+                  title={`${labelAt(slot)} — ${post ?? 'off'}${away?.[slot] ? ` · ${away[slot]}` : ''}`}
                   onClick={(e) => clickCell(e, row, slot)}
                 >
                   {post ?? ''}
                 </div>
               ))}
-              <div className="tally" role="cell">{server?.hours ?? row.hours}</div>
-              <div className="tally" role="cell">{server ? server.span : '…'}</div>
+              {/* Hours are counted here, so they are always current. Span is
+                  the server's, kept and dimmed while a newer check is on its
+                  way rather than blanked. */}
+              <div className="tally" role="cell">{row.hours}</div>
+              <div className={`tally${fresh ? '' : ' stale'}`} role="cell">{server?.span ?? ''}</div>
             </div>
           )
         })}

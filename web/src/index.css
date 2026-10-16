@@ -5,7 +5,13 @@
   --panel: #1f2227;
   --line: #34383f;
   --accent: #7cb5ff;
-  --silent: #232a36;
+  /* Each post a tinted ground and a text colour of its own, all above 6:1, so
+     posts read apart at a glance instead of four dark fills with grey text. */
+  --ap-bg: #22355c;  --ap: #a9c1ff;
+  --gg-bg: #1d3d37;  --gg: #72d6c3;
+  --pac-bg: #45301b; --pac: #f2b878;
+  --bus-bg: #4a2531; --bus: #f39fb0;
+  --away: #2a2e35;
   --bad: #ff7b72;
 
   color-scheme: dark;
@@ -186,15 +192,35 @@ button.danger { border-color: var(--bad); color: var(--bad); }
 .name .tag { font-size: 0.6rem; padding: 0 0.25rem; margin-left: 0.3rem; }
 .tally { color: var(--dim); border-left: 1px solid var(--line); }
 
-.hour.silent, .cell.silent { background: var(--silent); }
 .hour.cross { color: var(--accent); }
 
 .cell { color: transparent; }
 .cell.on { color: var(--ink); font-weight: 600; }
-.cell.on.ap { background: #2f4858; }
-.cell.on.gg { background: #3d4a2f; }
-.cell.on.pac { background: #4a3a52; }
-.cell.on.bus { background: #573f2c; }
+.cell.on.ap { background: var(--ap-bg); color: var(--ap); }
+.cell.on.gg { background: var(--gg-bg); color: var(--gg); }
+.cell.on.pac { background: var(--pac-bg); color: var(--pac); }
+.cell.on.bus { background: var(--bus-bg); color: var(--bus); }
+
+/* Hours a Trooper is on leave: hatched, so they read as unavailable rather
+   than as hours nobody posted. */
+.cell.away {
+  background: repeating-linear-gradient(135deg, transparent 0 3px, var(--away) 3px 5px);
+}
+.cell.away.on { outline: 1px dashed var(--bad); outline-offset: -2px; }
+
+/* Away all sheet: the whole row greys, with one label saying why. */
+.row.out .name { color: var(--dim); }
+.row.out .tally { color: #5f656d; }
+.band {
+  grid-column: 2 / span 24;
+  display: flex; align-items: center; justify-content: center;
+  background: repeating-linear-gradient(135deg, transparent 0 3px, var(--away) 3px 5px);
+}
+.band .why {
+  font-size: 0.68rem; font-weight: 600; letter-spacing: 0.08em;
+  color: var(--dim); background: var(--panel); border: 1px solid var(--line);
+  border-radius: 3px; padding: 0 0.6rem;
+}
 
 /* ---- views ---- */
 .views { display: flex; gap: 0.35rem; margin-right: auto; margin-left: 1.5rem; }
@@ -232,7 +258,20 @@ button.danger { border-color: var(--bad); color: var(--bad); }
 
 /* ---- editing the board ---- */
 .sheet-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem; }
-.sheet-bar .status { margin: 0.4rem 0; }
+.sheet-bar .status {
+  margin: 0.4rem 0; flex: 1 1 auto; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* Lines and buttons that come and go keep their space, so nothing below them
+   moves. Measured: before this, entering edit mode pushed the grid down 41px,
+   and a swap pushed the toolbar and grid down 27px. */
+.message, .hint { min-height: 1.35rem; margin: 0.35rem 0; line-height: 1.35rem; }
+button.mode { min-width: 8.5rem; }
+button.mode.wide { min-width: 11rem; }
+button.log { min-width: 12.5rem; }
+button.placeholder { visibility: hidden; }
+.stale { opacity: 0.55; }
 button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
 
 .grid.editing .cell { cursor: pointer; }
@@ -272,10 +311,10 @@ button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent);
 .menu-hd { font-size: 0.68rem; color: var(--dim); padding: 0.25rem 0.5rem; text-transform: uppercase; letter-spacing: 0.06em; }
 .menu-none { font-size: 0.75rem; color: var(--dim); padding: 0.25rem 0.5rem; }
 .dot { width: 0.9rem; height: 0.6rem; border-radius: 2px; flex: none; }
-.dot.on.ap { background: #2f4858; }
-.dot.on.gg { background: #3d4a2f; }
-.dot.on.pac { background: #4a3a52; }
-.dot.on.bus { background: #573f2c; }
+.dot.on.ap { background: var(--ap-bg); box-shadow: inset 0 0 0 1px var(--ap); }
+.dot.on.gg { background: var(--gg-bg); box-shadow: inset 0 0 0 1px var(--gg); }
+.dot.on.pac { background: var(--pac-bg); box-shadow: inset 0 0 0 1px var(--pac); }
+.dot.on.bus { background: var(--bus-bg); box-shadow: inset 0 0 0 1px var(--bus); }
 .dot.off { border: 1px dashed var(--line); }
 
 .issues { list-style: none; padding: 0; margin: 0.8rem 0 0; display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.82rem; }
@@ -292,3 +331,12 @@ button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent);
 .register tr.editing td { padding: 0.5rem 0; }
 .register .tag { margin-left: 0.5rem; }
 input.hours { width: 5rem; }
+
+/* ---- type, spacing and contrast pass ---- */
+.grid .name, .grid .cell, .grid .hour, .grid .tally { padding-top: 0.34rem; padding-bottom: 0.34rem; }
+/* A faint rule between hours: the eye can follow a column down twenty rows. */
+.grid .row > .cell + .cell { box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.035); }
+.grid .row > .cell.flag { box-shadow: inset 0 0 0 2px var(--bad); }
+.row.head .hour { color: #b4b9bf; font-weight: 500; }
+.controls { row-gap: 0.8rem; }
+.section-hd h2, .roster h2 { letter-spacing: 0.02em; }

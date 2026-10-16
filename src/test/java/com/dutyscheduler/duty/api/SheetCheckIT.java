@@ -162,6 +162,40 @@ class SheetCheckIT {
     }
 
     @Test
+    @DisplayName("the check says which hours each Trooper is away: every hour for an MC, three for a 0930-1130 appointment")
+    @SuppressWarnings("unchecked")
+    void awayHours() throws Exception {
+        mvc.perform(post("/api/absences").with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"trooper":"TROOPER_D","kind":"MC","span":"FULL","from":"2026-09-10","to":"2026-09-11"}
+                        """))
+                .andExpect(status().isCreated());
+        // 0930 to 1130 on the 11th: the 0900, 1000 and 1100 hours of the 10th's sheet.
+        mvc.perform(post("/api/absences").with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"trooper":"TROOPER_E","kind":"MA","span":"WINDOW","from":"2026-09-11","start":"09:30","end":"11:30"}
+                        """))
+                .andExpect(status().isCreated());
+
+        String body = mvc.perform(post("/api/schedules/" + DATE + "/check").with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(generate())))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        Map<String, List<String>> away = (Map<String, List<String>>) json.readValue(body, Map.class).get("away");
+
+        assertThat(away.get("TROOPER_D")).hasSize(24).containsOnly("MC");
+        List<String> e = away.get("TROOPER_E");
+        assertThat(e).hasSize(24);
+        for (int slot = 0; slot < 24; slot++) {
+            // Slot 13 is 0900, so 13 to 15 are the three hours the appointment touches.
+            assertThat(e.get(slot)).isEqualTo(slot >= 13 && slot <= 15 ? "MA" : null);
+        }
+        assertThat(away).doesNotContainKey("TROOPER_A");
+    }
+
+    @Test
     @DisplayName("a sheet that breaks a rule can still be logged: the log records what was used")
     void ruleBreakingSheetStillLogs() throws Exception {
         Map<String, Object> sheet = generate();

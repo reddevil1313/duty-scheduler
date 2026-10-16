@@ -20,17 +20,6 @@ export function labelAt(slot: number): string {
   return `${String(hourAt(slot)).padStart(2, '0')}00`
 }
 
-/**
- * Silent hours: 2200 to 0559, which is slots 2 through 9.
- *
- * <p>Fixed slots, not a time comparison, and that is the point of deriving it
- * from the slot index — the sheet always starts at 2000, so the silent block is
- * always in the same place on the board however the dates fall.
- */
-export function isSilent(slot: number): boolean {
-  return slot >= 2 && slot <= 9
-}
-
 /** The 0600-0800 block a night Trooper may be extended into. */
 export function isCrossover(slot: number): boolean {
   return slot >= 10 && slot <= 12
