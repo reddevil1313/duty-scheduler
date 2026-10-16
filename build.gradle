@@ -39,6 +39,13 @@ dependencies {
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
+// bootRun is only ever local, so it seeds the dev accounts by default. An
+// explicit SPRING_PROFILES_ACTIVE still wins: a system property would otherwise
+// override it silently.
+tasks.named('bootRun') {
+    systemProperty 'spring.profiles.active', System.getenv('SPRING_PROFILES_ACTIVE') ?: 'dev'
+}
+
 tasks.named('test') {
     useJUnitPlatform()
     testLogging {
