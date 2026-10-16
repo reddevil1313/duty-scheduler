@@ -3,6 +3,7 @@ import { ApiError, api } from '../api/client'
 import type { Post, Schedule, SheetCheck } from '../api/types'
 import { useReport } from '../api/useReport'
 import { useSession } from '../auth/session-context'
+import { shortDate } from '../dates'
 import type { RosterState } from '../roster/useRoster'
 import { mpShortfall, setCell, swapRows } from './edit'
 import { SheetGrid, type Mode } from './SheetGrid'
@@ -41,8 +42,9 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
   const [bus, setBus] = useState<string | null>(null)
   const busPick = bus !== null && roster.some((t) => t.name === bus) && !(bus in ticks) ? bus : null
   // The turnout to generate with (null for the free split), and the one the
-  // sheet on the board was generated with. Only a generated sheet has the
-  // second: MP hours are not stored, so a logged sheet has gaps, not MP hours.
+  // sheet on the board was made with — generated now, or logged with it. The
+  // MP hours themselves are never stored; the turnout is, and it is what tells
+  // an MP hour from a gap.
   const [turnout, setTurnout] = useState<number | null>(null)
   const [sheetTurnout, setSheetTurnout] = useState<number | null>(null)
   const report = useReport(setError)
@@ -72,7 +74,7 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
     api.schedule(date)
       .then((found) => {
         if (cancelled) return
-        show(found, 'logged')
+        show(found, 'logged', found.turnout ?? null)
         setError(null)
         setNote(null)
       })
@@ -117,12 +119,16 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
     try {
       // Someone ticked out stays out of the night group sent; the server drops
       // them too, but sending it right keeps the request saying what it means.
-      show(await api.generate(date, {
+      const sheet = await api.generate(date, {
         nightGroup: nightGroup.filter((n) => !(n in ticks)),
         ticks,
         bus: busPick,
         turnout,
-      }), 'generated', turnout)
+      })
+      show(sheet, 'generated', turnout)
+      if (sheet.reusedFrom) {
+        setNote(`Reused the sheet logged for ${shortDate(sheet.reusedFrom)}: the same posts, headcount and turnout.`)
+      }
     } catch (e) {
       await report(e)
     } finally {
@@ -136,10 +142,11 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
     setError(null)
     try {
       const count = issues.length
-      const hadMp = sheetTurnout !== null && mpHours > 0
-      show(await api.log(date, schedule), 'logged')
-      setNote((count > 0 ? `Logged, with ${count} issue${count === 1 ? '' : 's'} on record.` : 'Logged.')
-        + (hadMp ? ' The MP team\u2019s hours are not stored, so the logged sheet shows them as gaps.' : ''))
+      // The turnout goes with the sheet, so the logged sheet keeps its MP row
+      // and can be reused for another day made the same way.
+      const saved = await api.log(date, { ...schedule, turnout: sheetTurnout })
+      show(saved, 'logged', saved.turnout ?? null)
+      setNote(count > 0 ? `Logged, with ${count} issue${count === 1 ? '' : 's'} on record.` : 'Logged.')
     } catch (e) {
       await report(e)
     } finally {
@@ -226,7 +233,7 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
         )}
 
         {isAdmin && (
-          <fieldset className="night bus">
+          <fieldset className="bus">
             <legend>BUS 0700–1000</legend>
             <label className="pill">
               <input type="radio" name="bus" checked={busPick === null} onChange={() => setBus(null)} />
@@ -308,7 +315,7 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
             <p className="status">
               {source === 'generated'
                 ? `Generated${sheetTurnout ? ` at ${sheetTurnout}h each` : ''}, not yet logged.`
-                : 'The logged sheet for this date.'}
+                : `The logged sheet for this date${sheetTurnout ? `, at ${sheetTurnout}h each` : ''}.`}
               {mpHours > 0 && ` ${mpHours} post-hour${mpHours === 1 ? '' : 's'} to the MP team.`}
               {edited && ' Edited by hand.'}
               {' '}

@@ -7,11 +7,14 @@ import com.dutyscheduler.duty.api.dto.SheetCheck;
 import com.dutyscheduler.duty.domain.Absence;
 import com.dutyscheduler.duty.domain.AbsenceKind;
 import com.dutyscheduler.duty.domain.DutyDay;
+import com.dutyscheduler.duty.domain.Post;
+import com.dutyscheduler.duty.domain.DayDemand;
 import com.dutyscheduler.duty.domain.Schedule;
 import com.dutyscheduler.duty.domain.Trooper;
 import com.dutyscheduler.duty.persistence.DutySheetStore;
 import com.dutyscheduler.duty.persistence.TrooperEntity;
 import com.dutyscheduler.duty.persistence.TrooperRepository;
+import com.dutyscheduler.duty.rules.Availability;
 import com.dutyscheduler.duty.rules.ScheduleValidator;
 import com.dutyscheduler.duty.solver.ScheduleSolver;
 import com.dutyscheduler.duty.solver.SolveRequest;
@@ -27,6 +30,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Generating, reading and logging duty sheets.
@@ -77,18 +81,50 @@ public class ScheduleController {
         // the reason, before any search — and leaves as a 422 like any sheet
         // that cannot be covered.
         SolveResult result = solver.solve(
-                new SolveRequest(day, roster, night, absences, store.history(day.date()), bus, request.turnout()));
+                new SolveRequest(day, roster, night, absences, store.history(day.date()), bus, request.turnout(),
+                        reusable(day, roster, absences, request.turnout())));
 
         if (!result.isSolved()) {
             throw new UnsolvableException(result.reason());
         }
-        return ResponseEntity.ok(ScheduleResponse.from(result.schedule()));
+        return ResponseEntity.ok(ScheduleResponse.from(result.schedule(), request.turnout(), result.reusedFrom()));
+    }
+
+    /**
+     * Logged sheets the solver may reuse for this one, latest first: the same
+     * posts at the same hours (so any Monday-to-Thursday sheet matches any
+     * other), the same headcount, and the same turnout. Not this date's own
+     * sheet — regenerating a day is asking for something new.
+     *
+     * <p>
+     * Headcount is who can work at all: a roster Trooper with any hour free of
+     * leave and ticks, against those who stood any hour on the logged sheet.
+     */
+    private List<Schedule> reusable(DutyDay day, List<Trooper> roster, List<Absence> absences, Integer turnout) {
+        long headcount = roster.stream()
+                .filter(t -> {
+                    for (boolean free : Availability.mask(t, day, absences)) {
+                        if (free) {
+                            return true;
+                        }
+                    }
+                    return false;
+                })
+                .count();
+        List<Map<Post, Integer>> posts = DayDemand.of(day).byHour();
+        return store.loadAllLogged().stream()
+                .filter(l -> !l.schedule().day().equals(day))
+                .filter(l -> Objects.equals(l.turnout(), turnout))
+                .filter(l -> l.schedule().rows().stream().filter(r -> r.hours() > 0).count() == headcount)
+                .filter(l -> DayDemand.of(l.schedule().day()).byHour().equals(posts))
+                .map(DutySheetStore.Logged::schedule)
+                .toList();
     }
 
     @GetMapping("/{date}")
     public ResponseEntity<ScheduleResponse> read(@PathVariable LocalDate date) {
-        return store.load(date)
-                .map(ScheduleResponse::from)
+        return store.loadLogged(date)
+                .map(l -> ScheduleResponse.from(l.schedule(), l.turnout(), null))
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
     }
@@ -205,8 +241,12 @@ public class ScheduleController {
             @Valid @RequestBody ScheduleResponse body,
             Principal principal) {
         Schedule schedule = ScheduleAssembler.toDomain(date, body, troopers);
-        store.save(schedule, principal.getName());
-        return ResponseEntity.ok(ScheduleResponse.from(schedule));
+        Integer turnout = body.turnout();
+        if (turnout != null && (turnout < SolveRequest.MIN_TURNOUT || turnout > SolveRequest.MAX_TURNOUT)) {
+            throw new IllegalArgumentException("A fixed turnout is 5 to 7 hours, not " + turnout + ".");
+        }
+        store.save(schedule, principal.getName(), turnout);
+        return ResponseEntity.ok(ScheduleResponse.from(schedule, turnout, null));
     }
 
     /**

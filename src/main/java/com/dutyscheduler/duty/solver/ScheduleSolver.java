@@ -73,6 +73,16 @@ public final class ScheduleSolver {
         if (busProblem != null) {
             return SolveResult.failed(busProblem, null, 0);
         }
+        // A day worked before, with the same posts, headcount and turnout, is
+        // worked the same way again: the latest logged sheet that can be laid
+        // onto today's Troopers is used as it is. Only when none can is the
+        // sheet solved.
+        for (Schedule logged : request.reusable()) {
+            var laid = SheetReuse.layOnto(request, logged);
+            if (laid.isPresent()) {
+                return SolveResult.reused(laid.get(), logged.day().date());
+            }
+        }
         if (request.turnout() != null) {
             return solveFixed(request);
         }

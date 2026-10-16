@@ -27,6 +27,9 @@ public class DutySheetEntity {
     @Column(name = "created_by")
     private String createdBy;
 
+    /** The fixed turnout it was made with, or null for the free split. */
+    private Integer turnout;
+
     /**
      * Assignments are owned by the sheet: replacing a day's schedule replaces its
      * rows, and deleting the sheet deletes them.
@@ -81,6 +84,14 @@ public class DutySheetEntity {
 
     public void setNote(String note) {
         this.note = note;
+    }
+
+    public Integer getTurnout() {
+        return turnout;
+    }
+
+    public void setTurnout(Integer turnout) {
+        this.turnout = turnout;
     }
 
     public void setCreatedBy(String createdBy) {

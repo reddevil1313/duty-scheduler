@@ -42,11 +42,22 @@ public class DutySheetStore {
         this.credits = credits;
     }
 
+    /** A logged sheet and the turnout it was made with: null for the free split. */
+    public record Logged(Schedule schedule, Integer turnout) {
+    }
+
     /**
-     * Writes a sheet, replacing whatever was there for that date.
+     * Writes a sheet, replacing whatever was there for that date. As the free
+     * split; see {@link #save(Schedule, String, Integer)} for a fixed turnout.
      */
     @Transactional
     public DutySheetEntity save(Schedule schedule, String createdBy) {
+        return save(schedule, createdBy, null);
+    }
+
+    /** Writes a sheet with the turnout it was made with, replacing whatever was there for that date. */
+    @Transactional
+    public DutySheetEntity save(Schedule schedule, String createdBy, Integer turnout) {
         LocalDate date = schedule.day().date();
         DutySheetEntity sheet = sheets.findByDutyDate(date).orElse(null);
 
@@ -60,6 +71,7 @@ public class DutySheetStore {
             sheets.saveAndFlush(sheet);
         }
         sheet.setCreatedBy(createdBy);
+        sheet.setTurnout(turnout);
 
         Map<String, TrooperEntity> byName = new HashMap<>();
         for (TrooperEntity trooper : troopers.findAll()) {
@@ -90,14 +102,23 @@ public class DutySheetStore {
      */
     @Transactional(readOnly = true)
     public Optional<Schedule> load(LocalDate date) {
-        return sheets.findByDutyDate(date).map(DutySheetStore::toDomain);
+        return loadLogged(date).map(Logged::schedule);
     }
 
-    /** Every logged sheet, latest first. What the records are built from. */
+    /** A logged sheet with its turnout, or nothing if that day was never logged. */
     @Transactional(readOnly = true)
-    public List<Schedule> loadAll() {
-        return sheets.findAllWithAssignments().stream().map(DutySheetStore::toDomain).toList();
+    public Optional<Logged> loadLogged(LocalDate date) {
+        return sheets.findByDutyDate(date).map(sheet -> new Logged(toDomain(sheet), sheet.getTurnout()));
     }
+
+    /** Every logged sheet with its turnout, latest first. */
+    @Transactional(readOnly = true)
+    public List<Logged> loadAllLogged() {
+        return sheets.findAllWithAssignments().stream()
+                .map(sheet -> new Logged(toDomain(sheet), sheet.getTurnout()))
+                .toList();
+    }
+
 
     private static Schedule toDomain(DutySheetEntity sheet) {
         Map<Trooper, Post[]> grid = new LinkedHashMap<>();

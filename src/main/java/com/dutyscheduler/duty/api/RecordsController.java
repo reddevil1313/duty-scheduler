@@ -37,7 +37,7 @@ public class RecordsController {
 
     @GetMapping
     public RecordsResponse records() {
-        return RecordsAssembler.assemble(troopers.findAllByOrderByIdAsc(), store.loadAll(), store.credits(),
+        return RecordsAssembler.assemble(troopers.findAllByOrderByIdAsc(), store.loadAllLogged(), store.credits(),
                 store.allAbsences(), validator);
     }
 

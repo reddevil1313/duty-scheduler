@@ -23,6 +23,10 @@ export interface Schedule {
   date: string
   rows: ScheduleRow[]
   totalHours: number
+  /** The fixed turnout it was made with; null or absent for the free split. Logged with the sheet. */
+  turnout?: number | null
+  /** On a generated sheet, the logged sheet it reuses; null when it was solved. */
+  reusedFrom?: string | null
 }
 
 /** One thing a sheet gets wrong. `rule` is a validator rule name, or ON_LEAVE. */

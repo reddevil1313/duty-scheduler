@@ -7,8 +7,12 @@ import com.dutyscheduler.duty.domain.Absence;
 import com.dutyscheduler.duty.domain.DutyDay;
 import com.dutyscheduler.duty.domain.Post;
 import com.dutyscheduler.duty.domain.Schedule;
+import com.dutyscheduler.duty.persistence.DutySheetStore;
 import com.dutyscheduler.duty.persistence.TrooperEntity;
+import com.dutyscheduler.duty.rules.Availability;
+import com.dutyscheduler.duty.rules.Rule;
 import com.dutyscheduler.duty.rules.ScheduleValidator;
+import com.dutyscheduler.duty.rules.Violation;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -34,10 +38,10 @@ final class RecordsAssembler {
 
     /**
      * @param troopers every Trooper, archived included, in roster order
-     * @param sheets   every logged sheet, latest first
+     * @param sheets   every logged sheet with its turnout, latest first
      * @param credits  credited hours by date, then name
      */
-    static RecordsResponse assemble(List<TrooperEntity> troopers, List<Schedule> sheets,
+    static RecordsResponse assemble(List<TrooperEntity> troopers, List<DutySheetStore.Logged> logged,
             Map<LocalDate, Map<String, Integer>> credits, List<Absence> leave, ScheduleValidator validator) {
 
         Map<String, Tally> byName = new LinkedHashMap<>();
@@ -46,7 +50,8 @@ final class RecordsAssembler {
         troopers.stream().filter(t -> !t.isActive()).forEach(t -> byName.put(t.getName(), new Tally(t)));
 
         List<DayRecord> days = new ArrayList<>();
-        for (Schedule sheet : sheets) {
+        for (DutySheetStore.Logged entry : logged) {
+            Schedule sheet = entry.schedule();
             Map<String, Integer> credited = credits.getOrDefault(sheet.day().date(), Map.of());
             List<String> night = new ArrayList<>();
             List<String> bus = new ArrayList<>();
@@ -78,7 +83,7 @@ final class RecordsAssembler {
             int creditedTotal = credited.values().stream().mapToInt(Integer::intValue).sum();
             days.add(new DayRecord(sheet.day().date(), worked, creditedTotal, Map.copyOf(credited),
                     List.copyOf(night), List.copyOf(bus),
-                    validator.validate(sheet).violations().size()));
+                    issues(sheet, entry.turnout(), validator)));
         }
 
         for (Absence absence : leave) {
@@ -103,6 +108,22 @@ final class RecordsAssembler {
                 .map(Tally::toRecord)
                 .toList();
         return new RecordsResponse(records, List.copyOf(days));
+    }
+
+    /**
+     * What the validator finds, less the MP team's share on a fixed-turnout
+     * sheet: an under-manned hour outside the silent block with someone still
+     * on is the MP team covering it, not a broken rule.
+     */
+    private static int issues(Schedule sheet, Integer turnout, ScheduleValidator validator) {
+        List<Violation> found = validator.validate(sheet).violations();
+        if (turnout == null) {
+            return found.size();
+        }
+        boolean[] silent = Availability.silentSlots(sheet.day());
+        return (int) found.stream().filter(v -> !(v.rule() == Rule.UNDER_MANNED && v.slot() != null
+                && !silent[v.slot()]
+                && sheet.rows().stream().anyMatch(r -> r.at(v.slot()) != null))).count();
     }
 
     private static final class Tally {

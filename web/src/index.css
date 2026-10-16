@@ -108,7 +108,7 @@ label { display: inline-flex; flex-direction: column; gap: 0.25rem; font-size: 0
   margin-bottom: 1rem;
 }
 
-.night {
+.night, .bus {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
@@ -118,7 +118,7 @@ label { display: inline-flex; flex-direction: column; gap: 0.25rem; font-size: 0
   margin: 0;
 }
 
-.night legend { font-size: 0.75rem; color: var(--dim); padding: 0 0.3rem; }
+.night legend, .bus legend { font-size: 0.75rem; color: var(--dim); padding: 0 0.3rem; }
 
 .pill {
   flex-direction: row;

@@ -22,6 +22,11 @@ Both ship together as a single image.
   the MP team covers what is left, shown in its own row on the board. The
   silent hours are always fully manned, and every other hour keeps at least one
   Trooper on. A turnout that makes more hours than the sheet needs is refused.
+- **Reuse of past sheets**: when a logged sheet has the same posts and hours
+  (any Monday to Thursday matches any other), the same headcount and the same
+  turnout, a new sheet reuses it rather than being solved afresh. Its turnouts
+  go to whoever is available today, the longest to whoever has done fewest
+  hours, and only if the result breaks no rule.
 - **Edit a sheet by hand**: click an hour to change its post, or swap two
   Troopers' whole days. Every edit is checked against the rules as you make it,
   with an hour-by-hour coverage row and a list of what the sheet breaks,
