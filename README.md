@@ -15,10 +15,12 @@ Both ship together as a single image.
   night group. The solver balances hours across the team within the rules.
 - **Log the sheet actually used**, including any edits made by hand, and look
   up past sheets by date.
+- **Roster** of Troopers, each marked as living in or staying out, with a
+  default night group.
 - **Leave register** that takes absences into account automatically when
   sheets are generated.
-- **Two roles**: `ADMIN` generates and logs sheets and manages leave. `USER`
-  has read-only access.
+- **Two roles**: `ADMIN` manages the roster and leave, and generates and logs
+  sheets. `USER` has read-only access.
 
 ## How scheduling works
 
@@ -66,7 +68,7 @@ npm run dev
 Open **http://localhost:5173**. The dev server proxies `/api` and `/actuator`
 to the API.
 
-### Development accounts
+### Development data
 
 `bootRun` uses the `dev` profile, which creates two accounts:
 
@@ -77,6 +79,10 @@ to the API.
 
 To use different passwords, set `DEV_ADMIN_PASSWORD` and
 `DEV_TROOPER_PASSWORD`.
+
+It also creates a roster of nine Troopers when the roster is empty:
+`TROOPER_A` to `TROOPER_G` live in, with A, B and C as the default night group,
+and `TROOPER_H` and `TROOPER_I` stay out.
 
 ## Tests
 
@@ -108,6 +114,7 @@ that is well formed but cannot be fulfilled returns `422`.
 | `POST` | `/session/login` | anyone | Form-encoded; returns 204 or 401 |
 | `POST` | `/session/logout` | signed in | Returns 204 |
 | `GET` | `/troopers` | signed in | The roster |
+| `POST` | `/troopers` | `ADMIN` | Add a Trooper; 409 when the name is taken |
 | `POST` | `/schedules/generate` | `ADMIN` | Generate a sheet; 422 when it cannot be covered |
 | `GET` | `/schedules/{date}` | signed in | The logged sheet; 404 when none |
 | `PUT` | `/schedules/{date}` | `ADMIN` | Log the sheet actually used |

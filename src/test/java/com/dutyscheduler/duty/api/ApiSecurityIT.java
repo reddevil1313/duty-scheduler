@@ -20,6 +20,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -149,6 +150,76 @@ class ApiSecurityIT {
     @DisplayName("the roster is not public")
     void rosterNeedsAnAccount() throws Exception {
         mvc.perform(get("/api/troopers")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    @DisplayName("an ADMIN adds a Trooper, and they join the end of the roster")
+    void adminAddsTrooper() throws Exception {
+        mvc.perform(post("/api/troopers").with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"name":"  TROOPER_L ","rank":"","stayOut":false,"onNight":true}
+                        """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.name").value("TROOPER_L"))
+                .andExpect(jsonPath("$.rank").value(nullValue()))
+                .andExpect(jsonPath("$.onNight").value(true));
+
+        mvc.perform(get("/api/troopers"))
+                .andExpect(jsonPath("$.length()").value(ROSTER.size() + STAY_OUTS.size() + 1))
+                .andExpect(jsonPath("$[-1].name").value("TROOPER_L"));
+    }
+
+    @Test
+    @WithMockUser(username = "trooper_d", roles = "USER")
+    @DisplayName("a Trooper cannot add to the roster")
+    void trooperCannotAddTrooper() throws Exception {
+        mvc.perform(post("/api/troopers").with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"name":"TROOPER_L","stayOut":false,"onNight":false}
+                        """))
+                .andExpect(status().isForbidden());
+        assertThat(troopers.findByName("TROOPER_L")).isEmpty();
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    @DisplayName("a name already on the roster is a 409, not a second row")
+    void duplicateNameConflicts() throws Exception {
+        mvc.perform(post("/api/troopers").with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"name":"TROOPER_A","stayOut":false,"onNight":false}
+                        """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value("TROOPER_A is already on the roster."));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    @DisplayName("a stay-out on the night group is a 422: well formed, but impossible")
+    void stayOutOnNightIsUnprocessable() throws Exception {
+        mvc.perform(post("/api/troopers").with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"name":"TROOPER_L","stayOut":true,"onNight":true}
+                        """))
+                .andExpect(status().isUnprocessableEntity());
+        assertThat(troopers.findByName("TROOPER_L")).isEmpty();
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = "ADMIN")
+    @DisplayName("a blank name is a 400")
+    void blankNameIsBadRequest() throws Exception {
+        mvc.perform(post("/api/troopers").with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"name":"   ","stayOut":false,"onNight":false}
+                        """))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

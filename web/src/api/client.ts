@@ -1,4 +1,4 @@
-import type { Absence, ProblemDetail, Schedule, Session, Trooper } from './types'
+import type { Absence, NewTrooper, ProblemDetail, Schedule, Session, Trooper } from './types'
 
 /**
  * Everything that talks to the server, in one file.
@@ -139,4 +139,11 @@ export const api = {
   absences: () => request<Absence[]>('/api/absences'),
 
   troopers: () => request<Trooper[]>('/api/troopers'),
+
+  /** ADMIN only. 409 when the name is taken, 422 for a stay-out on the night group. */
+  addTrooper: (trooper: NewTrooper) =>
+    request<Trooper>('/api/troopers', {
+      method: 'POST',
+      body: JSON.stringify(trooper),
+    }),
 }

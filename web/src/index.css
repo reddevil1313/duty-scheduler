@@ -120,6 +120,20 @@ label { display: inline-flex; flex-direction: column; gap: 0.25rem; font-size: 0
 
 .actions { display: flex; gap: 0.5rem; }
 
+.add-trooper { margin-bottom: 1rem; }
+.add-trooper fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.5rem 0.7rem;
+  margin: 0;
+}
+.add-trooper legend { font-size: 0.75rem; color: var(--dim); padding: 0 0.3rem; }
+.add-trooper .pill { align-self: center; }
+
 .error { color: var(--bad); font-size: 0.9rem; }
 .note, .status { color: var(--dim); font-size: 0.85rem; }
 

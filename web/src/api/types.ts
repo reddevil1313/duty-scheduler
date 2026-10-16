@@ -73,3 +73,11 @@ export interface Trooper {
   permPac: boolean
   onNight: boolean
 }
+
+/** Add a Trooper. `onNight` pre-ticks them for the night group; it is a default, not a rule. */
+export interface NewTrooper {
+  name: string
+  rank: string | null
+  stayOut: boolean
+  onNight: boolean
+}

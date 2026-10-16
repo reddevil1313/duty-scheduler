@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { ApiError, api } from '../api/client'
 import type { Schedule, Trooper } from '../api/types'
 import { useSession } from '../auth/session-context'
+import { AddTrooperForm } from '../roster/AddTrooperForm'
 import { SLOT_COUNT, isCrossover, isSilent, labelAt } from './slots'
 
 type Source = 'logged' | 'generated'
@@ -85,6 +86,15 @@ export function ScheduleBoard() {
     return () => { cancelled = true }
   }, [date, report])
 
+  const trooperAdded = (trooper: Trooper) => {
+    setRoster((current) => [...current, trooper])
+    if (trooper.onNight) {
+      setNightGroup((current) => [...current, trooper.name])
+    }
+    setError(null)
+    setNote(`${trooper.name} added to the roster.`)
+  }
+
   const toggleNight = (name: string) => {
     setNightGroup((current) =>
       current.includes(name) ? current.filter((n) => n !== name) : [...current, name])
@@ -158,6 +168,8 @@ export function ScheduleBoard() {
           </div>
         )}
       </div>
+
+      {isAdmin && <AddTrooperForm onAdded={trooperAdded} onError={report} />}
 
       {error && <p className="error" role="alert">{error}</p>}
       {note && !error && <p className="note">{note}</p>}
