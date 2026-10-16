@@ -16,7 +16,8 @@ Both ship together as a single image.
 - **Log the sheet actually used**, including any edits made by hand, and look
   up past sheets by date.
 - **Roster** of Troopers, each marked as living in or staying out, with a
-  default night group.
+  default night group. Troopers can be added, edited and removed. Removing
+  someone who stood a logged sheet archives them, so past sheets stay intact.
 - **Leave register** that takes absences into account automatically when
   sheets are generated.
 - **Two roles**: `ADMIN` manages the roster and leave, and generates and logs
@@ -115,6 +116,8 @@ that is well formed but cannot be fulfilled returns `422`.
 | `POST` | `/session/logout` | signed in | Returns 204 |
 | `GET` | `/troopers` | signed in | The roster |
 | `POST` | `/troopers` | `ADMIN` | Add a Trooper; 409 when the name is taken |
+| `PUT` | `/troopers/{id}` | `ADMIN` | Edit a Trooper's particulars |
+| `DELETE` | `/troopers/{id}` | `ADMIN` | Remove a Trooper; archived if they stood a logged sheet |
 | `POST` | `/schedules/generate` | `ADMIN` | Generate a sheet; 422 when it cannot be covered |
 | `GET` | `/schedules/{date}` | signed in | The logged sheet; 404 when none |
 | `PUT` | `/schedules/{date}` | `ADMIN` | Log the sheet actually used |

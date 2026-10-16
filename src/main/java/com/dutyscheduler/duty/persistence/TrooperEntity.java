@@ -33,6 +33,10 @@ public class TrooperEntity {
 
     private String remark;
 
+    /** False once archived: off the roster, but still on the sheets they stood. */
+    @Column(nullable = false)
+    private boolean active = true;
+
     protected TrooperEntity() {
     }
 
@@ -76,6 +80,22 @@ public class TrooperEntity {
 
     public String getRemark() {
         return remark;
+    }
+
+    public boolean isActive() {
+        return active;
+    }
+
+    /**
+     * Renaming is safe for history: sheets, leave and hours all hold the id, so a
+     * renamed Trooper's past sheets simply show the new name.
+     */
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
     }
 
     public void setRank(String rank) {

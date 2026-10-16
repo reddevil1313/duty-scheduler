@@ -15,4 +15,7 @@ public interface DutyAssignmentRepository extends JpaRepository<DutyAssignmentEn
              WHERE a.sheet.dutyDate = :date
             """)
     long countForDate(@Param("date") LocalDate date);
+
+    /** Whether this Trooper stands on any logged sheet — which decides archive or delete. */
+    boolean existsByTrooper_Id(Long trooperId);
 }

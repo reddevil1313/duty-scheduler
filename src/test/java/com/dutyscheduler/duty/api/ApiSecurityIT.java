@@ -185,6 +185,24 @@ class ApiSecurityIT {
     }
 
     @Test
+    @WithMockUser(username = "trooper_d", roles = "USER")
+    @DisplayName("a Trooper cannot edit or remove anyone on the roster")
+    void trooperCannotEditOrRemove() throws Exception {
+        long id = troopers.findByName("TROOPER_A").orElseThrow().getId();
+
+        mvc.perform(put("/api/troopers/" + id).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"name":"TROOPER_Z","stayOut":false,"onNight":false}
+                        """))
+                .andExpect(status().isForbidden());
+        mvc.perform(delete("/api/troopers/" + id).with(csrf()))
+                .andExpect(status().isForbidden());
+
+        assertThat(troopers.findByName("TROOPER_A")).isPresent();
+    }
+
+    @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
     @DisplayName("a name already on the roster is a 409, not a second row")
     void duplicateNameConflicts() throws Exception {

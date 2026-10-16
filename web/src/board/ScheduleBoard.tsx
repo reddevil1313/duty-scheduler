@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { ApiError, api } from '../api/client'
 import type { Schedule, Trooper } from '../api/types'
 import { useSession } from '../auth/session-context'
-import { AddTrooperForm } from '../roster/AddTrooperForm'
+import { RosterPanel } from '../roster/RosterPanel'
 import { SLOT_COUNT, isCrossover, isSilent, labelAt } from './slots'
 
 type Source = 'logged' | 'generated'
@@ -95,6 +95,26 @@ export function ScheduleBoard() {
     setNote(`${trooper.name} added to the roster.`)
   }
 
+  const trooperUpdated = (before: Trooper, after: Trooper) => {
+    setRoster((current) => current.map((t) => (t.id === after.id ? after : t)))
+    // The night group is ticked by name, so a rename has to carry the tick
+    // across, and someone who has become a stay-out can no longer hold it.
+    setNightGroup((current) => {
+      const without = current.filter((n) => n !== before.name)
+      const wasTicked = without.length !== current.length
+      return wasTicked && !after.stayOut ? [...without, after.name] : without
+    })
+    setError(null)
+    setNote(`${after.name} updated.`)
+  }
+
+  const trooperRemoved = (trooper: Trooper) => {
+    setRoster((current) => current.filter((t) => t.id !== trooper.id))
+    setNightGroup((current) => current.filter((n) => n !== trooper.name))
+    setError(null)
+    setNote(`${trooper.name} removed from the roster.`)
+  }
+
   const toggleNight = (name: string) => {
     setNightGroup((current) =>
       current.includes(name) ? current.filter((n) => n !== name) : [...current, name])
@@ -169,7 +189,15 @@ export function ScheduleBoard() {
         )}
       </div>
 
-      {isAdmin && <AddTrooperForm onAdded={trooperAdded} onError={report} />}
+      {isAdmin && (
+        <RosterPanel
+          roster={roster}
+          onAdded={trooperAdded}
+          onUpdated={trooperUpdated}
+          onRemoved={trooperRemoved}
+          onError={report}
+        />
+      )}
 
       {error && <p className="error" role="alert">{error}</p>}
       {note && !error && <p className="note">{note}</p>}

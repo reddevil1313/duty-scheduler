@@ -130,7 +130,7 @@ public class DutySheetStore {
     public Map<Trooper, Integer> history(LocalDate upTo) {
         Map<String, Integer> byName = hoursSince(upTo.minusDays(HISTORY_DAYS), upTo.minusDays(1));
         Map<Trooper, Integer> out = new LinkedHashMap<>();
-        for (TrooperEntity entity : troopers.findAllByOrderByIdAsc()) {
+        for (TrooperEntity entity : troopers.findByActiveTrueOrderByIdAsc()) {
             out.put(entity.toDomain(), byName.getOrDefault(entity.getName(), 0));
         }
         return out;

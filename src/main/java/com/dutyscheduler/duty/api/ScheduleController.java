@@ -45,7 +45,7 @@ public class ScheduleController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ScheduleResponse> generate(@Valid @RequestBody GenerateRequest request) {
         DutyDay day = DutyDay.of(request.date());
-        List<Trooper> roster = troopers.findAllByOrderByIdAsc().stream()
+        List<Trooper> roster = troopers.findByActiveTrueOrderByIdAsc().stream()
                 .map(TrooperEntity::toDomain).toList();
         List<Trooper> night = roster.stream()
                 .filter(t -> request.nightGroup().contains(t.name()))

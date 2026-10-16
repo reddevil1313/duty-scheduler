@@ -1,4 +1,4 @@
-import type { Absence, NewTrooper, ProblemDetail, Schedule, Session, Trooper } from './types'
+import type { Absence, ProblemDetail, Schedule, Session, Trooper, TrooperParticulars } from './types'
 
 /**
  * Everything that talks to the server, in one file.
@@ -140,10 +140,24 @@ export const api = {
 
   troopers: () => request<Trooper[]>('/api/troopers'),
 
-  /** ADMIN only. 409 when the name is taken, 422 for a stay-out on the night group. */
-  addTrooper: (trooper: NewTrooper) =>
+  /**
+   * ADMIN only. 409 when the name is taken, 422 for a stay-out on the night
+   * group. An archived Trooper's name brings that Trooper back.
+   */
+  addTrooper: (trooper: TrooperParticulars) =>
     request<Trooper>('/api/troopers', {
       method: 'POST',
       body: JSON.stringify(trooper),
     }),
+
+  /** ADMIN only. Same refusals as adding, plus 404 for someone no longer on the roster. */
+  updateTrooper: (id: number, trooper: TrooperParticulars) =>
+    request<Trooper>(`/api/troopers/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(trooper),
+    }),
+
+  /** ADMIN only. Archived if they stand on a logged sheet, deleted if not — 204 either way. */
+  removeTrooper: (id: number) =>
+    request<void>(`/api/troopers/${id}`, { method: 'DELETE' }),
 }

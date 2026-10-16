@@ -45,7 +45,7 @@ public class AbsenceController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<AbsenceResponse> book(@Valid @RequestBody AbsenceRequest request,
             Principal principal) {
-        TrooperEntity trooper = troopers.findByName(request.trooper())
+        TrooperEntity trooper = troopers.findByNameAndActiveTrue(request.trooper())
                 .orElseThrow(() -> new IllegalArgumentException(
                         request.trooper() + " is not on the roster."));
 

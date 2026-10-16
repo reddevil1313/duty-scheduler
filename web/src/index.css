@@ -120,6 +120,16 @@ label { display: inline-flex; flex-direction: column; gap: 0.25rem; font-size: 0
 
 .actions { display: flex; gap: 0.5rem; }
 
+.roster { margin-bottom: 1rem; }
+.roster h2 { font-size: 0.85rem; color: var(--dim); margin: 0 0 0.4rem; font-weight: 600; }
+.roster table { border-collapse: collapse; font-size: 0.8rem; margin-bottom: 0.6rem; }
+.roster th { text-align: left; color: var(--dim); font-weight: 500; padding: 0.2rem 0.8rem 0.2rem 0; }
+.roster td { padding: 0.2rem 0.8rem 0.2rem 0; border-top: 1px solid var(--line); }
+.roster .row-actions { display: flex; gap: 0.35rem; align-items: center; }
+.roster tr.editing form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.6rem; padding: 0.3rem 0; }
+.roster tr.editing .pill { align-self: center; }
+button.danger { border-color: var(--bad); color: var(--bad); }
+
 .add-trooper { margin-bottom: 1rem; }
 .add-trooper fieldset {
   display: flex;

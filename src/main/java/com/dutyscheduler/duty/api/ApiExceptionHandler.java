@@ -20,10 +20,10 @@ public class ApiExceptionHandler {
         return problem;
     }
 
-    @ExceptionHandler(TrooperController.RosterConflictException.class)
-    public ProblemDetail rosterConflict(TrooperController.RosterConflictException e) {
+    @ExceptionHandler(TrooperController.RosterException.class)
+    public ProblemDetail roster(TrooperController.RosterException e) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(e.status(), e.getMessage());
-        problem.setTitle("That Trooper cannot be added");
+        problem.setTitle("That roster change cannot be made");
         return problem;
     }
 

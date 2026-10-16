@@ -67,6 +67,8 @@ export interface ProblemDetail {
 
 /** A name on the roster, with the flags the board needs to lay itself out. */
 export interface Trooper {
+  /** What edits and removals address. Not the name, which an edit can change. */
+  id: number
   name: string
   rank: string | null
   stayOut: boolean
@@ -74,8 +76,11 @@ export interface Trooper {
   onNight: boolean
 }
 
-/** Add a Trooper. `onNight` pre-ticks them for the night group; it is a default, not a rule. */
-export interface NewTrooper {
+/**
+ * The particulars an ADMIN sets when adding or editing a Trooper. `onNight`
+ * pre-ticks them for the night group; it is a default, not a rule.
+ */
+export interface TrooperParticulars {
   name: string
   rank: string | null
   stayOut: boolean
