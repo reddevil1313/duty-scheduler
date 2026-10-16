@@ -227,6 +227,9 @@ class ScheduleValidatorTest {
             ValidationResult result = validator.validate(broken);
 
             assertTrue(result.has(Rule.STAY_OUT_WINDOW), result.describe());
+            // Four-digit times, as the board writes them: "0800", never "800".
+            assertTrue(result.of(Rule.STAY_OUT_WINDOW).get(0).message().endsWith("outside 0800-1800"),
+                    result.describe());
         }
 
         @Test

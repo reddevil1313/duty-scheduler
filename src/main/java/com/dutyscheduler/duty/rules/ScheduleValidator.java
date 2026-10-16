@@ -130,8 +130,10 @@ public final class ScheduleValidator {
                                 + ", inside the weekend block"));
             } else if (t.getHour() < DutyRules.STAY_OUT_FROM || t.getHour() >= DutyRules.STAY_OUT_TO) {
                 violations.add(Violation.by(Rule.STAY_OUT_WINDOW, who, slot,
-                        who + " is a stay-out and is posted at " + s.label()
-                                + ", outside " + DutyRules.STAY_OUT_FROM + "00-" + DutyRules.STAY_OUT_TO + "00"));
+                        // Padded, so 8 reads as 0800: the board writes every
+                        // hour as four digits, and "800" looks like a typo.
+                        who + " is a stay-out and is posted at " + s.label() + ", outside "
+                                + "%02d00-%02d00".formatted(DutyRules.STAY_OUT_FROM, DutyRules.STAY_OUT_TO)));
             }
         }
     }
