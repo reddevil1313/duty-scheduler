@@ -224,7 +224,7 @@ class ApiSecurityIT {
                 .content("""
                         {"name":"TROOPER_L","stayOut":true,"onNight":true}
                         """))
-                .andExpect(status().isUnprocessableEntity());
+                .andExpect(status().isUnprocessableContent());
         assertThat(troopers.findByName("TROOPER_L")).isEmpty();
     }
 
@@ -322,7 +322,7 @@ class ApiSecurityIT {
                 """;
         mvc.perform(post("/api/schedules/generate").with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content(impossible))
-                .andExpect(status().isUnprocessableEntity());
+                .andExpect(status().isUnprocessableContent());
     }
 
     @Test

@@ -143,7 +143,7 @@ class TrooperRosterIT {
                 .andExpect(status().isConflict());
         mvc.perform(put("/api/troopers/" + id).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content(body("TROOPER_D", true, true)))
-                .andExpect(status().isUnprocessableEntity());
+                .andExpect(status().isUnprocessableContent());
         mvc.perform(put("/api/troopers/999999").with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content(body("TROOPER_D", false, false)))
                 .andExpect(status().isNotFound());
