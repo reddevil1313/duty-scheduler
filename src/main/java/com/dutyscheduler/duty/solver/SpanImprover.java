@@ -7,7 +7,6 @@ import com.dutyscheduler.duty.domain.Trooper;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
 /**
  * Local search, used as a repair step.
@@ -132,13 +131,8 @@ final class SpanImprover {
                 if (!eligibility.allows(trooper, slot)) {
                     return false;
                 }
-                if (slot > start) {
-                    Post previous = row[slot - 1];
-                    Post current = row[slot];
-                    if (previous != current
-                            && !DutyRules.FREE_AFTER.getOrDefault(previous, Set.of()).contains(current)) {
-                        return false;
-                    }
+                if (slot > start && !DutyRules.followsWithoutBreak(row[slot - 1], row[slot])) {
+                    return false;
                 }
                 slot++;
             }

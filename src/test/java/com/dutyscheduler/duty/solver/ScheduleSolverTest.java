@@ -5,6 +5,7 @@ import com.dutyscheduler.duty.domain.AbsenceKind;
 import com.dutyscheduler.duty.domain.DayDemand;
 import com.dutyscheduler.duty.domain.DutyDay;
 import com.dutyscheduler.duty.domain.DutyRules;
+import com.dutyscheduler.duty.domain.Post;
 import com.dutyscheduler.duty.domain.Schedule;
 import com.dutyscheduler.duty.domain.Trooper;
 import com.dutyscheduler.duty.rules.Rule;
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -244,6 +246,43 @@ class ScheduleSolverTest {
         SolveResult second = solver.solve(SolveRequest.of(day, ROSTER, NIGHT));
 
         assertEquals(first.schedule().rows(), second.schedule().rows());
+    }
+
+    private static Post[][] gridOf(Schedule schedule) {
+        return schedule.rows().stream().map(r -> r.posts().toArray(new Post[0])).toArray(Post[][]::new);
+    }
+
+    private static int walks(Schedule schedule) {
+        return schedule.rows().stream().mapToInt(r -> DutyRules.postChanges(r.posts().toArray(new Post[0]))).sum();
+    }
+
+    @ParameterizedTest(name = "the {0} sheet is left with no trade that would save a walk")
+    @ValueSource(strings = {
+            "2026-09-07", "2026-09-08", "2026-09-09", "2026-09-10",
+            "2026-09-11", "2026-09-12", "2026-09-13" })
+    void noWalkLeftToSave(String date) {
+        Schedule sheet = solver.solve(SolveRequest.of(DutyDay.of(LocalDate.parse(date)), ROSTER, NIGHT)).schedule();
+
+        Post[][] again = new PostSwapImprover().improve(gridOf(sheet));
+        int after = java.util.Arrays.stream(again).mapToInt(DutyRules::postChanges).sum();
+        assertEquals(walks(sheet), after);
+    }
+
+    @Test
+    @DisplayName("across a week the walks between AP and GG drop from 53 to 35")
+    void weekOfWalks() {
+        // 53 is what this roster's week came to before post changes were scored,
+        // measured on 2026-10-16; most of the saving is at the weekend, when AP
+        // and GG stand all day and there is room to trade. Weekday nights stay
+        // at four, which is forced: once the hours are set, the two posts at
+        // each silent hour leave only one way to fill them.
+        // A later change to the solver may well move this number. It should
+        // only ever go down.
+        int week = 0;
+        for (int d = 7; d <= 13; d++) {
+            week += walks(solver.solve(SolveRequest.of(DutyDay.of(LocalDate.of(2026, 9, d)), ROSTER, NIGHT)).schedule());
+        }
+        assertTrue(week <= 35, "the week walks " + week + " times between AP and GG");
     }
 
     @Test

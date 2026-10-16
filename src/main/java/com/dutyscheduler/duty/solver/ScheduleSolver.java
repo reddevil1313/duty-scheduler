@@ -183,6 +183,10 @@ public final class ScheduleSolver {
                 // Improve a legal schedule by swapping segments between rows to reduce wasted
                 // span.
                 Post[][] improved = new SpanImprover(troopers, this::eligible).improve(grid);
+                // Then cut walks between AP and GG. Second, and on its own,
+                // because it trades posts without moving hours: it cannot undo
+                // anything the span pass just won.
+                improved = new PostSwapImprover().improve(improved);
                 for (int t = 0; t < troopers.size(); t++) {
                     grid[t] = improved[t];
                 }

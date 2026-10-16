@@ -50,7 +50,10 @@ Both ship together as a single image.
   early day hours. Each possible amount is solved and scored, and the best is
   kept.
 - Sheets are **scored** lexicographically: hour spread first, then worst
-  excess, then total excess.
+  excess, then total excess, then walks between AP and GG. Walks come last, so
+  they only ever decide between sheets that are equally fair. Two Troopers on
+  duty in the same hours may trade posts to save a walk, which moves nobody's
+  hours.
 - **Leave** covers whole sheets. An absence "until the 12th" removes the 11th's
   sheet entirely and none of the 12th's.
 - An independent **validator** checks every rule against the solver's output.
