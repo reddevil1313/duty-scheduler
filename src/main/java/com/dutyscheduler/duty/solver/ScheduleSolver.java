@@ -12,6 +12,7 @@ import com.dutyscheduler.duty.rules.HourTargets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -71,6 +72,9 @@ public final class ScheduleSolver {
         String busProblem = busProblem(request);
         if (busProblem != null) {
             return SolveResult.failed(busProblem, null, 0);
+        }
+        if (request.turnout() != null) {
+            return solveFixed(request);
         }
         SolveResult best = null;
         ScheduleScore bestScore = null;
@@ -138,6 +142,97 @@ public final class ScheduleSolver {
     }
 
     /**
+     * Fixed-length turnouts: everyone does the same hours and the MP team takes
+     * whatever that leaves. The same search, the same rules and the same
+     * validator — only the space narrows, because the hour targets and the
+     * crossover are no longer choices but consequences of the turnout.
+     *
+     * <ul>
+     * <li>Everyone does {@code N}, or as near as their own availability allows.
+     * <li>The silent hours are always fully manned. If the night group at
+     * {@code N} each falls short of them, night Troopers go to {@code N + 1},
+     * fewest past hours first, until they do — and if even that falls short,
+     * the turnout is refused.
+     * <li>What the night group does beyond the silent hours spills into the
+     * morning crossover, as it would in the free split.
+     * <li>Every other hour with a post keeps at least one Trooper on; the rest
+     * of the post-hours go to the MP team. A turnout that would leave more
+     * hours than the sheet has to give is refused, not quietly shortened.
+     * </ul>
+     */
+    private SolveResult solveFixed(SolveRequest request) {
+        DutyDay day = request.day();
+        int n = request.turnout();
+        boolean[] silent = Availability.silentSlots(day);
+        boolean[] daytime = Availability.daySlots(day);
+        boolean[] cross = HourTargets.crossoverWindow(day);
+        boolean[] nightWindow = silent.clone();
+        for (int slot = 0; slot < DutyDay.SLOT_COUNT; slot++) {
+            nightWindow[slot] |= cross[slot];
+        }
+        int silentDemand = Availability.demandWithin(day, silent);
+        int dayDemand = Availability.demandWithin(day, daytime);
+        int crossCeiling = Run.crossoverCeiling(day);
+
+        Map<Trooper, Integer> hours = new LinkedHashMap<>();
+        Map<Trooper, Integer> room = new LinkedHashMap<>();
+        for (Trooper t : request.nightGroup()) {
+            int cap = Math.min(DutyRules.HOUR_CAP,
+                    Availability.capacityWithin(Availability.mask(t, day, request.absences()), nightWindow));
+            room.put(t, cap);
+            hours.put(t, Math.min(n, cap));
+        }
+        int night = hours.values().stream().mapToInt(Integer::intValue).sum();
+        // Short of the silent hours: an hour over the turnout, fewest past
+        // hours first, as long as it takes and as far as each one has room.
+        List<Trooper> byHistory = request.nightGroup().stream()
+                .sorted(Comparator.comparingInt((Trooper t) -> request.history().getOrDefault(t, 0))
+                        .thenComparing(Trooper::name))
+                .toList();
+        for (Trooper t : byHistory) {
+            if (night >= silentDemand) {
+                break;
+            }
+            if (hours.get(t) == n && room.get(t) > n) {
+                hours.put(t, n + 1);
+                night++;
+            }
+        }
+        if (night < silentDemand) {
+            return SolveResult.failed("The silent hours need " + silentDemand + " Trooper-hours, and the night group"
+                    + " at " + n + "h, or " + (n + 1) + "h, each can give only " + night
+                    + ". Add someone to the night group, or use the free split.", null, 0);
+        }
+        int crossover = night - silentDemand;
+        if (crossover > crossCeiling) {
+            return SolveResult.failed("At " + n + "h each the night group makes " + night + " hours, more than the"
+                    + " silent hours and the morning after can take (" + (silentDemand + crossCeiling)
+                    + "). Use the free split, or a shorter turnout.", null, 0);
+        }
+
+        int dayHours = 0;
+        for (Trooper t : request.dayGroup()) {
+            int cap = Math.min(DutyRules.HOUR_CAP,
+                    Availability.capacityWithin(Availability.mask(t, day, request.absences()), daytime));
+            int h = Math.min(n, cap);
+            hours.put(t, h);
+            dayHours += h;
+        }
+        if (dayHours > dayDemand - crossover) {
+            return SolveResult.failed("At " + n + "h each the team makes " + (night + dayHours) + " hours, more than"
+                    + " the " + (silentDemand + dayDemand) + " this sheet needs. Use the free split, or a shorter"
+                    + " turnout.", null, 0);
+        }
+
+        HourTargets targets = new HourTargets(hours, silentDemand + crossover, dayHours);
+        SolveResult result = new Run(request, crossover, targets).go();
+        if (!result.isSolved()) {
+            return result;
+        }
+        return new SolveResult(result.schedule(), result.targets(), null, result.nodes());
+    }
+
+    /**
      * How many day hours to consider handing to the night group.
      */
     private static List<Integer> crossoverCandidates(SolveRequest request) {
@@ -173,18 +268,30 @@ public final class ScheduleSolver {
         // search nor the improvers may move. Today only the chosen BUS hours.
         private final boolean[][] pinned; // [trooper][slot]
         private final int busTrooper; // index of the chosen BUS Trooper, -1 for none
+        // Fixed turnouts only: positions may be left to the MP team, never in
+        // the silent hours and never the last chance to man an hour, and
+        // exactly this many of them — what the turnouts do not reach.
+        private final boolean fixed;
+        private int mpBudget;
+        private static final int TO_MP = -2; // filledBy marker: left to the MP team
 
         private long nodes;
         private boolean exhausted;
 
         Run(SolveRequest request, int crossover) {
+            this(request, crossover, HourTargets.allocate(request.day(), request.nightGroup(), request.dayGroup(),
+                    request.absences(), request.history(), crossover));
+        }
+
+        /** With targets already decided, as fixed turnouts decide them. */
+        Run(SolveRequest request, int crossover, HourTargets targets) {
             this.request = request;
             this.crossover = crossover;
             this.day = request.day();
             this.crossSlots = HourTargets.crossoverWindow(request.day());
             this.troopers = request.roster();
-            this.targets = HourTargets.allocate(day, request.nightGroup(), request.dayGroup(),
-                    request.absences(), request.history(), crossover);
+            this.targets = targets;
+            this.fixed = request.turnout() != null;
 
             int n = troopers.size();
             this.silent = Availability.silentSlots(day);
@@ -217,6 +324,7 @@ public final class ScheduleSolver {
                     }
                 }
             }
+            this.mpBudget = fixed ? Math.max(0, positions.size() - targets.total()) : 0;
         }
 
         /** Every post-hour the sheet needs, in time order. */
@@ -290,9 +398,15 @@ public final class ScheduleSolver {
                 return "Covering every post would take more than " + DutyRules.HOUR_CAP
                         + " hours from at least one Trooper.";
             }
-            if (targets.total() < positions.size()) {
+            // With fixed turnouts a shortfall is the MP team's, by design.
+            if (!fixed && targets.total() < positions.size()) {
                 return "Not enough available manpower: the sheet needs " + positions.size()
                         + " Trooper-hours and this roster can absorb " + targets.total() + ".";
+            }
+            if (fixed && targets.total() < mandatory(0)) {
+                return "At " + request.turnout() + "h each there are " + targets.total() + " hours for "
+                        + mandatory(0) + " that must have a Trooper on: every silent post-hour, and one post"
+                        + " every other hour. Use a longer turnout, or the free split.";
             }
             if (targets.total() > positions.size()) {
                 return "The hour targets over-subscribe the sheet.";
@@ -313,10 +427,20 @@ public final class ScheduleSolver {
                 // Positions already pinned are covered, and the Trooper pinned
                 // there is not free for another post at the same hour.
                 int need = 0;
+                boolean manned = false;
                 for (int i = 0; i < positions.size(); i++) {
-                    if (positions.get(i).slot() == slot && filledBy[i] < 0) {
-                        need++;
+                    if (positions.get(i).slot() == slot) {
+                        if (filledBy[i] < 0) {
+                            need++;
+                        } else {
+                            manned = true;
+                        }
                     }
+                }
+                // With fixed turnouts an hour outside the silent block only
+                // needs one Trooper; the rest can be the MP team's.
+                if (fixed && !silent[slot]) {
+                    need = manned ? 0 : Math.min(need, 1);
                 }
                 if (need == 0) {
                     continue;
@@ -358,7 +482,9 @@ public final class ScheduleSolver {
                 return false;
             }
             if (index == positions.size()) {
-                return true;
+                // Every position decided; with fixed turnouts that is only done
+                // when everyone has done their hours, not just when the list ends.
+                return !fixed || Arrays.stream(owed).allMatch(o -> o == 0);
             }
             if (filledBy[index] >= 0) {
                 // Pinned before the search began; nothing to choose.
@@ -369,10 +495,14 @@ public final class ScheduleSolver {
 
             // The two PAC positions at one hour are interchangeable, so only ever
             // fill them in increasing trooper order. Without this the search
-            // explores every arrangement twice.
-            int floor = position.copy() == 0 ? 0 : filledBy[index - 1] + 1;
+            // explores every arrangement twice. For the same reason, once the
+            // first copy is left to the MP team the second goes the same way:
+            // "first to MP, second filled" is the mirror of "first filled,
+            // second to MP".
+            boolean previousToMp = position.copy() > 0 && filledBy[index - 1] == TO_MP;
+            int floor = position.copy() == 0 || previousToMp ? 0 : filledBy[index - 1] + 1;
 
-            for (int t : candidates(slot, position.post(), floor)) {
+            for (int t : previousToMp ? List.<Integer>of() : candidates(slot, position.post(), floor)) {
                 grid[t][slot] = position.post();
                 owed[t]--;
                 filledBy[index] = t;
@@ -387,7 +517,76 @@ public final class ScheduleSolver {
                 owed[t]++;
                 filledBy[index] = -1;
             }
+            // Fixed turnouts: hand this one to the MP team, if that is allowed
+            // and the hours still owed can still man what must be manned.
+            if (canLeaveToMp(index)) {
+                filledBy[index] = TO_MP;
+                mpBudget--;
+                if (Arrays.stream(owed).sum() >= mandatory(index + 1) && search(index + 1)) {
+                    return true;
+                }
+                mpBudget++;
+                filledBy[index] = -1;
+            }
             return false;
+        }
+
+        /**
+         * Whether a position may go to the MP team: only with fixed turnouts,
+         * while there is budget, never in the silent hours, and never as the last
+         * chance to have someone from the team on at that hour.
+         */
+        private boolean canLeaveToMp(int index) {
+            if (!fixed || mpBudget <= 0) {
+                return false;
+            }
+            int slot = positions.get(index).slot();
+            if (silent[slot]) {
+                return false;
+            }
+            for (int i = 0; i < positions.size(); i++) {
+                if (positions.get(i).slot() != slot || i == index) {
+                    continue;
+                }
+                // Someone already on at this hour, or a later position here that
+                // can still be filled: leaving this one does not empty the hour.
+                if ((i < index && filledBy[i] >= 0) || i > index) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /**
+         * Positions from {@code from} on that must have a Trooper: every silent
+         * one, and one per other hour not yet manned. A lower bound on the hours
+         * the search still needs, used to prune.
+         */
+        private int mandatory(int from) {
+            if (!fixed) {
+                return 0;
+            }
+            int count = 0;
+            boolean[] counted = new boolean[DutyDay.SLOT_COUNT];
+            for (int i = 0; i < from && i < positions.size(); i++) {
+                if (filledBy[i] >= 0) {
+                    counted[positions.get(i).slot()] = true;
+                }
+            }
+            for (int i = from; i < positions.size(); i++) {
+                int slot = positions.get(i).slot();
+                if (filledBy[i] >= 0) {
+                    counted[slot] = true; // pinned ahead: already manned
+                    continue;
+                }
+                if (silent[slot]) {
+                    count++;
+                } else if (!counted[slot]) {
+                    counted[slot] = true;
+                    count++;
+                }
+            }
+            return count;
         }
 
         /**

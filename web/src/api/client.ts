@@ -138,6 +138,7 @@ export const api = {
         nightGroup: options.nightGroup,
         out: Object.entries(options.ticks ?? {}).map(([trooper, kind]) => ({ trooper, kind })),
         bus: options.bus ?? null,
+        turnout: options.turnout ?? null,
       }),
     }),
 

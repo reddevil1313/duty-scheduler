@@ -98,6 +98,8 @@ export interface GenerateOptions {
   ticks?: Ticks
   /** Who takes the BUS run; left out, the solver chooses. */
   bus?: string | null
+  /** Everyone's hours, 5 to 7, the rest to the MP team; left out, the free split. */
+  turnout?: number | null
 }
 export type AbsenceSpan = 'FULL' | 'DAY_HALF' | 'NIGHT_HALF' | 'WINDOW'
 

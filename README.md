@@ -18,6 +18,10 @@ Both ship together as a single image.
   Who takes the BUS run (0700–1000) can be chosen the same way as the night
   group; a choice that cannot stand, such as a stay-out, is refused with the
   reason.
+- **Fixed turnouts** for a short-handed day: everyone does 5, 6 or 7 hours and
+  the MP team covers what is left, shown in its own row on the board. The
+  silent hours are always fully manned, and every other hour keeps at least one
+  Trooper on. A turnout that makes more hours than the sheet needs is refused.
 - **Edit a sheet by hand**: click an hour to change its post, or swap two
   Troopers' whole days. Every edit is checked against the rules as you make it,
   with an hour-by-hour coverage row and a list of what the sheet breaks,

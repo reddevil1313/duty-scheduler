@@ -78,3 +78,19 @@ export function coverage(sheet: Schedule, demand: SheetCheck['demand']): SlotCov
     return { manned, needed, state }
   })
 }
+
+/**
+ * Per hour, the posts nobody from the team is on: what the MP team covers on a
+ * fixed-turnout sheet. A post short twice at one hour appears twice.
+ */
+export function mpShortfall(sheet: Schedule, demand: SheetCheck['demand']): Post[][] {
+  return Array.from({ length: SLOT_COUNT }, (_, slot) => {
+    const need = demand[slot] ?? {}
+    const out: Post[] = []
+    for (const post of ['AP', 'GG', 'PAC', 'BUS'] as Post[]) {
+      const have = sheet.rows.filter((r) => r.posts[slot] === post).length
+      for (let k = have; k < (need[post] ?? 0); k++) out.push(post)
+    }
+    return out
+  })
+}

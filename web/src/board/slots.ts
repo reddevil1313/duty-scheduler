@@ -20,6 +20,16 @@ export function labelAt(slot: number): string {
   return `${String(hourAt(slot)).padStart(2, '0')}00`
 }
 
+/**
+ * Silent hours: 2200 to 0559, which is slots 2 through 9 — fixed, because the
+ * sheet always starts at 2000. The server's `Availability.silentSlots`; keep the
+ * two in step. Used to tell an MP hour, which must keep someone from the team
+ * on, from a silent hour, which must be fully manned.
+ */
+export function isSilent(slot: number): boolean {
+  return slot >= 2 && slot <= 9
+}
+
 /** The 0600-0800 block a night Trooper may be extended into. */
 export function isCrossover(slot: number): boolean {
   return slot >= 10 && slot <= 12

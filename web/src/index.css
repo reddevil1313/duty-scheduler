@@ -351,3 +351,11 @@ p.ticks {
   padding: 0.45rem 0.7rem; margin: 0.6rem 0;
 }
 .error.banner { margin: 0.6rem 1.25rem 0; }
+
+/* ---- MP row ---- */
+.row.mp { background: var(--panel); }
+.row.mp .name { color: var(--dim); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; }
+.cell.on.mp {
+  color: #d9b8ff; font-weight: 600; font-size: 0.68rem;
+  background: repeating-linear-gradient(135deg, #2c2238 0 4px, #33284a 4px 8px);
+}

@@ -1,6 +1,6 @@
 import { useEffect, useState, type MouseEvent } from 'react'
 import type { Post, Schedule, ScheduleRow, SheetCheck } from '../api/types'
-import { coverage } from './edit'
+import { coverage, mpShortfall } from './edit'
 import { SLOT_COUNT, isCrossover, labelAt } from './slots'
 
 export type Mode = 'view' | 'edit' | 'swap'
@@ -21,6 +21,12 @@ interface Props {
   check: SheetCheck | null
   /** Whether `check` was made of exactly this sheet. */
   fresh: boolean
+  /**
+   * A fixed-turnout sheet: hours the team does not reach are the MP team's, and
+   * a row under the grid shows which posts they cover. Never stored — a logged
+   * sheet has no MP row, only its gaps.
+   */
+  mp: boolean
   mode: Mode
   spare: SpareTrooper[]
   /** The first Trooper picked for a swap, waiting for the second. */
@@ -46,7 +52,7 @@ const MENU_ROW = 32
 const MENU_PAD = 12
 const MENU_WIDTH = 160
 
-export function SheetGrid({ sheet, check, fresh, mode, spare, swapPick, onSetCell, onPickRow }: Props) {
+export function SheetGrid({ sheet, check, fresh, mp, mode, spare, swapPick, onSetCell, onPickRow }: Props) {
   const [menu, setMenu] = useState<Menu | null>(null)
 
   // A click elsewhere, Escape, or a resize closes the menu. A scroll does not:
@@ -81,6 +87,7 @@ export function SheetGrid({ sheet, check, fresh, mode, spare, swapPick, onSetCel
   // while a newer answer is on its way, but never blanked.
   const checked = new Map((check?.sheet.rows ?? []).map((r) => [r.trooper, r]))
   const cover = check ? coverage(sheet, check.demand) : null
+  const mpPosts = mp && check ? mpShortfall(sheet, check.demand) : null
 
   // Cells a rule names by Trooper and hour get outlined, so the eye goes
   // straight to the hour a message is about. Only from a fresh check: an old
@@ -204,6 +211,25 @@ export function SheetGrid({ sheet, check, fresh, mode, spare, swapPick, onSetCel
               </div>
             ))}
             <div className="tally" role="cell" />
+            <div className="tally" role="cell" />
+          </div>
+        )}
+
+        {mpPosts && (
+          <div className="row mp" role="row">
+            <div className="name" role="rowheader">MP team</div>
+            {mpPosts.map((posts, slot) => (
+              <div
+                key={slot}
+                role="cell"
+                className={`cell${posts.length ? ' on mp' : ''}`}
+                title={`${labelAt(slot)} — ${posts.length ? `MP: ${posts.join(', ')}` : 'covered by the team'}`}
+              >
+                {/* One post fits a cell; two shows the first and a count. */}
+                {posts.length === 0 ? '' : posts.length === 1 ? posts[0] : `${posts[0]}+${posts.length - 1}`}
+              </div>
+            ))}
+            <div className="tally" role="cell">{mpPosts.reduce((n, p) => n + p.length, 0) || ''}</div>
             <div className="tally" role="cell" />
           </div>
         )}

@@ -77,7 +77,7 @@ public class ScheduleController {
         // the reason, before any search — and leaves as a 422 like any sheet
         // that cannot be covered.
         SolveResult result = solver.solve(
-                new SolveRequest(day, roster, night, absences, store.history(day.date()), bus));
+                new SolveRequest(day, roster, night, absences, store.history(day.date()), bus, request.turnout()));
 
         if (!result.isSolved()) {
             throw new UnsolvableException(result.reason());

@@ -4,8 +4,9 @@ import type { Post, Schedule, SheetCheck } from '../api/types'
 import { useReport } from '../api/useReport'
 import { useSession } from '../auth/session-context'
 import type { RosterState } from '../roster/useRoster'
-import { setCell, swapRows } from './edit'
+import { mpShortfall, setCell, swapRows } from './edit'
 import { SheetGrid, type Mode } from './SheetGrid'
+import { isSilent } from './slots'
 
 type Source = 'logged' | 'generated'
 
@@ -39,6 +40,11 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
   // out falls back to the solver's choice instead of a request that fails.
   const [bus, setBus] = useState<string | null>(null)
   const busPick = bus !== null && roster.some((t) => t.name === bus) && !(bus in ticks) ? bus : null
+  // The turnout to generate with (null for the free split), and the one the
+  // sheet on the board was generated with. Only a generated sheet has the
+  // second: MP hours are not stored, so a logged sheet has gaps, not MP hours.
+  const [turnout, setTurnout] = useState<number | null>(null)
+  const [sheetTurnout, setSheetTurnout] = useState<number | null>(null)
   const report = useReport(setError)
 
   const edited = schedule !== original
@@ -48,10 +54,11 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
   const latest = check && schedule && check.of.date === schedule.date ? check.result : null
 
   /** A fresh sheet on the board: nothing edited, nothing picked. */
-  const show = (sheet: Schedule | null, from: Source | null) => {
+  const show = (sheet: Schedule | null, from: Source | null, withTurnout: number | null = null) => {
     setOriginal(sheet)
     setSchedule(sheet)
     setSource(from)
+    setSheetTurnout(withTurnout)
     setMode('view')
     setSwapPick(null)
   }
@@ -114,7 +121,8 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
         nightGroup: nightGroup.filter((n) => !(n in ticks)),
         ticks,
         bus: busPick,
-      }), 'generated')
+        turnout,
+      }), 'generated', turnout)
     } catch (e) {
       await report(e)
     } finally {
@@ -127,9 +135,11 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
     setBusy(true)
     setError(null)
     try {
-      const issues = current?.issues.length ?? 0
+      const count = issues.length
+      const hadMp = sheetTurnout !== null && mpHours > 0
       show(await api.log(date, schedule), 'logged')
-      setNote(issues > 0 ? `Logged, with ${issues} issue${issues === 1 ? '' : 's'} on record.` : 'Logged.')
+      setNote((count > 0 ? `Logged, with ${count} issue${count === 1 ? '' : 's'} on record.` : 'Logged.')
+        + (hadMp ? ' The MP team\u2019s hours are not stored, so the logged sheet shows them as gaps.' : ''))
     } catch (e) {
       await report(e)
     } finally {
@@ -168,9 +178,20 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
       .map((t) => ({ name: t.name, stayOut: t.stayOut }))
     : []
 
+  // MP hours on a fixed-turnout sheet: the posts nobody from the team is on.
+  const mpHours = sheetTurnout !== null && latest && schedule
+    ? mpShortfall(schedule, latest.demand).reduce((n, posts) => n + posts.length, 0)
+    : 0
+  const manned = (slot: number) => !!schedule?.rows.some((r) => r.posts[slot] !== null)
+
   // From the latest check, dimmed while a newer one is on its way, so the list
-  // does not vanish and reappear around every edit.
-  const issues = latest?.issues ?? []
+  // does not vanish and reappear around every edit. On a fixed-turnout sheet an
+  // under-manned hour is the MP team's, and listed in their row instead — but
+  // only where the rules let it be: never a silent hour, never an hour with
+  // nobody from the team on. Those still show as broken, because they are.
+  const issues = (latest?.issues ?? []).filter((issue) => !(
+    sheetTurnout !== null && issue.rule === 'UNDER_MANNED' && issue.slot !== null
+    && !isSilent(issue.slot) && manned(issue.slot)))
   const canLog = !!schedule && (source === 'generated' || edited)
   const logLabel = !canLog ? 'Logged'
     : issues.length > 0 ? `Log anyway (${issues.length} issue${issues.length === 1 ? '' : 's'})`
@@ -229,6 +250,21 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
         )}
 
         {isAdmin && (
+          <label>
+            Turnout
+            <select
+              value={turnout ?? ''}
+              onChange={(e) => setTurnout(e.target.value === '' ? null : Number(e.target.value))}
+            >
+              <option value="">Free split</option>
+              <option value="5">5h each, rest to MP</option>
+              <option value="6">6h each, rest to MP</option>
+              <option value="7">7h each, rest to MP</option>
+            </select>
+          </label>
+        )}
+
+        {isAdmin && (
           <div className="actions">
             <button
               type="button"
@@ -270,7 +306,10 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
         <>
           <div className="sheet-bar">
             <p className="status">
-              {source === 'generated' ? 'Generated, not yet logged.' : 'The logged sheet for this date.'}
+              {source === 'generated'
+                ? `Generated${sheetTurnout ? ` at ${sheetTurnout}h each` : ''}, not yet logged.`
+                : 'The logged sheet for this date.'}
+              {mpHours > 0 && ` ${mpHours} post-hour${mpHours === 1 ? '' : 's'} to the MP team.`}
               {edited && ' Edited by hand.'}
               {' '}
               {current?.sheet.totalHours ?? schedule.totalHours} man-hours over {schedule.rows.length} men.
@@ -309,6 +348,7 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
             sheet={schedule}
             check={latest}
             fresh={current !== null}
+            mp={sheetTurnout !== null}
             mode={mode}
             spare={spare}
             swapPick={swapPick}
