@@ -3,6 +3,7 @@ package com.dutyscheduler.duty.api;
 import com.dutyscheduler.duty.api.dto.TrooperRequest;
 import com.dutyscheduler.duty.api.dto.TrooperResponse;
 import com.dutyscheduler.duty.persistence.DutyAssignmentRepository;
+import com.dutyscheduler.duty.persistence.HourCreditRepository;
 import com.dutyscheduler.duty.persistence.TrooperEntity;
 import com.dutyscheduler.duty.persistence.TrooperRepository;
 import jakarta.validation.Valid;
@@ -30,7 +31,8 @@ import java.util.List;
  * two places — the one that gets updated and the one that does not.
  *
  * <p>
- * Removing a Trooper archives them if they stand on any logged sheet, and
+ * Removing a Trooper archives them if they stand on any logged sheet or have
+ * credited hours, and
  * deletes them outright otherwise. A logged sheet is the record of what was
  * actually used; deleting the Trooper with it would rewrite that record.
  */
@@ -40,10 +42,13 @@ public class TrooperController {
 
     private final TrooperRepository troopers;
     private final DutyAssignmentRepository assignments;
+    private final HourCreditRepository credits;
 
-    public TrooperController(TrooperRepository troopers, DutyAssignmentRepository assignments) {
+    public TrooperController(TrooperRepository troopers, DutyAssignmentRepository assignments,
+            HourCreditRepository credits) {
         this.troopers = troopers;
         this.assignments = assignments;
+        this.credits = credits;
     }
 
     @GetMapping
@@ -106,7 +111,9 @@ public class TrooperController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> remove(@PathVariable Long id) {
         TrooperEntity entity = onRoster(id);
-        if (assignments.existsByTrooper_Id(id)) {
+        // Credited hours are history too, and their foreign key would refuse
+        // the delete just the same.
+        if (assignments.existsByTrooper_Id(id) || credits.existsByTrooper_Id(id)) {
             archive(entity);
             return ResponseEntity.noContent().build();
         }

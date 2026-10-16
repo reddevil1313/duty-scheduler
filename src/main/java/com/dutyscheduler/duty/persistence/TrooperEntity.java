@@ -37,6 +37,10 @@ public class TrooperEntity {
     @Column(nullable = false)
     private boolean active = true;
 
+    /** Hours done before this tracker existed; the starting point of their total. */
+    @Column(name = "opening_hours", nullable = false)
+    private int openingHours;
+
     protected TrooperEntity() {
     }
 
@@ -84,6 +88,14 @@ public class TrooperEntity {
 
     public boolean isActive() {
         return active;
+    }
+
+    public int getOpeningHours() {
+        return openingHours;
+    }
+
+    public void setOpeningHours(int openingHours) {
+        this.openingHours = openingHours;
     }
 
     /**

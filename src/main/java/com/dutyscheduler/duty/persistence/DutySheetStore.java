@@ -32,11 +32,14 @@ public class DutySheetStore {
     private final DutySheetRepository sheets;
     private final TrooperRepository troopers;
     private final AbsenceRepository absences;
+    private final HourCreditRepository credits;
 
-    public DutySheetStore(DutySheetRepository sheets, TrooperRepository troopers, AbsenceRepository absences) {
+    public DutySheetStore(DutySheetRepository sheets, TrooperRepository troopers, AbsenceRepository absences,
+            HourCreditRepository credits) {
         this.sheets = sheets;
         this.troopers = troopers;
         this.absences = absences;
+        this.credits = credits;
     }
 
     /**
@@ -87,17 +90,70 @@ public class DutySheetStore {
      */
     @Transactional(readOnly = true)
     public Optional<Schedule> load(LocalDate date) {
-        return sheets.findByDutyDate(date).map(sheet -> {
-            Map<Trooper, Post[]> grid = new LinkedHashMap<>();
-            for (DutyAssignmentEntity assignment : sheet.getAssignments()) {
-                Trooper trooper = assignment.getTrooper().toDomain();
-                grid.computeIfAbsent(trooper, t -> new Post[DutyDay.SLOT_COUNT])[assignment.getSlot()] = assignment
-                        .getPost();
+        return sheets.findByDutyDate(date).map(DutySheetStore::toDomain);
+    }
+
+    /** Every logged sheet, latest first. What the records are built from. */
+    @Transactional(readOnly = true)
+    public List<Schedule> loadAll() {
+        return sheets.findAllWithAssignments().stream().map(DutySheetStore::toDomain).toList();
+    }
+
+    private static Schedule toDomain(DutySheetEntity sheet) {
+        Map<Trooper, Post[]> grid = new LinkedHashMap<>();
+        for (DutyAssignmentEntity assignment : sheet.getAssignments()) {
+            Trooper trooper = assignment.getTrooper().toDomain();
+            grid.computeIfAbsent(trooper, t -> new Post[DutyDay.SLOT_COUNT])[assignment.getSlot()] = assignment
+                    .getPost();
+        }
+        Schedule.Builder builder = Schedule.builder(DutyDay.of(sheet.getDutyDate()));
+        grid.forEach((trooper, cells) -> builder.row(trooper, java.util.Arrays.asList(cells)));
+        return builder.build();
+    }
+
+    /** Credited hours, by logged date and then Trooper name. */
+    @Transactional(readOnly = true)
+    public Map<LocalDate, Map<String, Integer>> credits() {
+        Map<LocalDate, Map<String, Integer>> out = new LinkedHashMap<>();
+        for (HourCreditEntity credit : credits.findAllBy()) {
+            out.computeIfAbsent(credit.getSheet().getDutyDate(), d -> new LinkedHashMap<>())
+                    .put(credit.getTrooper().getName(), credit.getHours());
+        }
+        return out;
+    }
+
+    /**
+     * Replace a logged day's credited hours. A Trooper missing from the map, or
+     * credited zero, has none.
+     *
+     * @return false when nothing is logged for that date, so there is no day to
+     *         credit
+     * @throws IllegalArgumentException for a name not on any sheet's roster, or
+     *                                  hours outside 0 to 24
+     */
+    @Transactional
+    public boolean saveCredits(LocalDate date, Map<String, Integer> hours) {
+        DutySheetEntity sheet = sheets.findByDutyDate(date).orElse(null);
+        if (sheet == null) {
+            return false;
+        }
+        List<HourCreditEntity> rows = new ArrayList<>();
+        hours.forEach((name, h) -> {
+            if (h == null || h < 0 || h > DutyDay.SLOT_COUNT) {
+                throw new IllegalArgumentException(name + ": credited hours must be between 0 and 24.");
             }
-            Schedule.Builder builder = Schedule.builder(DutyDay.of(sheet.getDutyDate()));
-            grid.forEach((trooper, cells) -> builder.row(trooper, java.util.Arrays.asList(cells)));
-            return builder.build();
+            if (h == 0) {
+                return;
+            }
+            // Archived Troopers included: crediting an old day is about who was
+            // there then, not who is on the roster now.
+            TrooperEntity trooper = troopers.findByName(name).orElseThrow(
+                    () -> new IllegalArgumentException(name + " is not a Trooper."));
+            rows.add(new HourCreditEntity(sheet, trooper, h));
         });
+        credits.deleteBySheet(sheet);
+        credits.saveAll(rows);
+        return true;
     }
 
     /** Cumulative hours per man, which is what the fairness tiebreak reads. */
@@ -134,6 +190,12 @@ public class DutySheetStore {
             out.put(entity.toDomain(), byName.getOrDefault(entity.getName(), 0));
         }
         return out;
+    }
+
+    /** The whole leave register as domain objects, for counting leave in the records. */
+    @Transactional(readOnly = true)
+    public List<Absence> allAbsences() {
+        return absences.findAllByOrderByFromDateDescIdDesc().stream().map(AbsenceEntity::toDomain).toList();
     }
 
     /** Every booking that could reach the given sheet, as domain objects. */

@@ -19,6 +19,19 @@ public interface DutySheetRepository extends JpaRepository<DutySheetEntity, Long
   boolean existsByDutyDate(LocalDate dutyDate);
 
   /**
+   * Every logged sheet with its grid, latest first, in one query. The records
+   * read them all; loading each sheet's assignments lazily would be one query
+   * per day logged.
+   */
+  @Query("""
+      SELECT DISTINCT s FROM DutySheetEntity s
+        LEFT JOIN FETCH s.assignments a
+        LEFT JOIN FETCH a.trooper
+       ORDER BY s.dutyDate DESC
+      """)
+  List<DutySheetEntity> findAllWithAssignments();
+
+  /**
    * Cumulative hours per man over a date range — what long-run fairness is
    * decided from.
    */

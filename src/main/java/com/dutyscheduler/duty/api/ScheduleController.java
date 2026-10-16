@@ -24,6 +24,7 @@ import java.security.Principal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Generating, reading and logging duty sheets.
@@ -142,6 +143,20 @@ public class ScheduleController {
         Schedule schedule = ScheduleAssembler.toDomain(date, body, troopers);
         store.save(schedule, principal.getName());
         return ResponseEntity.ok(ScheduleResponse.from(schedule));
+    }
+
+    /**
+     * Replace a logged day's credited hours: hours counted toward someone's
+     * total for a day they did not stand, such as an MC or OL day. The grid is
+     * left alone. It is the record of who stood what, and editing it to reach
+     * a number would put people on posts they never stood.
+     */
+    @PutMapping("/{date}/credits")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> credit(@PathVariable LocalDate date, @RequestBody Map<String, Integer> hours) {
+        return store.saveCredits(date, hours)
+                ? ResponseEntity.noContent().build()
+                : ResponseEntity.status(HttpStatus.NOT_FOUND).build();
     }
 
     /** Thrown when the manpower cannot cover the sheet. Mapped to 422. */
