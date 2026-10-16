@@ -48,6 +48,10 @@ tasks.named('bootRun') {
 
 tasks.named('test') {
     useJUnitPlatform()
+    // The sheet image is drawn with Java2D. Headless, so tests on a Mac do not
+    // open a Dock icon and tests in CI need no display; the app itself is
+    // headless already, which Spring Boot sets by default.
+    systemProperty 'java.awt.headless', 'true'
     testLogging {
         events 'passed', 'skipped', 'failed'
         exceptionFormat 'full'

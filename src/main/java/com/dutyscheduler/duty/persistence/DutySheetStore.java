@@ -8,6 +8,7 @@ import com.dutyscheduler.duty.domain.Trooper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -42,8 +43,11 @@ public class DutySheetStore {
         this.credits = credits;
     }
 
-    /** A logged sheet and the turnout it was made with: null for the free split. */
-    public record Logged(Schedule schedule, Integer turnout) {
+    /**
+     * A logged sheet and the turnout it was made with: null for the free split.
+     * Who logged it, and when, ride along for anything that shows the record.
+     */
+    public record Logged(Schedule schedule, Integer turnout, String loggedBy, Instant loggedAt) {
     }
 
     /**
@@ -108,14 +112,14 @@ public class DutySheetStore {
     /** A logged sheet with its turnout, or nothing if that day was never logged. */
     @Transactional(readOnly = true)
     public Optional<Logged> loadLogged(LocalDate date) {
-        return sheets.findByDutyDate(date).map(sheet -> new Logged(toDomain(sheet), sheet.getTurnout()));
+        return sheets.findByDutyDate(date).map(sheet -> new Logged(toDomain(sheet), sheet.getTurnout(), sheet.getCreatedBy(), sheet.getCreatedAt()));
     }
 
     /** Every logged sheet with its turnout, latest first. */
     @Transactional(readOnly = true)
     public List<Logged> loadAllLogged() {
         return sheets.findAllWithAssignments().stream()
-                .map(sheet -> new Logged(toDomain(sheet), sheet.getTurnout()))
+                .map(sheet -> new Logged(toDomain(sheet), sheet.getTurnout(), sheet.getCreatedBy(), sheet.getCreatedAt()))
                 .toList();
     }
 

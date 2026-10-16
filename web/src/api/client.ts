@@ -42,7 +42,8 @@ export function setCsrfToken(token: string | null) {
   csrfToken = token
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+/** The one place a request is sent: credentials, CSRF header and error shape, for JSON and bytes alike. */
+async function send(path: string, init: RequestInit = {}): Promise<Response> {
   const method = init.method ?? 'GET'
   const headers = new Headers(init.headers)
 
@@ -66,10 +67,20 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!response.ok) {
     throw await errorFor(response)
   }
+  return response
+}
+
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const response = await send(path, init)
   if (response.status === 204 || response.headers.get('Content-Length') === '0') {
     return undefined as T
   }
   return (await response.json()) as T
+}
+
+/** A binary response, such as the sheet image. Failures still come back as ApiErrors. */
+async function requestBlob(path: string, init: RequestInit = {}): Promise<Blob> {
+  return (await send(path, init)).blob()
 }
 
 async function errorFor(response: Response): Promise<ApiError> {
@@ -143,6 +154,16 @@ export const api = {
     }),
 
   schedule: (date: string) => request<Schedule>(`/api/schedules/${date}`),
+
+  /**
+   * ADMIN only. Logs the sheet and returns its image, in one step: an image
+   * that comes back means the sheet is logged, and a failure logs nothing.
+   */
+  logAndImage: (date: string, schedule: Schedule) =>
+    requestBlob(`/api/schedules/${date}/image`, { method: 'POST', body: JSON.stringify(schedule) }),
+
+  /** The image of a sheet already logged. Anyone signed in; changes nothing. */
+  image: (date: string) => requestBlob(`/api/schedules/${date}/image`),
 
   /** What a sheet breaks, saving nothing. Called after every hand edit. */
   check: (date: string, schedule: Schedule, ticks: Ticks = {}) =>

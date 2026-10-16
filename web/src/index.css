@@ -359,3 +359,4 @@ p.ticks {
   color: #d9b8ff; font-weight: 600; font-size: 0.68rem;
   background: repeating-linear-gradient(135deg, #2c2238 0 4px, #33284a 4px 8px);
 }
+button.image { min-width: 11.5rem; }

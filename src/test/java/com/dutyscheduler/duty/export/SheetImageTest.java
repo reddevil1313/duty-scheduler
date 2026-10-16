@@ -1,0 +1,112 @@
+package com.dutyscheduler.duty.export;
+
+import com.dutyscheduler.duty.domain.DutyDay;
+import com.dutyscheduler.duty.domain.Post;
+import com.dutyscheduler.duty.domain.Schedule;
+import com.dutyscheduler.duty.domain.Trooper;
+import com.dutyscheduler.duty.solver.ScheduleSolver;
+import com.dutyscheduler.duty.solver.SolveRequest;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+import javax.imageio.ImageIO;
+import java.awt.Color;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+/**
+ * The image is checked by decoding it and reading pixels back: the grid is where
+ * the layout says, and each cell is the colour of the post the sheet has there.
+ * Text is not compared — fonts differ between machines — only the geometry and
+ * the colours the sheet decides.
+ */
+class SheetImageTest {
+
+    private static final List<Trooper> NINE = List.of(
+            Trooper.of("TROOPER_A"), Trooper.of("TROOPER_B"), Trooper.of("TROOPER_C"), Trooper.of("TROOPER_D"),
+            Trooper.of("TROOPER_E"), Trooper.of("TROOPER_F"), Trooper.of("TROOPER_G"),
+            Trooper.stayOut("TROOPER_H"), Trooper.stayOut("TROOPER_I"));
+    private static final DutyDay THURSDAY = DutyDay.of(LocalDate.of(2026, 9, 10));
+
+    // The layout, as SheetImage draws it.
+    private static final int PAD = 24, NAME_W = 150, HOUR_W = 34, TALLY_W = 46, ROW_H = 26, HEAD_H = 22;
+    private static final int FIRST_ROW_Y = PAD + 30 + 22 + 14 + HEAD_H;
+
+    private static Schedule solve(Integer turnout) {
+        SolveRequest request = SolveRequest.of(THURSDAY, NINE, NINE.subList(0, 3)).withTurnout(turnout);
+        return new ScheduleSolver().solve(request).schedule();
+    }
+
+    private static BufferedImage decode(byte[] png) throws IOException {
+        return ImageIO.read(new ByteArrayInputStream(png));
+    }
+
+    /** A pixel just inside a cell's top-left corner: the cell's ground, clear of the label. In image pixels, at the scale. */
+    private static Color groundAt(BufferedImage image, int row, int slot) {
+        int s = SheetImage.SCALE;
+        return new Color(image.getRGB((PAD + NAME_W + slot * HOUR_W + 3) * s, (FIRST_ROW_Y + row * ROW_H + 5) * s));
+    }
+
+    @Test
+    @DisplayName("it is a PNG, as wide as the grid and as tall as its rows, at twice the layout size")
+    void sizeFollowsTheSheet() throws IOException {
+        Schedule sheet = solve(null);
+        int rows = (int) sheet.rows().stream().filter(r -> r.hours() > 0).count();
+
+        BufferedImage image = decode(SheetImage.png(sheet, null, "admin", Instant.now()));
+
+        int s = SheetImage.SCALE;
+        assertEquals((PAD * 2 + NAME_W + DutyDay.SLOT_COUNT * HOUR_W + 2 * TALLY_W) * s, image.getWidth());
+        assertEquals((PAD + 30 + 22 + 14 + HEAD_H + rows * ROW_H + 18 + 16 + PAD) * s, image.getHeight());
+    }
+
+    @Test
+    @DisplayName("every cell is the colour of the post the sheet has there, and empty hours are paper")
+    void cellsMatchTheSheet() throws IOException {
+        Schedule sheet = solve(null);
+        List<Schedule.Row> rows = sheet.rows().stream().filter(r -> r.hours() > 0).toList();
+
+        BufferedImage image = decode(SheetImage.png(sheet, null, "admin", Instant.now()));
+
+        for (int r = 0; r < rows.size(); r++) {
+            for (int slot = 0; slot < DutyDay.SLOT_COUNT; slot++) {
+                Post post = rows.get(r).at(slot);
+                Color expected = post == null ? Color.WHITE : SheetImage.POST_COLOURS.get(post)[0];
+                assertEquals(expected, groundAt(image, r, slot),
+                        rows.get(r).trooper().name() + " at slot " + slot + " should be " + (post == null ? "empty" : post));
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("a fixed-turnout sheet gets an MP row, coloured where the MP team covers")
+    void mpRow() throws IOException {
+        Schedule sheet = solve(5);
+        int rows = (int) sheet.rows().stream().filter(r -> r.hours() > 0).count();
+        List<List<Post>> mp = SheetImage.shortfall(sheet);
+        int slot = 0;
+        while (mp.get(slot).isEmpty()) {
+            slot++;
+        }
+
+        BufferedImage image = decode(SheetImage.png(sheet, 5, "admin", Instant.now()));
+
+        assertEquals((PAD + 30 + 22 + 14 + HEAD_H + (rows + 1) * ROW_H + 18 + 16 + PAD) * SheetImage.SCALE, image.getHeight(),
+                "one row more than the Troopers: the MP team's");
+        assertEquals(SheetImage.MP_COLOURS[0], groundAt(image, rows, slot));
+    }
+
+    @Test
+    @DisplayName("the same sheet draws the same image")
+    void deterministic() {
+        Schedule sheet = solve(null);
+        Instant at = Instant.parse("2026-09-10T12:00:00Z");
+        assertArrayEquals(SheetImage.png(sheet, null, "admin", at), SheetImage.png(sheet, null, "admin", at));
+    }
+}

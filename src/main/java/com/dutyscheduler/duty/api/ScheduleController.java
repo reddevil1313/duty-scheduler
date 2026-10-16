@@ -241,10 +241,7 @@ public class ScheduleController {
             @Valid @RequestBody ScheduleResponse body,
             Principal principal) {
         Schedule schedule = ScheduleAssembler.toDomain(date, body, troopers);
-        Integer turnout = body.turnout();
-        if (turnout != null && (turnout < SolveRequest.MIN_TURNOUT || turnout > SolveRequest.MAX_TURNOUT)) {
-            throw new IllegalArgumentException("A fixed turnout is 5 to 7 hours, not " + turnout + ".");
-        }
+        Integer turnout = checkedTurnout(body.turnout());
         store.save(schedule, principal.getName(), turnout);
         return ResponseEntity.ok(ScheduleResponse.from(schedule, turnout, null));
     }
@@ -261,6 +258,14 @@ public class ScheduleController {
         return store.saveCredits(date, hours)
                 ? ResponseEntity.noContent().build()
                 : ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+    }
+
+    /** A logged turnout is 5 to 7 hours, or null for the free split. Shared with the image, which logs too. */
+    static Integer checkedTurnout(Integer turnout) {
+        if (turnout != null && (turnout < SolveRequest.MIN_TURNOUT || turnout > SolveRequest.MAX_TURNOUT)) {
+            throw new IllegalArgumentException("A fixed turnout is 5 to 7 hours, not " + turnout + ".");
+        }
+        return turnout;
     }
 
     /** Thrown when the manpower cannot cover the sheet. Mapped to 422. */

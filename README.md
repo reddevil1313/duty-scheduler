@@ -31,6 +31,8 @@ Both ship together as a single image.
   Troopers' whole days. Every edit is checked against the rules as you make it,
   with an hour-by-hour coverage row and a list of what the sheet breaks,
   including anyone put on duty during their own leave.
+- **Save the sheet as an image** for sending on. Saving the image logs the
+  sheet in the same step, so what was sent is always what was recorded.
 - **Log the sheet actually used**, edits included. A sheet that breaks a rule
   can still be logged, after a warning, because the log records what was used.
   Past sheets can be looked up by date.
@@ -152,6 +154,8 @@ that is well formed but cannot be fulfilled returns `422`.
 | `POST` | `/schedules/{date}/check` | signed in | What a sheet breaks, and each hour's demand; saves nothing |
 | `PUT` | `/schedules/{date}` | `ADMIN` | Log the sheet actually used |
 | `PUT` | `/schedules/{date}/credits` | `ADMIN` | Set a logged day's credited hours |
+| `POST` | `/schedules/{date}/image` | `ADMIN` | Log the sheet and return it as a PNG |
+| `GET` | `/schedules/{date}/image` | signed in | The logged sheet as a PNG; 404 when none |
 | `GET` | `/absences` | signed in | The leave register |
 | `POST` | `/absences` | `ADMIN` | Record leave |
 | `POST` | `/absences/preview` | signed in | The interval and sheets a booking would affect; saves nothing |
@@ -171,6 +175,7 @@ src/main/java/com/dutyscheduler/duty/
   solver/        ScheduleSolver, scoring and local improvement
   persistence/   JPA entities, repositories, DutySheetStore
   api/           controllers, security, DTOs
+  export/        the sheet image (Java2D)
 src/main/resources/db/migration/   Flyway migrations
 web/                               React client
 ```

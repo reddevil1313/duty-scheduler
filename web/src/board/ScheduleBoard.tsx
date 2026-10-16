@@ -4,6 +4,7 @@ import type { Post, Schedule, SheetCheck } from '../api/types'
 import { useReport } from '../api/useReport'
 import { useSession } from '../auth/session-context'
 import { shortDate } from '../dates'
+import { download } from '../download'
 import type { RosterState } from '../roster/useRoster'
 import { mpShortfall, setCell, swapRows } from './edit'
 import { SheetGrid, type Mode } from './SheetGrid'
@@ -154,6 +155,40 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
     }
   }
 
+  /**
+   * Log the sheet and save its image, in one request: the server draws, then
+   * logs, then sends, so the image saved is always the sheet recorded.
+   */
+  const logAndImage = async () => {
+    if (!schedule) return
+    setBusy(true)
+    setError(null)
+    try {
+      const image = await api.logAndImage(date, { ...schedule, turnout: sheetTurnout })
+      download(image, `duty-sheet-${date}.png`)
+      const saved = await api.schedule(date)
+      show(saved, 'logged', saved.turnout ?? null)
+      setNote('Logged, and the image saved.')
+    } catch (e) {
+      await report(e)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** The image of the sheet as logged, for sending it on again. */
+  const saveImage = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      download(await api.image(date), `duty-sheet-${date}.png`)
+    } catch (e) {
+      await report(e)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const toggleMode = (next: Mode) => {
     setMode((m) => (m === next ? 'view' : next))
     setSwapPick(null)
@@ -290,6 +325,16 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
             >
               {logLabel}
             </button>
+            {/* One button for both, so nothing shifts: a sheet still to log is
+                logged by saving its image; a logged one just saves it again. */}
+            <button
+              type="button"
+              className="image"
+              onClick={canLog ? logAndImage : saveImage}
+              disabled={busy || !schedule || (canLog && current === null)}
+            >
+              {canLog ? 'Log and save image' : 'Save image'}
+            </button>
           </div>
         )}
       </div>
@@ -321,6 +366,11 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
               {' '}
               {current?.sheet.totalHours ?? schedule.totalHours} man-hours over {schedule.rows.length} men.
             </p>
+            {!isAdmin && source === 'logged' && (
+              <div className="actions">
+                <button type="button" onClick={saveImage} disabled={busy}>Save image</button>
+              </div>
+            )}
             {isAdmin && (
               <div className="actions">
                 {/* Fixed widths, and Undo kept in place but hidden, so the
