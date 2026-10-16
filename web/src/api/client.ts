@@ -1,4 +1,6 @@
-import type { Absence, ProblemDetail, Schedule, Session, Trooper, TrooperParticulars } from './types'
+import type {
+  Absence, AbsenceReach, AbsenceRequest, ProblemDetail, Schedule, Session, Trooper, TrooperParticulars,
+} from './types'
 
 /**
  * Everything that talks to the server, in one file.
@@ -136,7 +138,20 @@ export const api = {
       body: JSON.stringify(schedule),
     }),
 
+  /** The leave register, latest first. Anyone signed in. */
   absences: () => request<Absence[]>('/api/absences'),
+
+  /** ADMIN only. 400 with the reason when the booking does not make sense. */
+  bookAbsence: (absence: AbsenceRequest) =>
+    request<Absence>('/api/absences', { method: 'POST', body: JSON.stringify(absence) }),
+
+  /** What a booking would reach, saving nothing. Still a POST, so still needs the CSRF token. */
+  previewAbsence: (absence: AbsenceRequest) =>
+    request<AbsenceReach>('/api/absences/preview', { method: 'POST', body: JSON.stringify(absence) }),
+
+  /** ADMIN only. */
+  cancelAbsence: (id: number) =>
+    request<void>(`/api/absences/${id}`, { method: 'DELETE' }),
 
   troopers: () => request<Trooper[]>('/api/troopers'),
 

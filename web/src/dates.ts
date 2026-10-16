@@ -1,0 +1,32 @@
+/** Dates as the API sends them: `YYYY-MM-DD`, and `YYYY-MM-DDTHH:MM[:SS]` for instants. */
+
+export function today(): string {
+  // Local, not toISOString(). A sheet is named by the evening it starts, and at
+  // 2100 in Singapore toISOString() already says tomorrow.
+  const now = new Date()
+  const offset = now.getTimezoneOffset() * 60_000
+  return new Date(now.getTime() - offset).toISOString().slice(0, 10)
+}
+
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/**
+ * `2026-09-10` → `Thu 10 Sep`.
+ *
+ * <p>Spelled out by hand rather than with toLocaleDateString: browsers' locale
+ * data disagree (current Chrome writes "Sept" for en-GB), and a board should
+ * not change its spelling with the browser it is opened in. Parsed as a local
+ * date, never through `new Date(string)`, which reads it as UTC.
+ */
+export function shortDate(date: string): string {
+  const [y, m, d] = date.split('-').map(Number)
+  const day = new Date(y, m - 1, d).getDay()
+  return `${DAYS[day]} ${d} ${MONTHS[m - 1]}`
+}
+
+/** `2026-09-10T20:00:00` → `Thu 10 Sep 2000`, the way times are written on the board. */
+export function shortInstant(instant: string): string {
+  const [date, time] = instant.split('T')
+  return `${shortDate(date)} ${time.slice(0, 2)}${time.slice(3, 5)}`
+}

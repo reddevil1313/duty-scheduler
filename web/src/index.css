@@ -19,6 +19,10 @@
 
 body { margin: 0; }
 
+/* A later display rule on main or a section would otherwise beat the attribute
+   and show both views at once. */
+[hidden] { display: none !important; }
+
 header {
   display: flex;
   align-items: center;
@@ -57,7 +61,7 @@ button {
 button:hover:not(:disabled) { border-color: var(--accent); }
 button:disabled { opacity: 0.45; cursor: not-allowed; }
 
-input {
+input, select {
   font: inherit;
   color: var(--ink);
   background: #14161a;
@@ -191,3 +195,37 @@ button.danger { border-color: var(--bad); color: var(--bad); }
 .cell.on.gg { background: #3d4a2f; }
 .cell.on.pac { background: #4a3a52; }
 .cell.on.bus { background: #573f2c; }
+
+/* ---- views ---- */
+.views { display: flex; gap: 0.35rem; margin-right: auto; margin-left: 1.5rem; }
+.views button { background: transparent; border-color: transparent; color: var(--dim); }
+.views button[aria-current="page"] { background: #2b3038; border-color: var(--line); color: var(--ink); }
+
+/* ---- leave register ---- */
+.section-hd { display: flex; align-items: baseline; gap: 0.8rem; margin-bottom: 0.6rem; }
+.section-hd h2 { font-size: 0.85rem; color: var(--dim); margin: 0; font-weight: 600; }
+
+.leave-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.7rem;
+  margin-bottom: 1rem;
+}
+.leave-form .times { display: flex; align-items: center; gap: 0.4rem; color: var(--dim); }
+.leave-form .preview { flex-basis: 100%; margin: 0; }
+
+.register { border-collapse: collapse; font-size: 0.82rem; width: 100%; }
+.register th { text-align: left; color: var(--dim); font-weight: 500; padding: 0.3rem 0.9rem 0.3rem 0; }
+.register td { padding: 0.35rem 0.9rem 0.35rem 0; border-top: 1px solid var(--line); }
+.register tr.past td { opacity: 0.5; }
+.register .row-actions { display: flex; gap: 0.35rem; }
+
+.kind { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.05em; padding: 0.1rem 0.45rem; border-radius: 3px; }
+.kind.MC { background: #4a2523; color: var(--bad); }
+.kind.OL { background: #45391a; color: #e3b341; }
+.kind.AL { background: #1f3350; color: var(--accent); }
+.kind.MA { background: #173d38; color: #56d4c0; }

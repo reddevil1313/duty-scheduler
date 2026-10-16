@@ -7,6 +7,8 @@ import com.dutyscheduler.duty.persistence.TrooperRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -18,7 +20,11 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
+import java.util.Arrays;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -26,7 +32,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * The leave register as the client uses it.
+ * The leave register as the client uses it: which sheets a booking reaches, the
+ * note, the order, and the preview the form shows before anything is saved.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -59,6 +66,52 @@ class LeaveRegisterIT {
         troopers.save(new TrooperEntity("TROOPER_B", false));
     }
 
+    /**
+     * The 2000 rule, one span at a time. A sheet is named by the evening it
+     * starts, so the answers are mostly the day before the date booked.
+     */
+    @ParameterizedTest(name = "{0}: {5}")
+    @CsvSource(delimiter = '|', textBlock = """
+            MC | FULL       | 2026-09-10 | 2026-09-12 |             | 2026-09-09 2026-09-10 2026-09-11 | an MC until the 12th never touches the 12th's sheet
+            AL | FULL       | 2026-09-10 | 2026-09-10 |             | 2026-09-09                       | a single day off is exactly one sheet, the one running through it
+            OL | DAY_HALF   | 2026-09-10 |            |             | 2026-09-09                       | the day half is the morning after the 9th's evening
+            OL | NIGHT_HALF | 2026-09-10 |            |             | 2026-09-10                       | the night half is the 10th's own evening
+            MA | WINDOW     | 2026-09-11 |            | 09:30-11:30 | 2026-09-10                       | a morning appointment lands on the previous day's sheet
+            MA | WINDOW     | 2026-09-11 |            | 20:30-21:30 | 2026-09-11                       | an evening appointment lands on the same day's sheet
+            """)
+    void sheetsReached(String kind, String span, String from, String to, String window,
+            String expected, String why) throws Exception {
+        String times = window == null ? "" : """
+                ,"start":"%s","end":"%s\"""".formatted(window.split("-")[0], window.split("-")[1]);
+        String body = """
+                {"trooper":"TROOPER_A","kind":"%s","span":"%s","from":"%s"%s%s}
+                """.formatted(kind, span, from, to == null ? "" : ",\"to\":\"" + to + "\"", times);
+
+        mvc.perform(post("/api/absences").with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.sheets", contains(Arrays.stream(expected.split(" ")).toArray())));
+    }
+
+    @Test
+    @DisplayName("the note is kept, trimmed, and a blank one is no note at all")
+    void noteIsKept() throws Exception {
+        mvc.perform(post("/api/absences").with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"trooper":"TROOPER_A","kind":"MC","span":"FULL","from":"2026-09-10","note":"  clinic ref 12 "}
+                        """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.note").value("clinic ref 12"));
+        mvc.perform(post("/api/absences").with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"trooper":"TROOPER_B","kind":"AL","span":"FULL","from":"2026-09-10","note":"   "}
+                        """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.note").value(nullValue()));
+    }
+
     @Test
     @DisplayName("the register lists the latest leave first")
     void latestFirst() throws Exception {
@@ -77,5 +130,45 @@ class LeaveRegisterIT {
         mvc.perform(get("/api/absences").param("trooper", "TROOPER_A"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[*].trooper", contains("TROOPER_A", "TROOPER_A", "TROOPER_A")));
+    }
+
+    @Test
+    @DisplayName("a preview answers what a booking would reach, and books nothing")
+    void previewSavesNothing() throws Exception {
+        mvc.perform(post("/api/absences/preview").with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"trooper":"TROOPER_A","kind":"MC","span":"FULL","from":"2026-09-10","to":"2026-09-12"}
+                        """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.covers").value("2026-09-10T00:00:00"))
+                .andExpect(jsonPath("$.until").value("2026-09-12T20:00:00"))
+                .andExpect(jsonPath("$.sheets", contains("2026-09-09", "2026-09-10", "2026-09-11")));
+
+        assertThat(absences.count()).isZero();
+    }
+
+    @Test
+    @DisplayName("a preview of an impossible booking says what is wrong")
+    void previewExplainsAMistake() throws Exception {
+        mvc.perform(post("/api/absences/preview").with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"trooper":"TROOPER_A","kind":"MA","span":"WINDOW","from":"2026-09-10","start":"11:00","end":"09:00"}
+                        """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("A window ends before it starts: 11:00 to 09:00"));
+    }
+
+    @Test
+    @WithMockUser(username = "trooper_d", roles = "USER")
+    @DisplayName("anyone signed in may preview, because a preview writes nothing")
+    void previewIsOpenToUsers() throws Exception {
+        mvc.perform(post("/api/absences/preview").with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"trooper":"TROOPER_A","kind":"AL","span":"FULL","from":"2026-09-10"}
+                        """))
+                .andExpect(status().isOk());
     }
 }

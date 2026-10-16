@@ -1,8 +1,10 @@
 package com.dutyscheduler.duty.api;
 
+import com.dutyscheduler.duty.api.dto.AbsenceReach;
 import com.dutyscheduler.duty.api.dto.AbsenceRequest;
 import com.dutyscheduler.duty.api.dto.AbsenceResponse;
 import com.dutyscheduler.duty.domain.Absence;
+import com.dutyscheduler.duty.domain.Trooper;
 import com.dutyscheduler.duty.persistence.AbsenceEntity;
 import com.dutyscheduler.duty.persistence.AbsenceRepository;
 import com.dutyscheduler.duty.persistence.TrooperEntity;
@@ -49,11 +51,30 @@ public class AbsenceController {
                 .orElseThrow(() -> new IllegalArgumentException(
                         request.trooper() + " is not on the roster."));
 
-        Absence absence = new Absence(trooper.toDomain(), request.kind(), request.span(),
-                request.from(), request.to(), request.start(), request.end());
-
-        AbsenceEntity saved = absences.save(new AbsenceEntity(trooper, absence, principal.getName()));
+        AbsenceEntity entity = new AbsenceEntity(trooper, toDomain(trooper.toDomain(), request),
+                principal.getName());
+        entity.setNote(request.note() == null || request.note().isBlank() ? null : request.note().trim());
+        AbsenceEntity saved = absences.save(entity);
         return ResponseEntity.status(HttpStatus.CREATED).body(AbsenceResponse.from(saved));
+    }
+
+    /**
+     * What a booking would take, without making it. The form calls this as it is
+     * filled in, so the sheets a booking reaches are on screen before it is
+     * saved — the 2000 cut-off is a surprise a week later otherwise.
+     *
+     * <p>
+     * Saves nothing, so any signed-in user may ask. The Trooper is not looked
+     * up: who it is changes nothing about the interval.
+     */
+    @PostMapping("/preview")
+    public AbsenceReach preview(@Valid @RequestBody AbsenceRequest request) {
+        return AbsenceReach.of(toDomain(new Trooper(request.trooper(), false), request));
+    }
+
+    private static Absence toDomain(Trooper trooper, AbsenceRequest request) {
+        return new Absence(trooper, request.kind(), request.span(),
+                request.from(), request.to(), request.start(), request.end());
     }
 
     @DeleteMapping("/{id}")

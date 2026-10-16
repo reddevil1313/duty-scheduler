@@ -20,8 +20,10 @@ Both ship together as a single image.
 - **Roster** of Troopers, each marked as living in or staying out, with a
   default night group. Troopers can be added, edited and removed. Removing
   someone who stood a logged sheet archives them, so past sheets stay intact.
-- **Leave register** that takes absences into account automatically when
-  sheets are generated.
+- **Leave register** for MCs, off-in-lieu, annual leave and medical
+  appointments: full days, half days or a time window. Each entry shows the
+  duty sheets it affects, before and after booking, and is taken into account
+  automatically when sheets are generated.
 - **Two roles**: `ADMIN` manages the roster and leave, and generates and logs
   sheets. `USER` has read-only access.
 
@@ -125,6 +127,7 @@ that is well formed but cannot be fulfilled returns `422`.
 | `PUT` | `/schedules/{date}` | `ADMIN` | Log the sheet actually used |
 | `GET` | `/absences` | signed in | The leave register |
 | `POST` | `/absences` | `ADMIN` | Record leave |
+| `POST` | `/absences/preview` | signed in | The interval and sheets a booking would affect; saves nothing |
 | `DELETE` | `/absences/{id}` | `ADMIN` | Remove leave |
 
 Write requests must send the CSRF token from `GET /api/session` in an

@@ -1,22 +1,16 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ApiError, api } from '../api/client'
 import type { Schedule, Trooper } from '../api/types'
+import { useReport } from '../api/useReport'
 import { useSession } from '../auth/session-context'
+import { today } from '../dates'
 import { RosterPanel } from '../roster/RosterPanel'
 import { SLOT_COUNT, isCrossover, isSilent, labelAt } from './slots'
 
 type Source = 'logged' | 'generated'
 
-function today(): string {
-  // Local, not toISOString(). A sheet is named by the evening it starts, and at
-  // 2100 in Singapore toISOString() already says tomorrow.
-  const now = new Date()
-  const offset = now.getTimezoneOffset() * 60_000
-  return new Date(now.getTime() - offset).toISOString().slice(0, 10)
-}
-
 export function ScheduleBoard() {
-  const { session, recheck } = useSession()
+  const { session } = useSession()
   const isAdmin = session?.role === 'ADMIN'
 
   const [date, setDate] = useState(today)
@@ -27,22 +21,7 @@ export function ScheduleBoard() {
   const [note, setNote] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-
-  /**
-   * One place where a failed call becomes something on screen.
-   *
-   * <p>The 401 branch is the reason this exists rather than a try/catch at each
-   * call site. A session that has quietly expired makes every button fail, and
-   * without the recheck the app would keep drawing a signed-in shell over an API
-   * that refuses everything.
-   */
-  const report = useCallback(async (e: unknown) => {
-    if (e instanceof ApiError && e.status === 401) {
-      await recheck()
-      return
-    }
-    setError(e instanceof Error ? e.message : 'Something went wrong.')
-  }, [recheck])
+  const report = useReport(setError)
 
   useEffect(() => {
     let cancelled = false

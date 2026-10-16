@@ -37,9 +37,31 @@ export interface Absence {
   to: string
   start: string | null
   end: string | null
+  note: string | null
   /** The resolved interval, worked out server-side so the 2000 rule lives in one place. */
   covers: string
   until: string
+  /** Duty dates whose sheets this reaches. A sheet is named by the evening it starts. */
+  sheets: string[]
+}
+
+/** Book leave. `to` is read only for FULL; `start` and `end` only for WINDOW. */
+export interface AbsenceRequest {
+  trooper: string
+  kind: AbsenceKind
+  span: AbsenceSpan
+  from: string
+  to: string | null
+  start: string | null
+  end: string | null
+  note: string | null
+}
+
+/** What a booking would take, from the preview endpoint. Nothing is saved. */
+export interface AbsenceReach {
+  covers: string
+  until: string
+  sheets: string[]
 }
 
 /**
