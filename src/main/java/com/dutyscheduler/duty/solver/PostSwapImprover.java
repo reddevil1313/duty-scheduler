@@ -25,6 +25,17 @@ final class PostSwapImprover {
     /** Each pass takes one trade; a sheet has far fewer walks than this to remove. */
     private static final int MAX_PASSES = 200;
 
+    /** [trooper][slot]: cells a human chose, such as the BUS hours. Never traded. */
+    private final boolean[][] pinned;
+
+    PostSwapImprover() {
+        this(null);
+    }
+
+    PostSwapImprover(boolean[][] pinned) {
+        this.pinned = pinned;
+    }
+
     Post[][] improve(Post[][] original) {
         Post[][] grid = new Post[original.length][];
         for (int i = 0; i < original.length; i++) {
@@ -63,6 +74,9 @@ final class PostSwapImprover {
         for (int slot = from; slot < from + length; slot++) {
             // Both on duty for every hour traded; otherwise the trade would move hours.
             if (grid[a][slot] == null || grid[b][slot] == null) {
+                return false;
+            }
+            if (pinned != null && (pinned[a][slot] || pinned[b][slot])) {
                 return false;
             }
             differs |= grid[a][slot] != grid[b][slot];

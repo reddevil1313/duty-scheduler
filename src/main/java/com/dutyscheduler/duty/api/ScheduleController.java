@@ -67,8 +67,17 @@ public class ScheduleController {
         List<Absence> absences = new ArrayList<>(store.absencesTouching(day));
         absences.addAll(ticked);
 
+        Trooper bus = null;
+        if (request.bus() != null && !request.bus().isBlank()) {
+            bus = roster.stream().filter(t -> t.name().equals(request.bus())).findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException(request.bus() + " is not on the roster."));
+        }
+
+        // A BUS choice the chosen Trooper cannot stand comes back unsolved, with
+        // the reason, before any search — and leaves as a 422 like any sheet
+        // that cannot be covered.
         SolveResult result = solver.solve(
-                new SolveRequest(day, roster, night, absences, store.history(day.date())));
+                new SolveRequest(day, roster, night, absences, store.history(day.date()), bus));
 
         if (!result.isSolved()) {
             throw new UnsolvableException(result.reason());

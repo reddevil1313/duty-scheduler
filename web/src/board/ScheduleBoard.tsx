@@ -34,6 +34,11 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
   const [note, setNote] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // Who takes the BUS run, chosen like the night group; null lets the solver
+  // choose. Read through busPick, so a Trooper since removed, renamed or ticked
+  // out falls back to the solver's choice instead of a request that fails.
+  const [bus, setBus] = useState<string | null>(null)
+  const busPick = bus !== null && roster.some((t) => t.name === bus) && !(bus in ticks) ? bus : null
   const report = useReport(setError)
 
   const edited = schedule !== original
@@ -105,7 +110,11 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
     try {
       // Someone ticked out stays out of the night group sent; the server drops
       // them too, but sending it right keeps the request saying what it means.
-      show(await api.generate(date, nightGroup.filter((n) => !(n in ticks)), ticks), 'generated')
+      show(await api.generate(date, {
+        nightGroup: nightGroup.filter((n) => !(n in ticks)),
+        ticks,
+        bus: busPick,
+      }), 'generated')
     } catch (e) {
       await report(e)
     } finally {
@@ -190,6 +199,30 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
                 />
                 {t.name}
                 {t.name in ticks && <span className="tag">{ticks[t.name]}</span>}
+              </label>
+            ))}
+          </fieldset>
+        )}
+
+        {isAdmin && (
+          <fieldset className="night bus">
+            <legend>BUS 0700–1000</legend>
+            <label className="pill">
+              <input type="radio" name="bus" checked={busPick === null} onChange={() => setBus(null)} />
+              Any
+            </label>
+            {/* Stay-outs are not in until 0800, so they are never offered;
+                the server refuses them regardless. */}
+            {roster.filter((t) => !t.stayOut).map((t) => (
+              <label key={t.name} className={`pill${t.name in ticks ? ' ticked' : ''}`}>
+                <input
+                  type="radio"
+                  name="bus"
+                  checked={busPick === t.name}
+                  disabled={t.name in ticks}
+                  onChange={() => setBus(t.name)}
+                />
+                {t.name}
               </label>
             ))}
           </fieldset>

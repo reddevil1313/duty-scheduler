@@ -34,10 +34,21 @@ final class SpanImprover {
 
     private final List<Trooper> troopers;
     private final Eligibility eligibility;
+    /** [trooper][slot]: cells a human chose, such as the BUS hours. Never moved. */
+    private final boolean[][] pinned;
 
     SpanImprover(List<Trooper> troopers, Eligibility eligibility) {
+        this(troopers, eligibility, null);
+    }
+
+    SpanImprover(List<Trooper> troopers, Eligibility eligibility, boolean[][] pinned) {
         this.troopers = troopers;
         this.eligibility = eligibility;
+        this.pinned = pinned;
+    }
+
+    private boolean isPinned(int trooper, int slot) {
+        return pinned != null && pinned[trooper][slot];
     }
 
     /**
@@ -162,6 +173,11 @@ final class SpanImprover {
                 }
                 for (int from = start; from < slot; from++) {
                     for (int to = from; to < slot && to - from < DutyRules.MAX_STINT; to++) {
+                        // A segment holding a pinned cell would carry it to
+                        // someone else, so it is never offered for a swap.
+                        if (isPinned(t, to)) {
+                            break;
+                        }
                         out.add(new Segment(t, from, to - from + 1));
                     }
                 }

@@ -91,6 +91,14 @@ export type TickKind = 'MC' | 'OL' | 'AL'
  * browser only, sent with each generate and check, and gone on sign-out.
  */
 export type Ticks = Record<string, TickKind>
+
+/** What a generate is asked for, beyond the date. */
+export interface GenerateOptions {
+  nightGroup: string[]
+  ticks?: Ticks
+  /** Who takes the BUS run; left out, the solver chooses. */
+  bus?: string | null
+}
 export type AbsenceSpan = 'FULL' | 'DAY_HALF' | 'NIGHT_HALF' | 'WINDOW'
 
 export interface Absence {

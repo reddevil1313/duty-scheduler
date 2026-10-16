@@ -14,7 +14,6 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Backtracking search that fills every post on a sheet.
@@ -66,6 +65,13 @@ public final class ScheduleSolver {
      * The returned schedule is legal.
      */
     public SolveResult solve(SolveRequest request) {
+        // A chosen BUS Trooper who cannot stand the BUS hours is refused before
+        // any search: the answer would only ever be "no solution", reached the
+        // slow way and explained worse.
+        String busProblem = busProblem(request);
+        if (busProblem != null) {
+            return SolveResult.failed(busProblem, null, 0);
+        }
         SolveResult best = null;
         ScheduleScore bestScore = null;
         String firstReason = null;
@@ -90,6 +96,45 @@ public final class ScheduleSolver {
             return SolveResult.failed(firstReason == null ? "No solution." : firstReason, null, nodes);
         }
         return new SolveResult(best.schedule(), best.targets(), null, nodes);
+    }
+
+    /**
+     * Why the chosen BUS Trooper cannot take the BUS hours on this sheet, or
+     * null when they can — or when nobody was chosen, or the sheet has no BUS.
+     */
+    static String busProblem(SolveRequest request) {
+        Trooper bus = request.bus();
+        if (bus == null) {
+            return null;
+        }
+        DutyDay day = request.day();
+        boolean[] free = Availability.mask(bus, day, request.absences());
+        boolean onNight = request.nightGroup().contains(bus);
+        boolean[] cross = HourTargets.crossoverWindow(day);
+        for (int slot : busSlots(day)) {
+            String at = day.slot(slot).label();
+            if (!free[slot]) {
+                return bus.name() + " cannot take BUS: they are not available at " + at
+                        + (bus.stayOut() ? ", being a stay-out." : ", being on leave.");
+            }
+            if (onNight && !cross[slot]) {
+                return bus.name() + " cannot take BUS: they are on night, and " + at
+                        + " is outside the hours a night Trooper may cross into.";
+            }
+        }
+        return null;
+    }
+
+    /** The slots BUS stands on this sheet, in order. Empty at the weekend. */
+    static List<Integer> busSlots(DutyDay day) {
+        DayDemand demand = DayDemand.of(day);
+        List<Integer> out = new ArrayList<>();
+        for (int slot = 0; slot < DutyDay.SLOT_COUNT; slot++) {
+            if (demand.at(slot).getOrDefault(Post.BUS, 0) > 0) {
+                out.add(slot);
+            }
+        }
+        return out;
     }
 
     /**
@@ -124,6 +169,10 @@ public final class ScheduleSolver {
         private final int[] owed; // hours each man still has to do
         private final List<Position> positions;
         private final int[] filledBy; // [position] -> trooper index, -1 unset
+        // Cells placed by a human choice before the search, which neither the
+        // search nor the improvers may move. Today only the chosen BUS hours.
+        private final boolean[][] pinned; // [trooper][slot]
+        private final int busTrooper; // index of the chosen BUS Trooper, -1 for none
 
         private long nodes;
         private boolean exhausted;
@@ -152,6 +201,22 @@ public final class ScheduleSolver {
             this.positions = buildPositions(day);
             this.filledBy = new int[positions.size()];
             Arrays.fill(filledBy, -1);
+            this.pinned = new boolean[n][DutyDay.SLOT_COUNT];
+
+            // The chosen BUS Trooper's hours are placed now and count toward
+            // their target, exactly as if the search had chosen them.
+            this.busTrooper = request.bus() == null ? -1 : troopers.indexOf(request.bus());
+            if (busTrooper >= 0) {
+                for (int i = 0; i < positions.size(); i++) {
+                    Position position = positions.get(i);
+                    if (position.post() == Post.BUS) {
+                        filledBy[i] = busTrooper;
+                        grid[busTrooper][position.slot()] = Post.BUS;
+                        pinned[busTrooper][position.slot()] = true;
+                        owed[busTrooper]--;
+                    }
+                }
+            }
         }
 
         /** Every post-hour the sheet needs, in time order. */
@@ -182,11 +247,11 @@ public final class ScheduleSolver {
             if (search(0)) {
                 // Improve a legal schedule by swapping segments between rows to reduce wasted
                 // span.
-                Post[][] improved = new SpanImprover(troopers, this::eligible).improve(grid);
+                Post[][] improved = new SpanImprover(troopers, this::eligible, pinned).improve(grid);
                 // Then cut walks between AP and GG. Second, and on its own,
                 // because it trades posts without moving hours: it cannot undo
                 // anything the span pass just won.
-                improved = new PostSwapImprover().improve(improved);
+                improved = new PostSwapImprover(pinned).improve(improved);
                 for (int t = 0; t < troopers.size(); t++) {
                     grid[t] = improved[t];
                 }
@@ -204,6 +269,18 @@ public final class ScheduleSolver {
             // Most specific first: a short night group and an over-cap sheet both
             // show up as "not enough hours" if you check the total before them,
             // and the general message is the least useful of the three.
+            if (busTrooper >= 0) {
+                String who = troopers.get(busTrooper).name();
+                if (owed[busTrooper] < 0) {
+                    return who + " is down for " + targets.forTrooper(troopers.get(busTrooper))
+                            + " hours on this split, fewer than the BUS run alone.";
+                }
+                for (int slot = 0; slot < DutyDay.SLOT_COUNT; slot++) {
+                    if (pinned[busTrooper][slot] && !rightGroup(busTrooper, slot)) {
+                        return who + " is on night, and can only take BUS when night hours cross into the morning.";
+                    }
+                }
+            }
             int minNight = Availability.minimumNightGroup(day);
             if (request.nightGroup().size() < minNight) {
                 return "The silent hours need at least " + minNight + " Troopers and only "
@@ -233,14 +310,20 @@ public final class ScheduleSolver {
             // The hour that usually makes a thin day impossible: 0700 stands two
             // PAC and the bus run, and a stay-out is not in yet.
             for (int slot = 0; slot < DutyDay.SLOT_COUNT; slot++) {
-                final int hour = slot;
-                int need = (int) positions.stream().filter(p -> p.slot() == hour).count();
+                // Positions already pinned are covered, and the Trooper pinned
+                // there is not free for another post at the same hour.
+                int need = 0;
+                for (int i = 0; i < positions.size(); i++) {
+                    if (positions.get(i).slot() == slot && filledBy[i] < 0) {
+                        need++;
+                    }
+                }
                 if (need == 0) {
                     continue;
                 }
                 int bodies = 0;
                 for (int t = 0; t < troopers.size(); t++) {
-                    if (owed[t] > 0 && available[t][slot] && rightGroup(t, slot)) {
+                    if (owed[t] > 0 && available[t][slot] && rightGroup(t, slot) && grid[t][slot] == null) {
                         bodies++;
                     }
                 }
@@ -276,6 +359,10 @@ public final class ScheduleSolver {
             }
             if (index == positions.size()) {
                 return true;
+            }
+            if (filledBy[index] >= 0) {
+                // Pinned before the search began; nothing to choose.
+                return search(index + 1);
             }
             Position position = positions.get(index);
             int slot = position.slot();
@@ -332,10 +419,14 @@ public final class ScheduleSolver {
             if (!rightGroup(t, slot)) {
                 return false;
             }
-            // Positions are filled in time order, so nothing past this slot is set
-            // and only the run behind us can be broken.
+            // Positions are filled in time order, so past this slot only pinned
+            // cells are set. The run is counted both ways so a placement that
+            // runs into a pinned BUS is judged as the stint it makes.
             int run = 1;
             for (int k = slot - 1; k >= 0 && grid[t][k] != null; k--) {
+                run++;
+            }
+            for (int k = slot + 1; k < DutyDay.SLOT_COUNT && grid[t][k] != null; k++) {
                 run++;
             }
 
@@ -344,15 +435,14 @@ public final class ScheduleSolver {
             if (run > DutyRules.MAX_STINT) {
                 return false;
             }
-            if (slot > 0 && grid[t][slot - 1] != null) {
-                Post previous = grid[t][slot - 1];
-                // The "free after" rule is a hard limit, so if the previous post forbids this
-                // one
-                // this branch is dead.
-                if (previous != post
-                        && !DutyRules.FREE_AFTER.getOrDefault(previous, Set.of()).contains(post)) {
-                    return false;
-                }
+            // The "free after" rule is a hard limit, in both directions: the post
+            // before this one, and a pinned post straight after it.
+            if (slot > 0 && grid[t][slot - 1] != null && !DutyRules.followsWithoutBreak(grid[t][slot - 1], post)) {
+                return false;
+            }
+            if (slot + 1 < DutyDay.SLOT_COUNT && grid[t][slot + 1] != null
+                    && !DutyRules.followsWithoutBreak(post, grid[t][slot + 1])) {
+                return false;
             }
             return true;
         }

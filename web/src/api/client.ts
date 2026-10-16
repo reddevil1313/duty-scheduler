@@ -1,5 +1,6 @@
 import type {
-  Absence, AbsenceReach, AbsenceRequest, ProblemDetail, Records, Schedule, Session, SheetCheck, Ticks, Trooper,
+  Absence, AbsenceReach, AbsenceRequest, GenerateOptions, ProblemDetail, Records, Schedule, Session, SheetCheck,
+  Ticks, Trooper,
   TrooperParticulars,
 } from './types'
 
@@ -125,14 +126,18 @@ export const api = {
     return api.session()
   },
 
-  /** Ticks shape this one sheet and are not stored; see `Ticks`. */
-  generate: (date: string, nightGroup: string[], ticks: Ticks = {}) =>
+  /**
+   * Ticks shape this one sheet and are not stored; see `Ticks`. `bus` pins the
+   * BUS run to one Trooper, and is refused with a 422 if they cannot stand it.
+   */
+  generate: (date: string, options: GenerateOptions) =>
     request<Schedule>('/api/schedules/generate', {
       method: 'POST',
       body: JSON.stringify({
         date,
-        nightGroup,
-        out: Object.entries(ticks).map(([trooper, kind]) => ({ trooper, kind })),
+        nightGroup: options.nightGroup,
+        out: Object.entries(options.ticks ?? {}).map(([trooper, kind]) => ({ trooper, kind })),
+        bus: options.bus ?? null,
       }),
     }),
 

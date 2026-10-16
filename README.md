@@ -15,6 +15,9 @@ Both ship together as a single image.
 
 - **Generate a sheet** for any date from the roster, the leave register and the
   night group. The solver balances hours across the team within the rules.
+  Who takes the BUS run (0700–1000) can be chosen the same way as the night
+  group; a choice that cannot stand, such as a stay-out, is refused with the
+  reason.
 - **Edit a sheet by hand**: click an hour to change its post, or swap two
   Troopers' whole days. Every edit is checked against the rules as you make it,
   with an hour-by-hour coverage row and a list of what the sheet breaks,
