@@ -1,5 +1,6 @@
 package com.dutyscheduler.duty.persistence;
 
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -27,5 +28,17 @@ public interface AbsenceRepository extends JpaRepository<AbsenceEntity, Long> {
             """)
     List<AbsenceEntity> findTouching(@Param("from") LocalDate from, @Param("to") LocalDate to);
 
+    /*
+     * The two register reads fetch the Trooper in the same query. The response
+     * names the Trooper on every entry, and open-in-view is off, so a lazy
+     * Trooper is loaded after the session has closed and the read fails with a
+     * LazyInitializationException — but only once the register has an entry,
+     * which is how it hid behind tests that read an empty one.
+     */
+    @EntityGraph(attributePaths = "trooper")
     List<AbsenceEntity> findByTrooperNameOrderByFromDateDesc(String name);
+
+    /** The whole register, latest first. Ties go to the most recently booked. */
+    @EntityGraph(attributePaths = "trooper")
+    List<AbsenceEntity> findAllByOrderByFromDateDescIdDesc();
 }

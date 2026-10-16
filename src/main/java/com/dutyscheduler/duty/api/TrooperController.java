@@ -157,7 +157,7 @@ public class TrooperController {
         // A stay-out is only available 0800–1800, so a default place in the
         // night group is one they could never fill. Well formed, but impossible.
         if (request.stayOut() && request.onNight()) {
-            throw new RosterException(HttpStatus.UNPROCESSABLE_ENTITY,
+            throw new RosterException(HttpStatus.UNPROCESSABLE_CONTENT,
                     "A stay-out cannot be in the night group.");
         }
     }

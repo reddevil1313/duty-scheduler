@@ -36,7 +36,7 @@ public class AbsenceController {
     @GetMapping
     public List<AbsenceResponse> list(@RequestParam(required = false) String trooper) {
         List<AbsenceEntity> found = trooper == null
-                ? absences.findAll()
+                ? absences.findAllByOrderByFromDateDescIdDesc()
                 : absences.findByTrooperNameOrderByFromDateDesc(trooper);
         return found.stream().map(AbsenceResponse::from).toList();
     }

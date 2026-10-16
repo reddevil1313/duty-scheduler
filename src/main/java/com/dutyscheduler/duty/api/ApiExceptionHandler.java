@@ -15,7 +15,7 @@ public class ApiExceptionHandler {
     @ExceptionHandler(ScheduleController.UnsolvableException.class)
     public ProblemDetail unsolvable(ScheduleController.UnsolvableException e) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
-                HttpStatus.UNPROCESSABLE_ENTITY, e.getMessage());
+                HttpStatus.UNPROCESSABLE_CONTENT, e.getMessage());
         problem.setTitle("This sheet cannot be covered");
         return problem;
     }
