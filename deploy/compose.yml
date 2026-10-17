@@ -1,0 +1,54 @@
+# Production on a small VM: Postgres, the app and Caddy for HTTPS.
+# The image is built elsewhere and loaded (see deploy/README.md).
+# Secrets and the hostname come from deploy/.env.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: duty
+      POSTGRES_USER: duty
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?set DATABASE_PASSWORD}
+    # Small, for a 1 GB machine.
+    command: postgres -c shared_buffers=32MB -c max_connections=20 -c work_mem=2MB
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U duty -d duty"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+
+  app:
+    image: duty-scheduler:latest
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: jdbc:postgresql://db:5432/duty
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      OWNER_USERNAME: ${OWNER_USERNAME:?set OWNER_USERNAME}
+      OWNER_PASSWORD: ${OWNER_PASSWORD:?set OWNER_PASSWORD}
+      TZ: ${TZ:-UTC}
+      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Xmx200m -Xss512k -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -XX:TieredStopAtLevel=1}
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      SITE_HOSTS: ${SITE_HOSTS:?set SITE_HOSTS}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

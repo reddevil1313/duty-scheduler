@@ -74,3 +74,47 @@ jobs:
       - run: curl -fsS http://localhost:8080/actuator/health | grep -q '"status":"UP"'
       - if: failure()
         run: docker compose --profile app logs app
+
+  deploy:
+    name: Deploy
+    needs: image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    environment:
+      name: production
+      url: https://duty.sagarsamay.com
+    env:
+      VM: ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      # Same cache as the image job, so this is quick.
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: duty-scheduler:latest
+          cache-from: type=gha
+      - name: SSH key
+        run: |
+          install -m 700 -d ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519
+      - name: Copy the image and config
+        run: |
+          docker save duty-scheduler:latest | gzip -1 | ssh "$VM" 'gunzip | docker load'
+          scp deploy/compose.yml deploy/Caddyfile "$VM":duty-scheduler/
+      - name: Restart
+        run: |
+          ssh "$VM" 'cd duty-scheduler && docker compose up -d --remove-orphans && docker image prune -f >/dev/null
+            for i in $(seq 1 40); do
+              [ "$(docker inspect -f "{{.State.Health.Status}}" "$(docker compose ps -q app)")" = healthy ] && exit 0
+              sleep 5
+            done
+            docker compose logs --tail 50 app; exit 1'
+      - run: curl -fsS https://duty.sagarsamay.com/actuator/health | grep -q '"status":"UP"'

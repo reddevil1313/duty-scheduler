@@ -93,6 +93,8 @@ OWNER_USERNAME=... OWNER_PASSWORD=... DATABASE_PASSWORD=... \
 ```
 
 This builds the image and starts it with Postgres on http://localhost:8080.
+For a VM behind Caddy, see [`deploy/`](deploy/). Pushes to `main` deploy
+there from CI once the tests pass.
 The owner is made on first start from the `OWNER_` variables. Run it behind
 HTTPS: the session cookie is HTTPS-only. Metrics are at
 `/actuator/prometheus`, for the owner.
