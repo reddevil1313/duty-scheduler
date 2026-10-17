@@ -36,7 +36,7 @@ export function AddTrooperForm({ onAdded, onError }: Props) {
       <fieldset>
         <legend>Add Trooper</legend>
         <TrooperFields draft={draft} onChange={setDraft} />
-        <button type="submit" disabled={busy || draft.name.trim() === ''}>
+        <button type="submit" className="primary" disabled={busy || draft.name.trim() === ''}>
           {busy ? 'Adding…' : 'Add'}
         </button>
       </fieldset>

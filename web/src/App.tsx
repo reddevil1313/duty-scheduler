@@ -9,6 +9,7 @@ import { LoginPage } from './LoginPage'
 import { today } from './dates'
 import { SessionProvider } from './auth/SessionProvider'
 import { useSession } from './auth/session-context'
+import { useTheme } from './theme'
 
 type View = 'board' | 'roster' | 'leave' | 'records'
 
@@ -21,6 +22,8 @@ const VIEWS: [View, string][] = [
 
 function Shell() {
   const { session } = useSession()
+  // Held above the sign-in form, so a chosen theme applies there too.
+  const theme = useTheme()
 
   // Null means the first session read has not come back. Rendering the sign-in
   // form in the meantime would flash it at someone who is already signed in.
@@ -33,10 +36,10 @@ function Shell() {
   // Keyed on the user, so everything below starts fresh for each sign-in:
   // roster ticks in particular are this user's scratch state and must not
   // survive into the next person's session.
-  return <SignedIn key={session.username} />
+  return <SignedIn key={session.username} theme={theme} />
 }
 
-function SignedIn() {
+function SignedIn({ theme: { theme, cycle } }: { theme: ReturnType<typeof useTheme> }) {
   const { session, signOut } = useSession()
   const [view, setView] = useState<View>('board')
   const [date, setDate] = useState(today)
@@ -46,22 +49,35 @@ function SignedIn() {
   const rosterState = useRoster(useReport(setRosterError))
 
   return (
-    <>
-      <header>
-        <h1>Duty Scheduler</h1>
-        <nav className="views">
-          {VIEWS.map(([v, label]) => (
-            <button key={v} type="button" aria-current={view === v ? 'page' : undefined} onClick={() => setView(v)}>
-              {label}
-            </button>
-          ))}
-        </nav>
-        <div className="who">
-          <span>{session?.displayName ?? session?.username}</span>
-          <span className="tag">{session?.role}</span>
-          <button type="button" onClick={() => void signOut()}>Sign out</button>
+    <div className="wrap">
+      <header className="mast">
+        <div>
+          <div className="rule" />
+          <h1>Duty Scheduler</h1>
+          <p className="sub">A sheet runs 2000 to 1959 the next morning · silent hours 2200–0600</p>
         </div>
       </header>
+      <nav className="viewbar">
+        {VIEWS.map(([v, label]) => (
+          <button
+            key={v}
+            type="button"
+            className="vtab"
+            aria-current={view === v ? 'page' : undefined}
+            onClick={() => setView(v)}
+          >
+            {label}
+          </button>
+        ))}
+        <div className="who">
+          <span>{session?.displayName ?? session?.username}</span>
+          <span className={`role${session?.role === 'ADMIN' ? ' admin' : ''}`}>{session?.role}</span>
+          <button type="button" className="sm" onClick={cycle} title="Follow the system, or keep light or dark">
+            Theme: {theme}
+          </button>
+          <button type="button" className="sm" onClick={() => void signOut()}>Sign out</button>
+        </div>
+      </nav>
       {rosterError && <p className="error banner" role="alert">{rosterError}</p>}
       {/* All stay mounted and are hidden rather than swapped, so a generated
           sheet that has not been logged yet survives a look at another tab. */}
@@ -83,7 +99,7 @@ function SignedIn() {
           }}
         />
       </main>
-    </>
+    </div>
   )
 }
 

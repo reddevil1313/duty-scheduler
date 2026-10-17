@@ -241,6 +241,15 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
   const mpHours = sheetTurnout !== null && latest && schedule
     ? mpShortfall(schedule, latest.demand).reduce((n, posts) => n + posts.length, 0)
     : 0
+  // The posts this date stands, from the server's demand rather than a copy of
+  // the weekday rules, for the tag in the sheet's header.
+  const postsStanding = latest
+    ? (['AP', 'GG', 'PAC', 'BUS'] as Post[]).filter((p) => latest.demand.some((d) => (d[p] ?? 0) > 0))
+    : []
+  // Who holds the silent hours on the sheet as it stands, edits included.
+  const nightOn = schedule
+    ? schedule.rows.filter((r) => r.posts.some((p, slot) => p !== null && isSilent(slot))).map((r) => r.trooper)
+    : []
   const manned = (slot: number) => !!schedule?.rows.some((r) => r.posts[slot] !== null)
 
   // From the latest check, dimmed while a newer one is on its way, so the list
@@ -258,7 +267,7 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
 
   return (
     <div className="board">
-      <div className="controls">
+      <section className="panel controls" aria-label="Sheet to work on">
         <label>
           Duty date
           <input type="date" value={date} onChange={(e) => onDateChange(e.target.value)} />
@@ -328,6 +337,7 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
           <div className="actions">
             <button
               type="button"
+              className="primary"
               onClick={generate}
               disabled={busy || nightGroup.filter((n) => !(n in ticks)).length === 0}
             >
@@ -355,7 +365,7 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
             </button>
           </div>
         )}
-      </div>
+      </section>
 
       {isAdmin && (
         Object.keys(ticks).length > 0 && (
@@ -373,8 +383,10 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
       </p>
 
       {schedule && (
-        <>
-          <div className="sheet-bar">
+        <section className="panel sheet" aria-label="Sheet">
+          <div className="panel-hd sheet-bar">
+            <h2>Sheet · {shortDate(schedule.date)}</h2>
+            {postsStanding.length > 0 && <span className="daytag">{postsStanding.join(' ')}</span>}
             <p className="status">
               {source === 'generated'
                 ? `Generated${sheetTurnout ? ` at ${sheetTurnout}h each` : ''}, not yet logged.`
@@ -419,31 +431,58 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
               : mode === 'swap' ? 'Click two names to trade their whole day.' : ''}
           </p>
 
-          <SheetGrid
-            sheet={schedule}
-            check={latest}
-            fresh={current !== null}
-            mp={sheetTurnout !== null}
-            mode={mode}
-            spare={spare}
-            swapPick={swapPick}
-            onSetCell={setCellTo}
-            onPickRow={pickRow}
-          />
+          <div className="scroller">
+            <SheetGrid
+              sheet={schedule}
+              check={latest}
+              fresh={current !== null}
+              mp={sheetTurnout !== null}
+              mode={mode}
+              spare={spare}
+              swapPick={swapPick}
+              onSetCell={setCellTo}
+              onPickRow={pickRow}
+            />
+          </div>
 
-          {issues.length > 0 && (
-            <ul className={`issues${current ? '' : ' stale'}`} aria-label="What this sheet breaks">
-              {issues.map((issue, i) => (
-                // Issues have no id, and the list is rebuilt whole on every
-                // check, so position is a stable enough key here.
-                <li key={i} className={issue.rule === 'ON_LEAVE' ? 'leave' : 'breaks'}>
-                  <b>{issue.rule === 'ON_LEAVE' ? 'LEAVE' : 'BREAKS'}</b>
-                  {issue.message}
-                </li>
-              ))}
-            </ul>
+          {(issues.length > 0 || mpHours > 0 || nightOn.length > 0) && (
+            <div className="notes">
+              {issues.length > 0 && (
+                <ul className={`issues${current ? '' : ' stale'}`} aria-label="What this sheet breaks">
+                  {issues.map((issue, i) => (
+                    // Issues have no id, and the list is rebuilt whole on every
+                    // check, so position is a stable enough key here.
+                    <li key={i} className={issue.rule === 'ON_LEAVE' ? 'leave' : 'breaks'}>
+                      <b>{issue.rule === 'ON_LEAVE' ? 'LEAVE' : 'BREAKS'}</b>
+                      {issue.message}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {mpHours > 0 && (
+                <p className="note mp">
+                  <b>MP</b>
+                  {mpHours} post-hour{mpHours === 1 ? '' : 's'} to the MP team at {sheetTurnout}h each; their row is under the grid.
+                </p>
+              )}
+              {nightOn.length > 0 && (
+                <p className="note info">
+                  <b>NIGHT</b>
+                  {nightOn.join(', ')} on the silent hours.
+                </p>
+              )}
+            </div>
           )}
-        </>
+
+          <div className="legend" aria-label="Key">
+            <span className="lg"><span className="sw ap">AP</span><span className="sw gg">GG</span>every hour</span>
+            <span className="lg"><span className="sw pac">PAC</span><span className="sw bus">BUS</span>weekday posts</span>
+            {sheetTurnout !== null && <span className="lg"><span className="sw mp">MP</span>MP team</span>}
+            <span className="lg"><span className="sw hatch" />away</span>
+            <span className="lg"><span className="tag">SO</span>stay-out, in 0800–1800</span>
+            <span className="lg"><span className="hour cross">06</span>night may extend into 0600–0859</span>
+          </div>
+        </section>
       )}
     </div>
   )

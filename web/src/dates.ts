@@ -8,6 +8,17 @@ export function today(): string {
   return new Date(now.getTime() - offset).toISOString().slice(0, 10)
 }
 
+/**
+ * The day after, `YYYY-MM-DD`. Built from local parts: going through
+ * toISOString() would read local midnight as UTC, and east of Greenwich hand
+ * back the same day.
+ */
+export function nextDay(date: string): string {
+  const [y, m, d] = date.split('-').map(Number)
+  const next = new Date(y, m - 1, d + 1)
+  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`
+}
+
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 

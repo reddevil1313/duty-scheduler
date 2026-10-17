@@ -49,6 +49,7 @@ Both ship together as a single image.
   appointments: full days, half days or a time window. Each entry shows the
   duty sheets it affects, before and after booking, and is taken into account
   automatically when sheets are generated.
+- **Light and dark themes**, following the system or set from the masthead.
 - **Two roles**: `ADMIN` manages the roster and leave, and generates and logs
   sheets. `USER` has read-only access.
 

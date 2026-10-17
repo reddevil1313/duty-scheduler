@@ -24,10 +24,10 @@ export function RosterView({ rosterState }: Props) {
   }
 
   return (
-    <section className="roster-view" aria-label="Roster">
-      <div className="section-hd">
+    <section className="panel roster-view" aria-label="Roster">
+      <div className="panel-hd">
         <h2>Roster</h2>
-        <span className="note">{roster.length} Trooper{roster.length === 1 ? '' : 's'}</span>
+        <span className="meta">{roster.length} Trooper{roster.length === 1 ? '' : 's'}</span>
       </div>
       {isAdmin && (
         <p className="note">

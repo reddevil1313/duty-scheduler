@@ -25,7 +25,10 @@ export function LoginPage() {
   return (
     <main className="login">
       <form onSubmit={submit}>
-        <h1>Duty Scheduler</h1>
+        <div>
+          <div className="rule" />
+          <h1>Duty Scheduler</h1>
+        </div>
         <label>
           Username
           <input
@@ -50,7 +53,7 @@ export function LoginPage() {
             server sends the same text for both, so the form cannot be used to
             find out which accounts exist. */}
         {error && <p className="error" role="alert">{error}</p>}
-        <button type="submit" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
+        <button type="submit" className="primary" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
       </form>
     </main>
   )

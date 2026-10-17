@@ -1,3 +1,5 @@
+import { nextDay } from '../dates'
+
 /**
  * The clock, in one place.
  *
@@ -37,8 +39,5 @@ export function isCrossover(slot: number): boolean {
 
 /** The date the slot actually falls on — the next day from slot 4 onwards. */
 export function dateAt(sheetDate: string, slot: number): string {
-  if (hourAt(slot) >= 20) return sheetDate
-  const next = new Date(`${sheetDate}T00:00:00`)
-  next.setDate(next.getDate() + 1)
-  return next.toISOString().slice(0, 10)
+  return hourAt(slot) >= 20 ? sheetDate : nextDay(sheetDate)
 }

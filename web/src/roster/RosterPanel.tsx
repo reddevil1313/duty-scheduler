@@ -124,7 +124,7 @@ function RosterRow({ trooper, canEdit, tick, onTick, onUpdated, onRemoved, onErr
         <td colSpan={9}>
           <form onSubmit={(e) => void save(e, draft)}>
             <TrooperFields draft={draft} onChange={(next) => setMode({ kind: 'edit', draft: next })} />
-            <button type="submit" disabled={busy || draft.name.trim() === ''}>
+            <button type="submit" className="primary" disabled={busy || draft.name.trim() === ''}>
               {busy ? 'Saving…' : 'Save'}
             </button>
             <button type="button" onClick={() => setMode({ kind: 'view' })} disabled={busy}>
@@ -140,8 +140,8 @@ function RosterRow({ trooper, canEdit, tick, onTick, onUpdated, onRemoved, onErr
     <tr>
       <td>{trooper.name}</td>
       <td>{trooper.rank ?? ''}</td>
-      <td>{trooper.stayOut ? 'Yes' : ''}</td>
-      <td>{trooper.onNight ? 'Yes' : ''}</td>
+      <td>{trooper.stayOut && <span className="tag">SO</span>}</td>
+      <td>{trooper.onNight && <span className="tag">N</span>}</td>
       {canEdit && (
         <td className="tick">
           <input
@@ -173,7 +173,7 @@ function RosterRow({ trooper, canEdit, tick, onTick, onUpdated, onRemoved, onErr
             <span className="note">
               Off the roster. Kept on any sheet they already stood.
             </span>
-            <button type="button" className="danger" onClick={() => void remove()} disabled={busy}>
+            <button type="button" className="danger solid" onClick={() => void remove()} disabled={busy}>
               {busy ? 'Removing…' : 'Remove'}
             </button>
             <button type="button" onClick={() => setMode({ kind: 'view' })} disabled={busy}>

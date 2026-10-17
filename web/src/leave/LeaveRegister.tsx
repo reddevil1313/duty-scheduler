@@ -73,18 +73,18 @@ export function LeaveRegister({ active, ticks }: Props) {
   }
 
   return (
-    <section className="leave" aria-label="Leave register">
-      <div className="section-hd">
+    <section className="panel leave" aria-label="Leave register">
+      <div className="panel-hd">
         <h2>Leave register</h2>
         {register.length > 0 && (
-          <span className="note">{register.length} {register.length === 1 ? 'entry' : 'entries'}</span>
+          <span className="meta">{register.length} {register.length === 1 ? 'entry' : 'entries'}</span>
         )}
       </div>
 
       {isAdmin ? (
         <BookingForm roster={roster} onBooked={booked} onError={report} />
       ) : (
-        <p className="note">You have view-only access. Ask an ADMIN to record leave.</p>
+        <p className="empty">You have view-only access. Ask an ADMIN to record leave.</p>
       )}
 
       {Object.keys(ticks).length > 0 && (
@@ -95,11 +95,12 @@ export function LeaveRegister({ active, ticks }: Props) {
         </p>
       )}
 
-      {error && <p className="error" role="alert">{error}</p>}
-      {note && !error && <p className="note">{note}</p>}
+      {(error || note) && (
+        <p className={`message${error ? ' error' : ' note'}`} role={error ? 'alert' : 'status'}>{error ?? note}</p>
+      )}
 
       {register.length === 0 ? (
-        <p className="note">
+        <p className="empty">
           Nothing booked yet. Anything recorded here is taken into account when that day's sheet is generated.
         </p>
       ) : (
@@ -265,7 +266,7 @@ function BookingForm({ roster, onBooked, onError }: FormProps) {
           maxLength={200}
         />
       </label>
-      <button type="submit" disabled={busy || !trooper || problem !== null}>
+      <button type="submit" className="primary" disabled={busy || !trooper || problem !== null}>
         {busy ? 'Booking…' : 'Book'}
       </button>
 
@@ -331,7 +332,7 @@ function RegisterRow({ absence, canCancel, onCancelled, onError }: RowProps) {
         <td className="row-actions">
           {confirming ? (
             <>
-              <button type="button" className="danger" onClick={() => void cancel()} disabled={busy}>
+              <button type="button" className="danger solid" onClick={() => void cancel()} disabled={busy}>
                 {busy ? 'Cancelling…' : 'Cancel leave'}
               </button>
               <button type="button" onClick={() => setConfirming(false)} disabled={busy}>Keep</button>

@@ -46,7 +46,7 @@ export function RecordsView({ active, onOpen }: Props) {
   }, [active, report])
 
   if (!records) {
-    return <section className="records" aria-label="Records"><p className="note">Loading…</p></section>
+    return <section className="panel records" aria-label="Records"><p className="empty">Loading…</p></section>
   }
 
   const openingSaved = (next: Records) => {
@@ -65,80 +65,85 @@ export function RecordsView({ active, onOpen }: Props) {
 
   return (
     <section className="records" aria-label="Records">
-      <div className="section-hd">
-        <h2>Records</h2>
-        <span className="note">
-          {records.days.length} day{records.days.length === 1 ? '' : 's'} logged
-        </span>
-        {isAdmin && !editingOpening && (
-          <button type="button" onClick={() => setEditingOpening(true)}>Edit opening hours</button>
+      <div className="panel">
+        <div className="panel-hd">
+          <h2>Records</h2>
+          <span className="meta">
+            {records.days.length} day{records.days.length === 1 ? '' : 's'} logged
+          </span>
+          {isAdmin && !editingOpening && (
+            <button type="button" className="sm" onClick={() => setEditingOpening(true)}>Edit opening hours</button>
+          )}
+        </div>
+
+        {(error || note) && (
+          <p className={`message${error ? ' error' : ' note'}`} role={error ? 'alert' : 'status'}>{error ?? note}</p>
+        )}
+
+        {editingOpening ? (
+          <OpeningForm
+            troopers={records.troopers}
+            onSaved={openingSaved}
+            onCancel={() => setEditingOpening(false)}
+            onError={report}
+          />
+        ) : (
+          <TotalsTable troopers={records.troopers} />
         )}
       </div>
 
-      {error && <p className="error" role="alert">{error}</p>}
-      {note && !error && <p className="note">{note}</p>}
-
-      {editingOpening ? (
-        <OpeningForm
-          troopers={records.troopers}
-          onSaved={openingSaved}
-          onCancel={() => setEditingOpening(false)}
-          onError={report}
-        />
-      ) : (
-        <TotalsTable troopers={records.troopers} />
-      )}
-
-      <div className="section-hd">
-        <h2>Days logged</h2>
+      <div className="panel">
+        <div className="panel-hd">
+          <h2>Days logged</h2>
+        </div>
+        {records.days.length === 0 ? (
+          <p className="empty">No sheets logged yet.</p>
+        ) : (
+          <table className="register">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th className="n">Hours</th>
+                <th className="n">Credited</th>
+                <th>Night</th>
+                <th>BUS</th>
+                <th>Issues</th>
+                <th aria-label="Actions" />
+              </tr>
+            </thead>
+            <tbody>
+              {records.days.map((day) => crediting === day.date ? (
+                <tr key={day.date} className="editing">
+                  <td colSpan={7}>
+                    <CreditForm
+                      day={day}
+                      troopers={records.troopers}
+                      onSaved={() => credited(day.date)}
+                      onCancel={() => setCrediting(null)}
+                      onError={report}
+                    />
+                  </td>
+                </tr>
+              ) : (
+                <tr key={day.date}>
+                  <td>{shortDate(day.date)}</td>
+                  <td className="n">{day.worked}</td>
+                  <td className="n">{day.credited || ''}</td>
+                  <td>{day.night.join(', ')}</td>
+                  <td>{day.bus.join(', ')}</td>
+                  <td>{day.issues > 0 && <span className="kind MC">{day.issues} BROKEN</span>}</td>
+                  <td className="row-actions">
+                    <button type="button" onClick={() => onOpen(day.date)}>Open on board</button>
+                    {isAdmin && (
+                      <button type="button" onClick={() => setCrediting(day.date)}>Credit hours</button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
-      {records.days.length === 0 ? (
-        <p className="note">No sheets logged yet.</p>
-      ) : (
-        <table className="register">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th className="n">Hours</th>
-              <th className="n">Credited</th>
-              <th>Night</th>
-              <th>BUS</th>
-              <th>Issues</th>
-              <th aria-label="Actions" />
-            </tr>
-          </thead>
-          <tbody>
-            {records.days.map((day) => crediting === day.date ? (
-              <tr key={day.date} className="editing">
-                <td colSpan={7}>
-                  <CreditForm
-                    day={day}
-                    troopers={records.troopers}
-                    onSaved={() => credited(day.date)}
-                    onCancel={() => setCrediting(null)}
-                    onError={report}
-                  />
-                </td>
-              </tr>
-            ) : (
-              <tr key={day.date}>
-                <td>{shortDate(day.date)}</td>
-                <td className="n">{day.worked}</td>
-                <td className="n">{day.credited || ''}</td>
-                <td>{day.night.join(', ')}</td>
-                <td>{day.bus.join(', ')}</td>
-                <td>{day.issues > 0 && <span className="kind MC">{day.issues} BROKEN</span>}</td>
-                <td className="row-actions">
-                  <button type="button" onClick={() => onOpen(day.date)}>Open on board</button>
-                  {isAdmin && (
-                    <button type="button" onClick={() => setCrediting(day.date)}>Credit hours</button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
     </section>
   )
 }
@@ -227,7 +232,7 @@ function OpeningForm({ troopers, onSaved, onCancel, onError }: OpeningProps) {
           />
         </label>
       ))}
-      <button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
+      <button type="submit" className="primary" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
       <button type="button" onClick={onCancel} disabled={busy}>Cancel</button>
     </form>
   )
@@ -281,7 +286,7 @@ function CreditForm({ day, troopers, onSaved, onCancel, onError }: CreditProps) 
           />
         </label>
       ))}
-      <button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
+      <button type="submit" className="primary" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
       <button type="button" onClick={onCancel} disabled={busy}>Cancel</button>
     </form>
   )

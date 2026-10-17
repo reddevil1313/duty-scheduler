@@ -1,7 +1,8 @@
 import { useEffect, useState, type MouseEvent } from 'react'
 import type { Post, Schedule, ScheduleRow, SheetCheck } from '../api/types'
 import { availableFirst, coverage, mpShortfall } from './edit'
-import { SLOT_COUNT, isCrossover, labelAt } from './slots'
+import { shortDate } from '../dates'
+import { SLOT_COUNT, dateAt, isCrossover, labelAt } from './slots'
 
 export type Mode = 'view' | 'edit' | 'swap'
 
@@ -51,6 +52,10 @@ const POSTS: Post[] = ['AP', 'GG', 'PAC', 'BUS']
 const MENU_ROW = 32
 const MENU_PAD = 12
 const MENU_WIDTH = 160
+
+/** Slot 4 is midnight, where the sheet's date changes: drawn with a heavier rule. */
+const MIDNIGHT = 4
+const mid = (slot: number) => (slot === MIDNIGHT ? ' mid' : '')
 
 export function SheetGrid({ sheet, check, fresh, mp, mode, spare, swapPick, onSetCell, onPickRow }: Props) {
   const [menu, setMenu] = useState<Menu | null>(null)
@@ -131,10 +136,22 @@ export function SheetGrid({ sheet, check, fresh, mp, mode, spare, swapPick, onSe
         role="table"
         aria-label={`Duty sheet for ${sheet.date}`}
       >
+        {/* Presentational: the dates repeat what the hour labels and the
+            date picker already say, for the eye rather than a screen reader. */}
+        <div className="row days" aria-hidden="true">
+          <div className="eve">{shortDate(sheet.date)}</div>
+          <div className="morn">{shortDate(dateAt(sheet.date, MIDNIGHT))}</div>
+          <div className="tot">Total</div>
+        </div>
         <div className="row head" role="row">
           <div className="name" role="columnheader">Trooper</div>
           {Array.from({ length: SLOT_COUNT }, (_, slot) => (
-            <div key={slot} role="columnheader" className={isCrossover(slot) ? 'hour cross' : 'hour'}>
+            <div
+              key={slot}
+              role="columnheader"
+              className={`hour${isCrossover(slot) ? ' cross' : ''}${mid(slot)}`}
+              title={isCrossover(slot) ? `${labelAt(slot)} — a night Trooper may be extended into this hour` : undefined}
+            >
               {labelAt(slot).slice(0, 2)}
             </div>
           ))}
@@ -180,14 +197,22 @@ export function SheetGrid({ sheet, check, fresh, mp, mode, spare, swapPick, onSe
                   key={slot}
                   role="cell"
                   className={
-                    `cell${post ? ` on ${post.toLowerCase()}` : ''}` +
+                    `cell${post ? ` on ${post.toLowerCase()}` : ''}${mid(slot)}` +
+                    // A stint is drawn as one block: its first hour opens it
+                    // and carries the label, its last hour closes it.
+                    `${post && row.posts[slot - 1] !== post ? ' s-start' : ''}` +
+                    `${post && row.posts[slot + 1] !== post ? ' s-end' : ''}` +
                     `${away?.[slot] ? ' away' : ''}` +
                     `${flagged.has(`${row.trooper}@${slot}`) ? ' flag' : ''}`
                   }
                   title={`${labelAt(slot)} — ${post ?? 'off'}${away?.[slot] ? ` · ${away[slot]}` : ''}`}
                   onClick={(e) => clickCell(e, row, slot)}
                 >
-                  {post ?? ''}
+                  {post && (
+                    <span className="blk">
+                      {row.posts[slot - 1] === post ? '' : post}
+                    </span>
+                  )}
                 </div>
               ))}
               {/* Hours are counted here, so they are always current. Span is
@@ -206,7 +231,7 @@ export function SheetGrid({ sheet, check, fresh, mp, mode, spare, swapPick, onSe
               <div
                 key={slot}
                 role="cell"
-                className={`cell cov ${c.state}`}
+                className={`cell cov ${c.state}${mid(slot)}`}
                 title={`${labelAt(slot)} — ${c.manned} of ${c.needed}`}
               >
                 {c.state === 'none' ? '' : c.manned}
@@ -224,11 +249,13 @@ export function SheetGrid({ sheet, check, fresh, mp, mode, spare, swapPick, onSe
               <div
                 key={slot}
                 role="cell"
-                className={`cell${posts.length ? ' on mp' : ''}`}
+                className={`cell${posts.length ? ' on mp s-start s-end' : ''}${mid(slot)}`}
                 title={`${labelAt(slot)} — ${posts.length ? `MP: ${posts.join(', ')}` : 'covered by the team'}`}
               >
                 {/* One post fits a cell; two shows the first and a count. */}
-                {posts.length === 0 ? '' : posts.length === 1 ? posts[0] : `${posts[0]}+${posts.length - 1}`}
+                {posts.length > 0 && (
+                  <span className="blk">{posts.length === 1 ? posts[0] : `${posts[0]}+${posts.length - 1}`}</span>
+                )}
               </div>
             ))}
             <div className="tally" role="cell">{mpPosts.reduce((n, p) => n + p.length, 0) || ''}</div>
