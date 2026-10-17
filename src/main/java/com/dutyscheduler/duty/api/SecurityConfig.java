@@ -71,11 +71,15 @@ public class SecurityConfig {
     private static final String LOGIN = "/api/session/login";
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http, AppUserRepository users, LoginThrottle throttle)
-            throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http, AppUserRepository users, LoginThrottle throttle,
+            DutyMetrics metrics) throws Exception {
         http
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(LOGIN, "/actuator/health").permitAll()
+                        // The client itself, as the image serves it: the page and its
+                        // hashed assets. It has to load before anyone can sign in,
+                        // and holds no data — everything it shows comes from /api.
+                        .requestMatchers(HttpMethod.GET, "/", "/index.html", "/favicon.svg", "/assets/**").permitAll()
                         // Boot's error page, which a failure Spring answers itself
                         // forwards to. Closed, it turned every such failure for a caller
                         // with no account — someone accepting an invite — into a 401.
@@ -116,7 +120,7 @@ public class SecurityConfig {
                 .addFilterBefore(new AccountCheckFilter(users), AnonymousAuthenticationFilter.class)
                 // Before either way of signing in, so a refused address is answered
                 // before its password is checked.
-                .addFilterBefore(new LoginThrottleFilter(throttle, LOGIN), UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(new LoginThrottleFilter(throttle, metrics, LOGIN), UsernamePasswordAuthenticationFilter.class)
 
                 // Spring's defaults stay (nosniff, frame denial, no caching of
                 // responses); the policy above is added, and no Referer is sent on.

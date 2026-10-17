@@ -28,11 +28,13 @@ import java.time.Instant;
 final class LoginThrottleFilter extends OncePerRequestFilter {
 
     private final LoginThrottle throttle;
+    private final DutyMetrics metrics;
     /** Matched as Spring Security matches it: the servlet path alone is empty under some mappings. */
     private final RequestMatcher login;
 
-    LoginThrottleFilter(LoginThrottle throttle, String loginPath) {
+    LoginThrottleFilter(LoginThrottle throttle, DutyMetrics metrics, String loginPath) {
         this.throttle = throttle;
+        this.metrics = metrics;
         this.login = PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, loginPath);
     }
 
@@ -44,6 +46,7 @@ final class LoginThrottleFilter extends OncePerRequestFilter {
         if (attempt) {
             Instant until = throttle.refusedUntil(request.getRemoteAddr()).orElse(null);
             if (until != null) {
+                metrics.signInRefused();
                 long seconds = Math.max(1, Duration.between(Instant.now(), until).toSeconds());
                 long minutes = (seconds + 59) / 60;
                 response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());

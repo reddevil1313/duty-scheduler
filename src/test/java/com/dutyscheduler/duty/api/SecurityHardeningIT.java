@@ -4,6 +4,7 @@ import com.dutyscheduler.duty.TestTeamListener;
 import com.dutyscheduler.duty.persistence.AppUserEntity;
 import com.dutyscheduler.duty.persistence.AppUserRepository;
 import com.dutyscheduler.duty.persistence.TeamRepository;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,6 +23,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -59,6 +61,9 @@ class SecurityHardeningIT {
     @Autowired
     PasswordEncoder encoder;
 
+    @Autowired
+    MeterRegistry registry;
+
     static final String PASSWORD = "the-right-password";
 
     @BeforeEach
@@ -89,6 +94,7 @@ class SecurityHardeningIT {
     @Test
     @DisplayName("ten wrong passwords from one address, and the right one is refused there with a 429")
     void throttlesTheForm() throws Exception {
+        double refusedBefore = registry.counter("duty.signin.refused").count();
         for (int i = 0; i < LoginThrottle.LIMIT; i++) {
             signIn("192.0.2.10", "wrong", 401);
         }
@@ -97,6 +103,7 @@ class SecurityHardeningIT {
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().exists("Retry-After"))
                 .andExpect(jsonPath("$.detail").value(containsString("Try again in 15 minutes")));
+        assertThat(registry.counter("duty.signin.refused").count()).isEqualTo(refusedBefore + 1);
         // Another address is not held to it.
         signIn("192.0.2.11", PASSWORD, 204);
     }
@@ -160,5 +167,17 @@ class SecurityHardeningIT {
     void actuatorForTheOwner() throws Exception {
         mvc.perform(get("/actuator/metrics")).andExpect(status().isOk());
         mvc.perform(get("/actuator/health")).andExpect(jsonPath("$.components.db.status").value("UP"));
+    }
+
+    @Test
+    @DisplayName("the client's own files are open to anyone, since signing in happens inside them")
+    void clientIsOpen() throws Exception {
+        // No client is built into the test classpath, so these are 404s: what
+        // matters is that they are not 401s.
+        for (String path : new String[] { "/", "/index.html", "/favicon.svg", "/assets/index-abc.js" }) {
+            mvc.perform(get(path)).andExpect(status().isNotFound());
+        }
+        // And nothing else is, by being near them.
+        mvc.perform(get("/api/troopers")).andExpect(status().isUnauthorized());
     }
 }

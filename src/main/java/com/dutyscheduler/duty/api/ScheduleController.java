@@ -49,13 +49,15 @@ public class ScheduleController {
     private final ScheduleValidator validator;
     private final DutySheetStore store;
     private final TrooperRepository troopers;
+    private final DutyMetrics metrics;
 
     public ScheduleController(ScheduleSolver solver, ScheduleValidator validator, DutySheetStore store,
-            TrooperRepository troopers) {
+            TrooperRepository troopers, DutyMetrics metrics) {
         this.solver = solver;
         this.validator = validator;
         this.store = store;
         this.troopers = troopers;
+        this.metrics = metrics;
     }
 
     /**
@@ -87,17 +89,21 @@ public class ScheduleController {
         // the reason, before any search — and leaves as a 422 like any sheet
         // that cannot be covered.
         List<Schedule> reusable = reusable(day, roster, absences, request.turnout());
-        SolveResult result = solver.solve(
-                new SolveRequest(day, roster, night, absences, store.history(day.date()), bus, request.turnout(),
-                        reusable));
-        // The roster's default is a starting point, not a choice made for this
-        // sheet: on leave, or unable to stand BUS today, they give way and the
-        // solver chooses. Only a pick made for this sheet is refused.
-        if (!result.isSolved() && bus != null && Boolean.TRUE.equals(request.busDefault())) {
-            result = solver.solve(
-                    new SolveRequest(day, roster, night, absences, store.history(day.date()), null,
+        Trooper pick = bus;
+        SolveResult result = metrics.generate(request.turnout(), () -> {
+            SolveResult first = solver.solve(
+                    new SolveRequest(day, roster, night, absences, store.history(day.date()), pick,
                             request.turnout(), reusable));
-        }
+            // The roster's default is a starting point, not a choice made for this
+            // sheet: on leave, or unable to stand BUS today, they give way and the
+            // solver chooses. Only a pick made for this sheet is refused.
+            if (!first.isSolved() && pick != null && Boolean.TRUE.equals(request.busDefault())) {
+                return solver.solve(
+                        new SolveRequest(day, roster, night, absences, store.history(day.date()), null,
+                                request.turnout(), reusable));
+            }
+            return first;
+        });
 
         if (!result.isSolved()) {
             throw new UnsolvableException(result.reason());
@@ -267,6 +273,7 @@ public class ScheduleController {
         Schedule schedule = ScheduleAssembler.toDomain(date, body, troopers);
         Integer turnout = checkedTurnout(body.turnout());
         store.save(schedule, principal.getName(), turnout);
+        metrics.logged("board");
         return ResponseEntity.ok(ScheduleResponse.from(schedule, turnout, null));
     }
 

@@ -38,7 +38,8 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        # prometheus is for a scraper, signed in as the owner (HTTP Basic).
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       # Up or down for anyone; which database and how much disk only for the

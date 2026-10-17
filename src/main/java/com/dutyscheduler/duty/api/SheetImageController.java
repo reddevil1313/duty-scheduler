@@ -42,9 +42,12 @@ public class SheetImageController {
     private final DutySheetStore store;
     private final TrooperRepository troopers;
 
-    public SheetImageController(DutySheetStore store, TrooperRepository troopers) {
+    private final DutyMetrics metrics;
+
+    public SheetImageController(DutySheetStore store, TrooperRepository troopers, DutyMetrics metrics) {
         this.store = store;
         this.troopers = troopers;
+        this.metrics = metrics;
     }
 
     /**
@@ -65,6 +68,7 @@ public class SheetImageController {
         Integer turnout = ScheduleController.checkedTurnout(body.turnout());
         byte[] png = SheetImage.png(schedule, turnout, principal.getName(), Instant.now());
         store.save(schedule, principal.getName(), turnout);
+        metrics.logged("image");
         return image(date, png);
     }
 
