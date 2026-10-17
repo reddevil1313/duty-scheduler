@@ -1,6 +1,7 @@
 package com.dutyscheduler.duty.api;
 
 import com.dutyscheduler.duty.persistence.AppUserEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.CredentialsContainer;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -54,6 +55,18 @@ public final class Account implements UserDetails, CredentialsContainer {
     /** Null for the owner, who belongs to no team. */
     public Long teamId() {
         return teamId;
+    }
+
+    /**
+     * The caller's team, for an endpoint that only makes sense inside one.
+     * Refused rather than defaulted: an endpoint reached by someone with no
+     * team — the owner, or a test's mock user — must not guess one.
+     */
+    static long teamOf(Account account) {
+        if (account == null || account.teamId == null) {
+            throw new AccessDeniedException("Only a team's own accounts can do this.");
+        }
+        return account.teamId;
     }
 
     @Override

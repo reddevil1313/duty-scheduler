@@ -12,6 +12,13 @@ spring:
   flyway:
     enabled: true
 
+# The owner, made at startup if there is none yet; see OwnerBootstrap. Left
+# empty, the server starts without one and says so in the log.
+owner:
+  bootstrap:
+    username: ${OWNER_USERNAME:}
+    password: ${OWNER_PASSWORD:}
+
 management:
   endpoints:
     web:

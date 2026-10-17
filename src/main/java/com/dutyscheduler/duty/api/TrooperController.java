@@ -39,6 +39,10 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/troopers")
+// A team's own accounts only. The owner has no team, so would read nothing
+// here anyway; refusing them outright says so. Methods that write narrow this
+// to ADMIN with their own annotation, which takes precedence over this one.
+@PreAuthorize("hasAnyRole('ADMIN', 'USER')")
 public class TrooperController {
 
     private final TrooperRepository troopers;

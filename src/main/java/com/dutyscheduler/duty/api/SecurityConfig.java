@@ -1,5 +1,6 @@
 package com.dutyscheduler.duty.api;
 
+import com.dutyscheduler.duty.persistence.AppUserRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -12,6 +13,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 
@@ -47,15 +49,27 @@ public class SecurityConfig {
             "status":401,"detail":"That username and password did not match."}""";
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http, AppUserRepository users) throws Exception {
         http
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/api/session/login", "/actuator/health").permitAll()
+                        // Boot's error page, which a failure Spring answers itself
+                        // forwards to. Closed, it turned every such failure for a caller
+                        // with no account — someone accepting an invite — into a 401.
+                        // It shows a status and a path, nothing that needs an account.
+                        .requestMatchers("/error").permitAll()
                         // GET only, and named explicitly rather than by prefix. This is
                         // the endpoint that hands out the CSRF token a client needs
                         // before it can post to the login URL, so it has to be reachable
                         // while anonymous — but only for reading.
                         .requestMatchers(HttpMethod.GET, "/api/session").permitAll()
+                        // An invite link is opened, and accepted, by someone with no
+                        // account yet. One path segment, so the admin's own list at
+                        // /api/invites is not caught by it, and GET only for the
+                        // view, so revoking (DELETE on the same shape) still needs an
+                        // account. The token is the guard; InviteController says more.
+                        .requestMatchers(HttpMethod.GET, "/api/invites/*").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/invites/*/accept").permitAll()
                         // Everything else needs an account. Note what this does NOT do:
                         // it does not distinguish reading from writing. Doing that here
                         // would mean every new endpoint needs a URL rule adding, and the
@@ -69,6 +83,10 @@ public class SecurityConfig {
                 // between them depends on request headers; naming one removes the
                 // guesswork. It also sends no WWW-Authenticate header, so the browser
                 // never puts up its own credentials box over the React app.
+                // Before the anonymous filter, so a session it ends carries on as
+                // anonymous for the rest of this request.
+                .addFilterBefore(new AccountCheckFilter(users), AnonymousAuthenticationFilter.class)
+
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
 

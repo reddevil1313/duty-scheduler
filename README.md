@@ -1,8 +1,8 @@
 # Duty Scheduler
 
-Generates guard duty schedules for a team under hard constraints, keeps a
+Generates guard duty schedules for teams under hard constraints, keeps a
 record of the sheet that was actually used, and serves both to a browser
-client.
+client. One server hosts many teams, and no team sees another's data.
 
 - **API**: Spring Boot 4 on Java 21, with PostgreSQL 16 and Flyway
 - **Client**: React 19 + TypeScript, built with Vite, in [`web/`](web/)
@@ -52,8 +52,17 @@ Both ship together as a single image.
   what is running or to come first and past leave folded away beneath it, and
   the register can be narrowed to one Trooper.
 - **Light and dark themes**, following the system or set from the masthead.
-- **Two roles**: `ADMIN` manages the roster and leave, and generates and logs
-  sheets. `USER` has read-only access.
+- **Teams**: every roster, sheet, leave entry and record belongs to one team.
+  Two teams can have Troopers of the same name and log sheets for the same
+  evening without meeting.
+- **Invite links**: an admin makes a one-time link for a new `ADMIN` or `USER`
+  and sends it by chat. Whoever opens it chooses their own username and
+  password and joins the team. Links expire after seven days and can be
+  revoked; admins also change roles and remove accounts from the **Team** tab.
+- **Three roles**: the `OWNER` runs the server, creates teams and makes the
+  link for each team's first admin, and sees no team's data. `ADMIN` manages
+  the team's roster, leave and accounts, and generates and logs sheets.
+  `USER` has read-only access.
 
 ## How scheduling works
 
@@ -104,19 +113,27 @@ npm run dev
 Open **http://localhost:5173**. The dev server proxies `/api` and `/actuator`
 to the API.
 
+### The owner
+
+The server makes the owner account at startup from `OWNER_USERNAME` and
+`OWNER_PASSWORD`, once; after that the variables can be removed. The owner
+signs in, makes a team, and sends its first admin the link it gives.
+
 ### Development data
 
-`bootRun` uses the `dev` profile, which creates two accounts:
+`bootRun` uses the `dev` profile, which creates an owner and a team called
+"Dev team" with two accounts:
 
 | Username | Password | Role |
 | --- | --- | --- |
+| `owner` | `owner` | `OWNER` |
 | `admin` | `admin` | `ADMIN` |
 | `trooper_d` | `trooper_d` | `USER` |
 
-To use different passwords, set `DEV_ADMIN_PASSWORD` and
+To use different passwords, set `OWNER_PASSWORD`, `DEV_ADMIN_PASSWORD` and
 `DEV_TROOPER_PASSWORD`.
 
-It also creates a roster of nine Troopers when the roster is empty:
+It also gives Dev team a roster of nine Troopers when its roster is empty:
 `TROOPER_A` to `TROOPER_G` live in, with A, B and C as the default night group,
 and `TROOPER_H` and `TROOPER_I` stay out.
 
@@ -149,23 +166,37 @@ that is well formed but cannot be fulfilled returns `422`.
 | `GET` | `/session` | anyone | Identity and CSRF token |
 | `POST` | `/session/login` | anyone | Form-encoded; returns 204 or 401 |
 | `POST` | `/session/logout` | signed in | Returns 204 |
-| `GET` | `/troopers` | signed in | The roster |
+| `GET` | `/troopers` | team member | The roster |
 | `POST` | `/troopers` | `ADMIN` | Add a Trooper; 409 when the name is taken |
 | `PUT` | `/troopers/{id}` | `ADMIN` | Edit a Trooper's particulars |
 | `DELETE` | `/troopers/{id}` | `ADMIN` | Remove a Trooper; archived if they stood a logged sheet |
 | `POST` | `/schedules/generate` | `ADMIN` | Generate a sheet, optionally with roster ticks; 422 when it cannot be covered |
-| `GET` | `/schedules/{date}` | signed in | The logged sheet; 404 when none |
-| `POST` | `/schedules/{date}/check` | signed in | What a sheet breaks, and each hour's demand; saves nothing |
+| `GET` | `/schedules/{date}` | team member | The logged sheet; 404 when none |
+| `POST` | `/schedules/{date}/check` | team member | What a sheet breaks, and each hour's demand; saves nothing |
 | `PUT` | `/schedules/{date}` | `ADMIN` | Log the sheet actually used |
 | `PUT` | `/schedules/{date}/credits` | `ADMIN` | Set a logged day's credited hours |
 | `POST` | `/schedules/{date}/image` | `ADMIN` | Log the sheet and return it as a PNG |
-| `GET` | `/schedules/{date}/image` | signed in | The logged sheet as a PNG; 404 when none |
-| `GET` | `/absences` | signed in | The leave register |
+| `GET` | `/schedules/{date}/image` | team member | The logged sheet as a PNG; 404 when none |
+| `GET` | `/absences` | team member | The leave register |
 | `POST` | `/absences` | `ADMIN` | Record leave |
-| `POST` | `/absences/preview` | signed in | The interval and sheets a booking would affect; saves nothing |
+| `POST` | `/absences/preview` | team member | The interval and sheets a booking would affect; saves nothing |
 | `DELETE` | `/absences/{id}` | `ADMIN` | Remove leave |
-| `GET` | `/records` | signed in | Totals per Trooper, and the days logged |
+| `GET` | `/records` | team member | Totals per Trooper, and the days logged |
 | `PUT` | `/records/opening` | `ADMIN` | Set opening hours |
+| `GET` | `/teams` | `OWNER` | Every team, with its account counts |
+| `POST` | `/teams` | `OWNER` | Make a team and the invite for its first admin |
+| `POST` | `/teams/{id}/invites` | `OWNER` | Another invite into a team |
+| `GET` | `/invites` | `ADMIN` | The team's invites still waiting |
+| `POST` | `/invites` | `ADMIN` | Make an invite; the only response with its token |
+| `DELETE` | `/invites/{id}` | `ADMIN` | Revoke an invite |
+| `GET` | `/invites/{token}` | anyone | The team and role an invite is for |
+| `POST` | `/invites/{token}/accept` | anyone | Make the account and use the invite |
+| `GET` | `/members` | `ADMIN` | The team's accounts |
+| `PUT` | `/members/{id}` | `ADMIN` | Change a member's role |
+| `DELETE` | `/members/{id}` | `ADMIN` | Remove an account |
+
+A team member is an `ADMIN` or `USER`, and sees only their own team's data.
+The owner is refused these.
 
 Write requests must send the CSRF token from `GET /api/session` in an
 `X-XSRF-TOKEN` header. The token changes on sign-in and sign-out.

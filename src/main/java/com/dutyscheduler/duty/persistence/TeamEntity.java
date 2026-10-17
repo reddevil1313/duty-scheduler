@@ -20,7 +20,8 @@ public class TeamEntity {
     @Column(nullable = false)
     private String name;
 
-    @Column(name = "created_at", nullable = false, updatable = false, insertable = false)
+    /** Set here rather than by the column default, so a new row has it before it is read back. */
+    @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
     protected TeamEntity() {
@@ -28,6 +29,7 @@ public class TeamEntity {
 
     public TeamEntity(String name) {
         this.name = name;
+        this.createdAt = Instant.now();
     }
 
     public Long getId() {
