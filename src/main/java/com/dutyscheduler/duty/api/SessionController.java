@@ -3,6 +3,8 @@ package com.dutyscheduler.duty.api;
 import com.dutyscheduler.duty.api.dto.SessionResponse;
 import com.dutyscheduler.duty.persistence.AppUserEntity;
 import com.dutyscheduler.duty.persistence.AppUserRepository;
+import com.dutyscheduler.duty.persistence.TeamEntity;
+import com.dutyscheduler.duty.persistence.TeamRepository;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -26,9 +28,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class SessionController {
 
     private final AppUserRepository users;
+    private final TeamRepository teams;
 
-    public SessionController(AppUserRepository users) {
+    public SessionController(AppUserRepository users, TeamRepository teams) {
         this.users = users;
+        this.teams = teams;
     }
 
     /**
@@ -56,14 +60,17 @@ public class SessionController {
                 && !(authentication instanceof AnonymousAuthenticationToken);
 
         if (!signedIn) {
-            return new SessionResponse(false, null, null, null, csrfToken.getToken());
+            return new SessionResponse(false, null, null, null, null, csrfToken.getToken());
         }
 
         AppUserEntity user = users.findByUsername(authentication.getName()).orElse(null);
         String role = user != null ? user.getRole() : roleFromAuthorities(authentication);
         String displayName = user != null ? user.getDisplayName() : authentication.getName();
+        String team = user == null || user.getTeamId() == null
+                ? null
+                : teams.findById(user.getTeamId()).map(TeamEntity::getName).orElse(null);
 
-        return new SessionResponse(true, authentication.getName(), displayName, role,
+        return new SessionResponse(true, authentication.getName(), displayName, role, team,
                 csrfToken.getToken());
     }
 

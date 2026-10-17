@@ -2,7 +2,14 @@ package com.dutyscheduler.duty.persistence;
 
 import jakarta.persistence.*;
 
-/** An account. The password column holds a bcrypt hash and nothing else. */
+/**
+ * An account. The password column holds a bcrypt hash and nothing else.
+ *
+ * <p>
+ * Not scoped by {@code @TenantId}: signing in has to find an account before
+ * anyone knows its team, and the owner's has none. The team is a plain column,
+ * and the code that lists a team's members filters on it by hand.
+ */
 @Entity
 @Table(name = "app_user")
 public class AppUserEntity {
@@ -23,14 +30,19 @@ public class AppUserEntity {
     @Column(nullable = false)
     private String role;
 
+    /** The one team this account belongs to; null only for the owner (V6's CHECK). */
+    @Column(name = "team_id")
+    private Long teamId;
+
     protected AppUserEntity() {
     }
 
-    public AppUserEntity(String username, String displayName, String passwordHash, String role) {
+    public AppUserEntity(String username, String displayName, String passwordHash, String role, Long teamId) {
         this.username = username;
         this.displayName = displayName;
         this.passwordHash = passwordHash;
         this.role = role;
+        this.teamId = teamId;
     }
 
     public Long getId() {
@@ -51,6 +63,10 @@ public class AppUserEntity {
 
     public String getRole() {
         return role;
+    }
+
+    public Long getTeamId() {
+        return teamId;
     }
 
     public void setPasswordHash(String passwordHash) {

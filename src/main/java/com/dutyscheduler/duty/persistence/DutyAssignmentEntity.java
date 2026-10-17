@@ -2,6 +2,7 @@ package com.dutyscheduler.duty.persistence;
 
 import com.dutyscheduler.duty.domain.Post;
 import jakarta.persistence.*;
+import org.hibernate.annotations.TenantId;
 
 /**
  * One man, one hour, one post.
@@ -14,6 +15,11 @@ public class DutyAssignmentEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    /** The team this row belongs to, filled and filtered by Hibernate; see {@link TrooperEntity}. */
+    @TenantId
+    @Column(name = "team_id", nullable = false, updatable = false)
+    private Long team;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "sheet_id", nullable = false)

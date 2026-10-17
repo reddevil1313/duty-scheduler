@@ -12,11 +12,14 @@ package com.dutyscheduler.duty.api.dto;
  *
  * @param authenticated false for an anonymous caller; the rest of the identity
  *                      fields are then null
+ * @param team          the name of the caller's team; null when anonymous, and
+ *                      for the owner, who belongs to none
  * @param csrfToken     always present, and always current for this request
  */
 public record SessionResponse(boolean authenticated,
         String username,
         String displayName,
         String role,
+        String team,
         String csrfToken) {
 }

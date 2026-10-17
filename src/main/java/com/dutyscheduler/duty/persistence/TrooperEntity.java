@@ -2,6 +2,7 @@ package com.dutyscheduler.duty.persistence;
 
 import com.dutyscheduler.duty.domain.Trooper;
 import jakarta.persistence.*;
+import org.hibernate.annotations.TenantId;
 
 /**
  * The roster, as rows.
@@ -14,7 +15,18 @@ public class TrooperEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
+    /**
+     * The team this row belongs to. Hibernate fills it from the current team
+     * on insert and adds it to every query, so nothing here can read or write
+     * another team's rows; V6's composite foreign keys hold the same line in
+     * the database.
+     */
+    @TenantId
+    @Column(name = "team_id", nullable = false, updatable = false)
+    private Long team;
+
+    /** Unique within the team (V6), not across teams. */
+    @Column(nullable = false)
     private String name;
 
     private String rank;

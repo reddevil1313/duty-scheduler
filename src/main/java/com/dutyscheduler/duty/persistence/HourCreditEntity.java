@@ -1,6 +1,7 @@
 package com.dutyscheduler.duty.persistence;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.TenantId;
 
 /** Hours credited to a Trooper for a logged day they did not stand. */
 @Entity
@@ -10,6 +11,11 @@ public class HourCreditEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    /** The team this row belongs to, filled and filtered by Hibernate; see {@link TrooperEntity}. */
+    @TenantId
+    @Column(name = "team_id", nullable = false, updatable = false)
+    private Long team;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "sheet_id", nullable = false)

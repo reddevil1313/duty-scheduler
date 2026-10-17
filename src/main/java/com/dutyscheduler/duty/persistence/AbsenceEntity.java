@@ -4,6 +4,7 @@ import com.dutyscheduler.duty.domain.Absence;
 import com.dutyscheduler.duty.domain.AbsenceKind;
 import com.dutyscheduler.duty.domain.AbsenceSpan;
 import jakarta.persistence.*;
+import org.hibernate.annotations.TenantId;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -16,6 +17,11 @@ public class AbsenceEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    /** The team this row belongs to, filled and filtered by Hibernate; see {@link TrooperEntity}. */
+    @TenantId
+    @Column(name = "team_id", nullable = false, updatable = false)
+    private Long team;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "trooper_id", nullable = false)

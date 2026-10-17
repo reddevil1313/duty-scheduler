@@ -2,8 +2,13 @@ package com.dutyscheduler.duty.api;
 
 import com.dutyscheduler.duty.persistence.AppUserEntity;
 import com.dutyscheduler.duty.persistence.AppUserRepository;
+import com.dutyscheduler.duty.persistence.TeamEntity;
+import com.dutyscheduler.duty.persistence.TeamRepository;
+import com.dutyscheduler.duty.persistence.TeamScope;
 import com.dutyscheduler.duty.persistence.TrooperEntity;
 import com.dutyscheduler.duty.persistence.TrooperRepository;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -57,6 +62,28 @@ class DevDataSeederIT {
     @Autowired
     ApplicationRunner seedDevData;
 
+    @Autowired
+    TeamRepository teams;
+
+    @Autowired
+    DatabaseUserDetailsService accounts;
+
+    private TeamScope.Opened devTeam;
+
+    /**
+     * Read the roster as the dev team, which is where the seeder put it; the
+     * test team every other test runs as has none.
+     */
+    @BeforeEach
+    void openDevTeam() {
+        devTeam = TeamScope.open(users.findByUsername("admin").orElseThrow().getTeamId());
+    }
+
+    @AfterEach
+    void closeDevTeam() {
+        devTeam.close();
+    }
+
     @Test
     @DisplayName("both dev accounts sign in with their default passwords")
     void seededAccountsSignIn() throws Exception {
@@ -69,6 +96,14 @@ class DevDataSeederIT {
 
         assertThat(users.findByUsername("admin")).map(AppUserEntity::getRole).hasValue("ADMIN");
         assertThat(users.findByUsername("trooper_d")).map(AppUserEntity::getRole).hasValue("USER");
+    }
+
+    @Test
+    @DisplayName("both accounts belong to the dev team")
+    void seededTeam() {
+        Long team = users.findByUsername("admin").orElseThrow().getTeamId();
+        assertThat(teams.findById(team)).map(TeamEntity::getName).hasValue(DevDataSeeder.TEAM);
+        assertThat(users.findByUsername("trooper_d")).map(AppUserEntity::getTeamId).hasValue(team);
     }
 
     @Test
@@ -90,7 +125,8 @@ class DevDataSeederIT {
             "2026-09-07", "2026-09-08", "2026-09-09", "2026-09-10",
             "2026-09-11", "2026-09-12", "2026-09-13" })
     void everyDayOfTheWeekSolves(String date) throws Exception {
-        mvc.perform(post("/api/schedules/generate").with(csrf()).with(user("admin").roles("ADMIN"))
+        // The seeded admin itself, so the request runs as the dev team.
+        mvc.perform(post("/api/schedules/generate").with(csrf()).with(user(accounts.loadUserByUsername("admin")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {"date":"%s","nightGroup":["TROOPER_A","TROOPER_B","TROOPER_C"]}

@@ -1,6 +1,7 @@
 package com.dutyscheduler.duty.persistence;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.TenantId;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -16,7 +17,13 @@ public class DutySheetEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "duty_date", nullable = false, unique = true)
+    /** The team this row belongs to, filled and filtered by Hibernate; see {@link TrooperEntity}. */
+    @TenantId
+    @Column(name = "team_id", nullable = false, updatable = false)
+    private Long team;
+
+    /** One sheet per evening per team (V6). */
+    @Column(name = "duty_date", nullable = false)
     private LocalDate dutyDate;
 
     private String note;

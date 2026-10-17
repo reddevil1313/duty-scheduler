@@ -2,6 +2,9 @@ package com.dutyscheduler.duty.api;
 
 import com.dutyscheduler.duty.persistence.AppUserEntity;
 import com.dutyscheduler.duty.persistence.AppUserRepository;
+import com.dutyscheduler.duty.persistence.TeamEntity;
+import com.dutyscheduler.duty.persistence.TeamRepository;
+import com.dutyscheduler.duty.persistence.TeamScope;
 import com.dutyscheduler.duty.persistence.TrooperEntity;
 import com.dutyscheduler.duty.persistence.TrooperRepository;
 import org.slf4j.Logger;
@@ -17,7 +20,7 @@ import java.util.List;
 
 /**
  * Enough data that a fresh development database can be signed into and
- * scheduled: two accounts and a nine-Trooper roster.
+ * scheduled: a team, two accounts in it and a nine-Trooper roster.
  *
  * <p>
  * A runner under the {@code dev} profile rather than a Flyway migration. A
@@ -58,24 +61,36 @@ public class DevDataSeeder {
     record SeedTrooper(String name, boolean stayOut, boolean onNight) {
     }
 
+    static final String TEAM = "Dev team";
+
     @Bean
-    ApplicationRunner seedDevData(AppUserRepository users, TrooperRepository troopers,
+    ApplicationRunner seedDevData(AppUserRepository users, TeamRepository teams, TrooperRepository troopers,
             PasswordEncoder encoder,
             @Value("${dev.seed.admin-password}") String adminPassword,
             @Value("${dev.seed.trooper-password}") String trooperPassword) {
         return args -> {
-            seedAccount(users, encoder, "admin", "Admin", adminPassword, "ADMIN");
-            seedAccount(users, encoder, "trooper_d", "Trooper D", trooperPassword, "USER");
-            seedRoster(troopers);
+            // The dev admin's team, wherever it is: on a database that predates
+            // teams, V6 put the old accounts and roster into "First team", and
+            // seeding a second team beside it would hide that data from them.
+            long team = users.findByUsername("admin")
+                    .map(AppUserEntity::getTeamId)
+                    .orElseGet(() -> teams.findByNameIgnoreCase(TEAM)
+                            .orElseGet(() -> teams.save(new TeamEntity(TEAM)))
+                            .getId());
+            seedAccount(users, encoder, "admin", "Admin", adminPassword, "ADMIN", team);
+            seedAccount(users, encoder, "trooper_d", "Trooper D", trooperPassword, "USER", team);
+            // Nobody is signed in at startup, so the roster is seeded under an
+            // explicit scope; without one it would be written to no team at all.
+            TeamScope.run(team, () -> seedRoster(troopers));
         };
     }
 
     private static void seedAccount(AppUserRepository users, PasswordEncoder encoder,
-            String username, String displayName, String password, String role) {
+            String username, String displayName, String password, String role, long team) {
         if (users.findByUsername(username).isPresent()) {
             return;
         }
-        users.save(new AppUserEntity(username, displayName, encoder.encode(password), role));
+        users.save(new AppUserEntity(username, displayName, encoder.encode(password), role, team));
         log.info("Seeded dev account '{}' ({})", username, role);
     }
 
