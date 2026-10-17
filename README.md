@@ -15,6 +15,7 @@ Both ship together as a single image.
 
 - **Generate a sheet** for any date from the roster, the leave register and the
   night group. The solver balances hours across the team within the rules.
+  Anyone away for the whole sheet is listed at the bottom.
   Who takes the BUS run (0700–1000) can be chosen the same way as the night
   group, starting from the roster's default BUS Trooper; a choice that cannot
   stand, such as a stay-out, is refused with the reason.

@@ -1,6 +1,6 @@
 import { useEffect, useState, type MouseEvent } from 'react'
 import type { Post, Schedule, ScheduleRow, SheetCheck } from '../api/types'
-import { coverage, mpShortfall } from './edit'
+import { availableFirst, coverage, mpShortfall } from './edit'
 import { SLOT_COUNT, isCrossover, labelAt } from './slots'
 
 export type Mode = 'view' | 'edit' | 'swap'
@@ -77,11 +77,13 @@ export function SheetGrid({ sheet, check, fresh, mp, mode, spare, swapPick, onSe
   // effect that resets state.
   const openMenu = mode === 'edit' ? menu : null
 
-  const rows: ScheduleRow[] = mode === 'edit'
+  // Anyone away the whole sheet goes to the bottom, below even the spare rows,
+  // so the rows at the top are the people who can work.
+  const rows: ScheduleRow[] = availableFirst(mode === 'edit'
     ? [...sheet.rows, ...spare.map((s) => ({
         trooper: s.name, stayOut: s.stayOut, posts: Array(SLOT_COUNT).fill(null), hours: 0, span: 0,
       }))]
-    : sheet.rows
+    : sheet.rows, check?.away)
 
   // Hours as counted here, span as the server last worked it out — dimmed
   // while a newer answer is on its way, but never blanked.

@@ -6,7 +6,7 @@ import { useSession } from '../auth/session-context'
 import { shortDate } from '../dates'
 import { download } from '../download'
 import type { RosterState } from '../roster/useRoster'
-import { mpShortfall, setCell, swapRows } from './edit'
+import { availableFirst, mpShortfall, setCell, swapRows } from './edit'
 import { SheetGrid, type Mode } from './SheetGrid'
 import { isSilent } from './slots'
 
@@ -59,6 +59,13 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
   // The most recent check for this date, even if of an earlier edit: what the
   // grid shows while a newer one is on its way, so nothing blanks and reflows.
   const latest = check && schedule && check.of.date === schedule.date ? check.result : null
+
+  /**
+   * The sheet as it goes to the server: rows in the order the board shows
+   * them, so the logged sheet and its image list them the same way.
+   */
+  const asShown = (sheet: Schedule): Schedule =>
+    ({ ...sheet, rows: availableFirst(sheet.rows, latest?.away), turnout: sheetTurnout })
 
   /** A fresh sheet on the board: nothing edited, nothing picked. */
   const show = (sheet: Schedule | null, from: Source | null, withTurnout: number | null = null) => {
@@ -155,7 +162,7 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
       const count = issues.length
       // The turnout goes with the sheet, so the logged sheet keeps its MP row
       // and can be reused for another day made the same way.
-      const saved = await api.log(date, { ...schedule, turnout: sheetTurnout })
+      const saved = await api.log(date, asShown(schedule))
       show(saved, 'logged', saved.turnout ?? null)
       setNote(count > 0 ? `Logged, with ${count} issue${count === 1 ? '' : 's'} on record.` : 'Logged.')
     } catch (e) {
@@ -174,7 +181,7 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
     setBusy(true)
     setError(null)
     try {
-      const image = await api.logAndImage(date, { ...schedule, turnout: sheetTurnout })
+      const image = await api.logAndImage(date, asShown(schedule))
       download(image, `duty-sheet-${date}.png`)
       const saved = await api.schedule(date)
       show(saved, 'logged', saved.turnout ?? null)

@@ -94,3 +94,15 @@ export function mpShortfall(sheet: Schedule, demand: SheetCheck['demand']): Post
     return out
   })
 }
+
+/**
+ * Rows of Troopers away every hour moved to the bottom, the rest in their
+ * order. Stable, so a sheet already in this order — as the server generates
+ * it — does not move when its check arrives.
+ */
+export function availableFirst<R extends { trooper: string }>(rows: R[], away: SheetCheck['away'] | undefined): R[] {
+  if (!away) return rows
+  const out = (r: R) => !!away[r.trooper]?.every((k) => k !== null)
+  const last = rows.filter(out)
+  return last.length === 0 ? rows : [...rows.filter((r) => !out(r)), ...last]
+}

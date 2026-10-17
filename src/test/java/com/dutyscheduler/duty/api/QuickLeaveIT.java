@@ -104,6 +104,19 @@ class QuickLeaveIT {
     }
 
     @Test
+    @DisplayName("someone out the whole sheet is listed last, everyone else in roster order")
+    @SuppressWarnings("unchecked")
+    void unavailableRowsGoLast() throws Exception {
+        String sheet = generate("\"TROOPER_A\",\"TROOPER_B\",\"TROOPER_C\"",
+                "{\"trooper\":\"TROOPER_D\",\"kind\":\"MC\"},{\"trooper\":\"TROOPER_F\",\"kind\":\"AL\"}");
+
+        List<Map<String, Object>> rows = (List<Map<String, Object>>) json.readValue(sheet, Map.class).get("rows");
+        assertThat(rows).extracting(r -> r.get("trooper")).containsExactly(
+                "TROOPER_A", "TROOPER_B", "TROOPER_C", "TROOPER_E", "TROOPER_G", "TROOPER_H",
+                "TROOPER_I", "TROOPER_J", "TROOPER_K", "TROOPER_D", "TROOPER_F");
+    }
+
+    @Test
     @DisplayName("a tick lasts one request: the next generate without it puts the Trooper back")
     void tickIsForgotten() throws Exception {
         generate("\"TROOPER_A\",\"TROOPER_B\",\"TROOPER_C\"", "{\"trooper\":\"TROOPER_D\",\"kind\":\"OL\"}");

@@ -31,6 +31,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Generating, reading and logging duty sheets.
@@ -96,7 +98,24 @@ public class ScheduleController {
         if (!result.isSolved()) {
             throw new UnsolvableException(result.reason());
         }
-        return ResponseEntity.ok(ScheduleResponse.from(result.schedule(), request.turnout(), result.reusedFrom()));
+        // Those who cannot stand any hour go last, so the board, the logged
+        // sheet and its image all list them below everyone working.
+        Set<String> unavailable = roster.stream()
+                .filter(t -> !availableAtAll(t, day, absences))
+                .map(Trooper::name)
+                .collect(Collectors.toSet());
+        return ResponseEntity.ok(ScheduleResponse.from(result.schedule(), request.turnout(), result.reusedFrom())
+                .withLast(unavailable));
+    }
+
+    /** Whether any hour of the sheet is free of leave and ticks for this Trooper. */
+    private static boolean availableAtAll(Trooper trooper, DutyDay day, List<Absence> absences) {
+        for (boolean free : Availability.mask(trooper, day, absences)) {
+            if (free) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -110,16 +129,7 @@ public class ScheduleController {
      * leave and ticks, against those who stood any hour on the logged sheet.
      */
     private List<Schedule> reusable(DutyDay day, List<Trooper> roster, List<Absence> absences, Integer turnout) {
-        long headcount = roster.stream()
-                .filter(t -> {
-                    for (boolean free : Availability.mask(t, day, absences)) {
-                        if (free) {
-                            return true;
-                        }
-                    }
-                    return false;
-                })
-                .count();
+        long headcount = roster.stream().filter(t -> availableAtAll(t, day, absences)).count();
         List<Map<Post, Integer>> posts = DayDemand.of(day).byHour();
         return store.loadAllLogged().stream()
                 .filter(l -> !l.schedule().day().equals(day))
