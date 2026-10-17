@@ -5,8 +5,7 @@ import com.dutyscheduler.duty.persistence.TrooperEntity;
 /**
  * A name on the roster, with the flags a client needs to lay out a board.
  *
- * @param id what edits and deletes address. Not the name: a rename would
- *           otherwise change the address of the thing being renamed.
+ * @param id used by edits and deletes, so a rename is safe
  */
 public record TrooperResponse(long id, String name, String rank, boolean stayOut,
         boolean permPac, boolean onNight, boolean defaultBus) {

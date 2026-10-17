@@ -23,10 +23,7 @@ import java.util.Optional;
 @Service
 public class DutySheetStore {
 
-    /**
-     * The silent hours as slot indices. A slot's hour is {@code (20 + slot) % 24},
-     * so 2200 through 0500 is always slots 2 to 9 whatever the date.
-     */
+    /** Silent hours 2200-0559 as slots; the sheet always starts at 2000. */
     static final int SILENT_FROM = 2;
     static final int SILENT_TO = 9;
 
@@ -43,23 +40,17 @@ public class DutySheetStore {
         this.credits = credits;
     }
 
-    /**
-     * A logged sheet and the turnout it was made with: null for the free split.
-     * Who logged it, and when, ride along for anything that shows the record.
-     */
+    /** A logged sheet. {@code turnout} is null for the free split. */
     public record Logged(Schedule schedule, Integer turnout, String loggedBy, Instant loggedAt) {
     }
 
-    /**
-     * Writes a sheet, replacing whatever was there for that date. As the free
-     * split; see {@link #save(Schedule, String, Integer)} for a fixed turnout.
-     */
+    /** Saves as a free split, replacing any sheet for that date. */
     @Transactional
     public DutySheetEntity save(Schedule schedule, String createdBy) {
         return save(schedule, createdBy, null);
     }
 
-    /** Writes a sheet with the turnout it was made with, replacing whatever was there for that date. */
+    /** Saves with its turnout, replacing any sheet for that date. */
     @Transactional
     public DutySheetEntity save(Schedule schedule, String createdBy, Integer turnout) {
         LocalDate date = schedule.day().date();
@@ -68,9 +59,8 @@ public class DutySheetStore {
         if (sheet == null) {
             sheet = new DutySheetEntity(date, createdBy);
         } else {
-            // Clear the old rows and push the DELETEs out before adding replacements.
-            // Hibernate flushes inserts-first, deletes-last, so doing both in one go
-            // collides with rows that are still there.
+            // Flush the deletes first: Hibernate inserts before it deletes, which
+            // would hit the unique key.
             sheet.getAssignments().clear();
             sheets.saveAndFlush(sheet);
         }
@@ -100,29 +90,23 @@ public class DutySheetStore {
         return sheets.save(sheet);
     }
 
-    /**
-     * Reads a sheet back as a domain object, or nothing if that day was never
-     * logged.
-     */
     @Transactional(readOnly = true)
     public Optional<Schedule> load(LocalDate date) {
         return loadLogged(date).map(Logged::schedule);
     }
 
-    /** A logged sheet with its turnout, or nothing if that day was never logged. */
     @Transactional(readOnly = true)
     public Optional<Logged> loadLogged(LocalDate date) {
         return sheets.findByDutyDate(date).map(sheet -> new Logged(toDomain(sheet), sheet.getTurnout(), sheet.getCreatedBy(), sheet.getCreatedAt()));
     }
 
-    /** Every logged sheet with its turnout, latest first. */
+    /** Latest first. */
     @Transactional(readOnly = true)
     public List<Logged> loadAllLogged() {
         return sheets.findAllWithAssignments().stream()
                 .map(sheet -> new Logged(toDomain(sheet), sheet.getTurnout(), sheet.getCreatedBy(), sheet.getCreatedAt()))
                 .toList();
     }
-
 
     private static Schedule toDomain(DutySheetEntity sheet) {
         Map<Trooper, Post[]> grid = new LinkedHashMap<>();
@@ -148,13 +132,9 @@ public class DutySheetStore {
     }
 
     /**
-     * Replace a logged day's credited hours. A Trooper missing from the map, or
-     * credited zero, has none.
+     * Replaces a logged day's credited hours. Missing or zero means none.
      *
-     * @return false when nothing is logged for that date, so there is no day to
-     *         credit
-     * @throws IllegalArgumentException for a name not on any sheet's roster, or
-     *                                  hours outside 0 to 24
+     * @return false if nothing is logged for that date
      */
     @Transactional
     public boolean saveCredits(LocalDate date, Map<String, Integer> hours) {
@@ -170,8 +150,7 @@ public class DutySheetStore {
             if (h == 0) {
                 return;
             }
-            // Archived Troopers included: crediting an old day is about who was
-            // there then, not who is on the roster now.
+            // Includes archived Troopers.
             TrooperEntity trooper = troopers.findByName(name).orElseThrow(
                     () -> new IllegalArgumentException(name + " is not a Trooper."));
             rows.add(new HourCreditEntity(sheet, trooper, h));
@@ -181,13 +160,11 @@ public class DutySheetStore {
         return true;
     }
 
-    /** Cumulative hours per Trooper, which is what the fairness tiebreak reads. */
     @Transactional(readOnly = true)
     public Map<String, Integer> hoursSince(LocalDate from, LocalDate to) {
         return toCounts(sheets.hoursPerTrooper(from, to));
     }
 
-    /** The same for the silent hours alone. */
     @Transactional(readOnly = true)
     public Map<String, Integer> silentHoursSince(LocalDate from, LocalDate to) {
         return toCounts(sheets.silentHoursPerTrooper(from, to));
@@ -201,12 +178,9 @@ public class DutySheetStore {
         return out;
     }
 
-    /**
-     * How many hours each Trooper has done recently, keyed by the domain object the
-     * solver uses.
-     */
     public static final int HISTORY_DAYS = 90;
 
+    /** Hours each roster Trooper did in the last {@link #HISTORY_DAYS} days. */
     @Transactional(readOnly = true)
     public Map<Trooper, Integer> history(LocalDate upTo) {
         Map<String, Integer> byName = hoursSince(upTo.minusDays(HISTORY_DAYS), upTo.minusDays(1));
@@ -217,13 +191,12 @@ public class DutySheetStore {
         return out;
     }
 
-    /** The whole leave register as domain objects, for counting leave in the records. */
     @Transactional(readOnly = true)
     public List<Absence> allAbsences() {
         return absences.findAllByOrderByFromDateDescIdDesc().stream().map(AbsenceEntity::toDomain).toList();
     }
 
-    /** Every booking that could reach the given sheet, as domain objects. */
+    /** Leave that reaches the given sheet. */
     @Transactional(readOnly = true)
     public List<Absence> absencesTouching(DutyDay day) {
         return absences.findTouching(day.date().minusDays(1), day.date().plusDays(1))

@@ -5,18 +5,13 @@ import { useReport } from '../api/useReport'
 import { localDay, shortDate } from '../dates'
 import { InviteLink } from './InviteLink'
 
-/**
- * The owner's whole view: the teams on this server and the way into a new
- * one. Names and account counts only — the owner has no team, so no roster,
- * sheet or leave of any team ever reaches this page.
- */
+/** The owner's view: teams and account counts, no team data. */
 export function OwnerConsole() {
   const [teams, setTeams] = useState<Team[] | null>(null)
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // The latest link made, and for which team: one on screen at a time, so it
-  // is plain which team a link belongs to.
+  // One link on screen at a time.
   const [link, setLink] = useState<{ team: string; invite: Invite } | null>(null)
   const report = useReport(setError)
 
@@ -108,8 +103,6 @@ export function OwnerConsole() {
                     <td className="n">{team.users}</td>
                     <td>{shortDate(localDay(team.createdAt))}</td>
                     <td className="row-actions">
-                      {/* The way back in for a team whose admins have all gone,
-                          or whose first link expired unused. */}
                       <button type="button" onClick={() => void newAdminLink(team)}>New admin link</button>
                     </td>
                   </tr>

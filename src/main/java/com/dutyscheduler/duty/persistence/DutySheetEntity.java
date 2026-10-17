@@ -37,10 +37,7 @@ public class DutySheetEntity {
     /** The fixed turnout it was made with, or null for the free split. */
     private Integer turnout;
 
-    /**
-     * Assignments are owned by the sheet: replacing a day's schedule replaces its
-     * rows, and deleting the sheet deletes them.
-     */
+    /** Owned by the sheet: replaced and deleted with it. */
     @OneToMany(mappedBy = "sheet", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<DutyAssignmentEntity> assignments = new ArrayList<>();
 

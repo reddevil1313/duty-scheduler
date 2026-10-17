@@ -17,14 +17,8 @@ import java.util.Comparator;
 public record ScheduleScore(int hourSpread, int worstExcess, int totalExcess, int postChanges) {
 
     /**
-     * The best schedule is the one with the lowest spread of hours,
-     * then the lowest worst excess span, then the lowest total excess span,
-     * then the fewest walks between AP and GG.
-     *
-     * <p>
-     * Post changes come last on purpose. A walk between posts is a nuisance;
-     * an uneven share of hours or a day spread thin is unfair. Ranked last, they
-     * only ever decide between schedules that are equally fair.
+     * Lowest hour spread, then worst excess span, then total excess span, then
+     * fewest AP/GG walks. Walks are last so they never cost fairness.
      */
     public static final Comparator<ScheduleScore> BEST_FIRST =
             Comparator.comparingInt(ScheduleScore::hourSpread)
@@ -42,8 +36,7 @@ public record ScheduleScore(int hourSpread, int worstExcess, int totalExcess, in
         int most = 0;
         int changes = 0;
         for (Schedule.Row row : schedule.rows()) {
-            // Counted for stay-outs too: they are spared the span score because
-            // they are in all day regardless, but they still walk.
+            // Stay-outs still walk, even though span doesn't count for them.
             changes += DutyRules.postChanges(row.posts().toArray(new Post[0]));
             if (row.hours() > 0) {
                 fewest = Math.min(fewest, row.hours());

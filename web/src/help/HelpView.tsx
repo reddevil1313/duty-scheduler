@@ -1,17 +1,7 @@
 import type { ReactNode } from 'react'
 import type { Role } from '../api/types'
 
-/**
- * How to use the app, written for whoever is reading: an ADMIN gets the day's
- * routine from roster to logged sheet, a USER how to read what is there, and
- * the owner how teams and their links work.
- *
- * <p>
- * Plain text in the client rather than a page from the server: it describes
- * the screens around it, and changes when they do, in the same commit.
- * It names the rules the solver keeps but holds none of them; the board and
- * the server's check are what apply them.
- */
+/** Help, with sections chosen by role. */
 interface Section {
   id: string
   title: string
@@ -213,8 +203,7 @@ export function HelpView({ role }: { role: Role }) {
           <h2>How to use it</h2>
           <span className="meta">for {role === 'OWNER' ? 'the owner' : role === 'ADMIN' ? 'an admin' : 'a user'}</span>
         </div>
-        {/* Buttons that scroll rather than #fragment links: the fragment is
-            where invite links carry their token, and is left alone. */}
+        {/* Buttons, not #links: the fragment is used for invite tokens. */}
         <nav className="help-toc" aria-label="Contents">
           {sections.map((s) => (
             <button

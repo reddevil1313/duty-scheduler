@@ -62,11 +62,9 @@ public final class DutyRules {
      * How many times a row walks between AP and GG within one turnout.
      *
      * <p>
-     * Consecutive duty hours are compared, breaks skipped, so "3h GG, an hour
-     * off, 1h AP, an hour off, 3h GG" counts two. A gap of {@link #REST_GAP} or
-     * more starts a new turnout and resets it: whoever stands GG after going
-     * home has not walked from AP. Only AP and GG count — AP to PAC at 0600 is
-     * the designed handover off the silent hours, not a walk to be avoided.
+     * Breaks are skipped, so "3h GG, 1h off, 1h AP, 1h off, 3h GG" counts two.
+     * A gap of {@link #REST_GAP} or more resets the count. AP to PAC is not
+     * counted; that is the normal 0600 handover.
      */
     public static int postChanges(Post[] cells) {
         int changes = 0;

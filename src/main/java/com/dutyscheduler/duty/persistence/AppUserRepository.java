@@ -14,7 +14,7 @@ import java.util.Optional;
 public interface AppUserRepository extends JpaRepository<AppUserEntity, Long> {
     Optional<AppUserEntity> findByUsername(String username);
 
-    /** Usernames are unique across the server, not per team: signing in names no team. */
+    /** Usernames are unique server-wide. */
     boolean existsByUsernameIgnoreCase(String username);
 
     boolean existsByRole(String role);

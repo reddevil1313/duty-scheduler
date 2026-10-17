@@ -4,11 +4,7 @@ import jakarta.persistence.*;
 
 import java.time.Instant;
 
-/**
- * A team: its own roster, sheets, leave and records, which no other team sees.
- * Not itself scoped to a team — the owner lists them all — so it carries no
- * {@code @TenantId}.
- */
+/** A team. Not a {@code @TenantId} entity, since the owner lists them all. */
 @Entity
 @Table(name = "team")
 public class TeamEntity {
@@ -20,7 +16,7 @@ public class TeamEntity {
     @Column(nullable = false)
     private String name;
 
-    /** Set here rather than by the column default, so a new row has it before it is read back. */
+    /** Set here so it isn't null before the row is read back. */
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

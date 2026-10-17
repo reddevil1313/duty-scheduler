@@ -34,10 +34,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * Reuse through the API: which logged sheets match a new one, and the turnout
- * that logging now records so that "same turnout" can be asked at all.
- */
+/** Reuse through the API, and the turnout stored when logging. */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
@@ -119,7 +116,7 @@ class SheetReuseIT {
     }
 
     @Test
-    @DisplayName("a Monday reuses the logged Thursday, and says so")
+    @DisplayName("Monday reuses Thursday and says so")
     void mondayReusesThursday() throws Exception {
         String thursday = generate(THURSDAY, "");
         log(THURSDAY, thursday);
@@ -131,14 +128,14 @@ class SheetReuseIT {
     }
 
     @Test
-    @DisplayName("a Friday has different posts, so it is solved, not reused")
+    @DisplayName("Friday has different posts, so is solved")
     void fridayIsSolved() throws Exception {
         log(THURSDAY, generate(THURSDAY, ""));
         assertThat(parse(generate(FRIDAY, "")).get("reusedFrom")).isNull();
     }
 
     @Test
-    @DisplayName("one fewer Trooper, ticked out, is a different headcount: solved")
+    @DisplayName("one ticked out is a different headcount")
     void headcountDiffers() throws Exception {
         log(THURSDAY, generate(THURSDAY, ""));
         String monday = generate(MONDAY, ",\"out\":[{\"trooper\":\"TROOPER_G\",\"kind\":\"OL\"}]");
@@ -146,21 +143,21 @@ class SheetReuseIT {
     }
 
     @Test
-    @DisplayName("a different turnout is not a match: a free-split Thursday does not serve a 5h Monday")
+    @DisplayName("different turnout doesn't match")
     void turnoutDiffers() throws Exception {
         log(THURSDAY, generate(THURSDAY, ""));
         assertThat(parse(generate(MONDAY, ",\"turnout\":5")).get("reusedFrom")).isNull();
     }
 
     @Test
-    @DisplayName("regenerating a logged day does not reuse that day's own sheet")
+    @DisplayName("regenerating doesn't reuse the same day")
     void notItsOwnSheet() throws Exception {
         log(THURSDAY, generate(THURSDAY, ""));
         assertThat(parse(generate(THURSDAY, "")).get("reusedFrom")).isNull();
     }
 
     @Test
-    @DisplayName("logging records the turnout; a 5h Thursday serves a 5h Monday, and its MP gaps are not broken rules")
+    @DisplayName("5h Thursday serves a 5h Monday")
     void fixedTurnoutRoundTrip() throws Exception {
         String thursday = generate(THURSDAY, ",\"turnout\":5");
         assertThat(parse(thursday).get("turnout")).isEqualTo(5);
@@ -172,7 +169,7 @@ class SheetReuseIT {
     }
 
     @Test
-    @DisplayName("a free-split sheet logs with no turnout")
+    @DisplayName("free split logs no turnout")
     void freeSplitHasNoTurnout() throws Exception {
         log(THURSDAY, generate(THURSDAY, ""));
         mvc.perform(get("/api/schedules/" + THURSDAY)).andExpect(jsonPath("$.turnout").value(nullValue()));

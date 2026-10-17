@@ -18,12 +18,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * A logged sheet laid onto a new day's Troopers. The old turnouts are kept
- * exactly; who stands each may change. Anything that cannot be laid, or comes
- * out breaking a rule, is solved instead — so each test checks both that reuse
- * happens when it should and that it steps aside when it should not.
- */
+/** Reusing a logged sheet, and falling back to solving when it doesn't fit. */
 class SheetReuseTest {
 
     private static final Trooper TROOPER_A = Trooper.of("TROOPER_A");
@@ -54,7 +49,7 @@ class SheetReuseTest {
         return result.schedule();
     }
 
-    /** The turnouts on a sheet, whoever stands them: what reuse must keep. */
+    /** The rows' shapes, ignoring who stands them. */
     private static List<List<Post>> turnouts(Schedule sheet) {
         List<List<Post>> out = new ArrayList<>(sheet.rows().stream()
                 .filter(r -> r.hours() > 0).map(Schedule.Row::posts).toList());
@@ -63,7 +58,7 @@ class SheetReuseTest {
     }
 
     @Test
-    @DisplayName("a Monday reuses a logged Thursday: the same turnouts, and a clean sheet")
+    @DisplayName("Monday reuses a logged Thursday")
     void reusesTheLoggedSheet() {
         Schedule thursday = logged(SolveRequest.of(THURSDAY, NINE, NIGHT));
 
@@ -76,7 +71,7 @@ class SheetReuseTest {
     }
 
     @Test
-    @DisplayName("the same headcount with different people still reuses: someone new takes a row")
+    @DisplayName("same headcount, different people still reuses")
     void differentPeopleSameHeadcount() {
         Schedule thursday = logged(SolveRequest.of(THURSDAY, NINE, NIGHT));
         // TROOPER_D is on MC all Monday; TROOPER_J, not there on Thursday, is.
@@ -95,7 +90,7 @@ class SheetReuseTest {
     }
 
     @Test
-    @DisplayName("a different headcount is not reused; the day is solved")
+    @DisplayName("different headcount is solved instead")
     void differentHeadcountIsSolved() {
         Schedule thursday = logged(SolveRequest.of(THURSDAY, NINE, NIGHT));
         List<Trooper> ten = new ArrayList<>(NINE);
@@ -108,10 +103,10 @@ class SheetReuseTest {
     }
 
     @Test
-    @DisplayName("rows that cannot be laid onto today's night group are not reused; the day is solved")
+    @DisplayName("solved when rows don't fit today's night group")
     void nightGroupMismatchIsSolved() {
         Schedule thursday = logged(SolveRequest.of(THURSDAY, NINE, NIGHT));
-        // Four on night today: the fourth would need a night row, and there are three.
+        // Four on night, but only three night rows.
         List<Trooper> night = List.of(TROOPER_A, TROOPER_B, TROOPER_C, TROOPER_D);
 
         SolveResult monday = solver.solve(SolveRequest.of(MONDAY, NINE, night).withReusable(List.of(thursday)));
@@ -134,9 +129,9 @@ class SheetReuseTest {
     }
 
     @Test
-    @DisplayName("a BUS pick on a sheet whose BUS run was split is not reused: no one row holds it")
+    @DisplayName("BUS pick can't reuse a sheet with split BUS")
     void splitBusIsSolved() {
-        // Left to itself the solver splits BUS across three Troopers on this roster.
+        // The solver splits BUS three ways on this roster.
         Schedule thursday = logged(SolveRequest.of(THURSDAY, NINE, NIGHT));
         assertTrue(thursday.rows().stream().filter(r -> r.posts().contains(Post.BUS)).count() > 1,
                 "the premise: BUS split on the logged sheet");
@@ -149,10 +144,10 @@ class SheetReuseTest {
     }
 
     @Test
-    @DisplayName("a logged sheet that broke a rule is never reused")
+    @DisplayName("a sheet that broke a rule is never reused")
     void brokenSheetIsNotReused() {
         Schedule good = logged(SolveRequest.of(THURSDAY, NINE, NIGHT));
-        // Take TROOPER_A off their first hour: under-manned, as a careless hand edit would be.
+        // Leaves an hour under-manned.
         Schedule.Row a = good.row(TROOPER_A).orElseThrow();
         int first = a.posts().indexOf(a.posts().stream().filter(p -> p != null).findFirst().orElseThrow());
         Schedule broken = good.with(TROOPER_A, first, null);
@@ -165,7 +160,7 @@ class SheetReuseTest {
     }
 
     @Test
-    @DisplayName("the longest row someone can stand goes to whoever has done fewest hours")
+    @DisplayName("longest row goes to whoever has the fewest hours")
     void historyDecidesWhoGetsTheLongRow() {
         Schedule thursday = logged(SolveRequest.of(THURSDAY, NINE, NIGHT));
         // Everyone on 100 hours but TROOPER_G, on none.
@@ -177,8 +172,7 @@ class SheetReuseTest {
         Schedule monday = solver.solve(SolveRequest.of(MONDAY, NINE, NIGHT)
                 .withHistory(history).withReusable(List.of(thursday))).schedule();
 
-        // TROOPER_G is on days, so any row without night hours is theirs to
-        // take, a stay-out's included: the longest of those is theirs.
+        // TROOPER_G can take any day row.
         int longestDayRow = thursday.rows().stream()
                 .filter(r -> !NIGHT.contains(r.trooper()))
                 .mapToInt(Schedule.Row::hours).max().orElseThrow();
@@ -186,7 +180,7 @@ class SheetReuseTest {
     }
 
     @Test
-    @DisplayName("a fixed-turnout sheet is reused at the same turnout, MP gaps and all")
+    @DisplayName("fixed-turnout sheets reuse at the same turnout")
     void fixedTurnoutReused() {
         Schedule thursday = logged(SolveRequest.of(THURSDAY, NINE, NIGHT).withTurnout(5));
 
@@ -199,7 +193,7 @@ class SheetReuseTest {
     }
 
     @Test
-    @DisplayName("of several candidates, the first that fits is used")
+    @DisplayName("uses the first candidate that fits")
     void firstThatFitsWins() {
         Schedule thursday = logged(SolveRequest.of(THURSDAY, NINE, NIGHT));
         Schedule wednesday = logged(SolveRequest.of(DutyDay.of(LocalDate.of(2026, 9, 9)), NINE, NIGHT));

@@ -13,12 +13,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Turns a posted sheet back into a domain object.
- *
- * <p>
- * An Admin can hand-edit the board before logging it, so what arrives
- * here is not necessarily what the solver produced — it has to be rebuilt
- * properly rather than trusted.
+ * Turns a posted sheet back into a domain object. It may have been edited by
+ * hand, so it is rebuilt, not trusted.
  */
 final class ScheduleAssembler {
 

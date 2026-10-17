@@ -4,33 +4,28 @@ spring:
   datasource:
     url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/duty}
     username: ${DATABASE_USER:duty}
-    # No default outside the dev profile: a deploy that forgets to set it fails
-    # to connect at startup, rather than running on the password in this repo.
+    # No default outside dev, so a missing password fails at startup.
     password: ${DATABASE_PASSWORD:}
   jpa:
     hibernate:
       ddl-auto: validate
-    open-in-view: false # off by default here; it hides N+1 queries behind lazy loads
+    open-in-view: false
   flyway:
     enabled: true
 
-# The owner, made at startup if there is none yet; see OwnerBootstrap. Left
-# empty, the server starts without one and says so in the log.
+# See OwnerBootstrap. Empty means no owner is created.
 owner:
   bootstrap:
     username: ${OWNER_USERNAME:}
     password: ${OWNER_PASSWORD:}
 
 server:
-  # Client addresses from X-Forwarded-For, trusted only from internal proxy
-  # addresses, so the sign-in throttle counts the caller and not the proxy —
-  # and someone outside cannot pick their own address with the header.
+  # Real client address behind a proxy, for the sign-in throttle.
   forward-headers-strategy: native
   servlet:
     session:
       cookie:
-        # HTTPS only, and not sent with requests from other sites. The dev
-        # profile turns secure off for plain http://localhost.
+        # The dev profile turns secure off.
         secure: ${SESSION_COOKIE_SECURE:true}
         same-site: lax
 
@@ -38,11 +33,10 @@ management:
   endpoints:
     web:
       exposure:
-        # prometheus is for a scraper, signed in as the owner (HTTP Basic).
+        # Scraped as the owner over HTTP Basic.
         include: health,info,metrics,prometheus
   endpoint:
     health:
-      # Up or down for anyone; which database and how much disk only for the
-      # owner, who is the only one let at the rest of the actuator.
+      # Details for the owner only.
       show-details: when-authorized
       roles: OWNER

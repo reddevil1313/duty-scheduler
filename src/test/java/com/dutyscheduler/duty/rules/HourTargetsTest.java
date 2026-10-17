@@ -33,7 +33,7 @@ class HourTargetsTest {
             List.of(TROOPER_D, TROOPER_E, TROOPER_F, TROOPER_G, TROOPER_H, TROOPER_I, TROOPER_J, TROOPER_K);
 
     @Test
-    @DisplayName("the targets absorb exactly the sheet's demand, no more and no less")
+    @DisplayName("targets add up to demand")
     void targetsAbsorbTheSheet() {
         HourTargets targets = HourTargets.allocate(DutyDay.of(THURSDAY), NIGHT, DAY, Map.of());
 
@@ -43,7 +43,7 @@ class HourTargetsTest {
     }
 
     @Test
-    @DisplayName("within a group nobody is more than an hour off anybody else")
+    @DisplayName("within a group, spread is at most 1")
     void eachGroupIsEvenToWithinAnHour() {
         HourTargets targets = HourTargets.allocate(DutyDay.of(THURSDAY), NIGHT, DAY, Map.of());
 
@@ -52,15 +52,9 @@ class HourTargetsTest {
         assertTrue(targets.withinCap());
     }
 
-    /**
-     * The trade-off worth being honest about. Sixteen silent hours over three Troopers
-     * is five or six each; thirty-one day hours over eight is three or four. Both
-     * halves are even, and the sheet as a whole is not — and no choice of group
-     * size fixes it, because it is just the arithmetic. What fixes it is the week:
-     * the history tiebreak below moves the extra hours around.
-     */
+    /** 16 over 3 is 5-6; 31 over 8 is 3-4. History evens it out over a week. */
     @Test
-    @DisplayName("but the sheet as a whole runs three to six, and that is not a bug")
+    @DisplayName("the whole sheet can range 3 to 6")
     void theSheetItselfIsNotEven() {
         HourTargets targets = HourTargets.allocate(DutyDay.of(THURSDAY), NIGHT, DAY, Map.of());
 
@@ -70,7 +64,7 @@ class HourTargetsTest {
     }
 
     @Test
-    @DisplayName("the odd hour goes to whoever has done least so far")
+    @DisplayName("spare hour to whoever has done least")
     void historyBreaksTheTie() {
         Map<Trooper, Integer> history = Map.of(TROOPER_A, 100, TROOPER_B, 90, TROOPER_C, 80);
 
@@ -82,7 +76,7 @@ class HourTargetsTest {
     }
 
     @Test
-    @DisplayName("with no history to go on it is settled by name, so the same input gives the same answer")
+    @DisplayName("no history: settled by name")
     void allocationIsDeterministic() {
         HourTargets first = HourTargets.allocate(DutyDay.of(THURSDAY), NIGHT, DAY, Map.of());
         HourTargets second = HourTargets.allocate(DutyDay.of(THURSDAY), NIGHT, DAY, Map.of());
@@ -91,7 +85,7 @@ class HourTargetsTest {
     }
 
     @Test
-    @DisplayName("a weekend sheet splits the same way, it just has more to share")
+    @DisplayName("weekend splits the same way")
     void weekendSheet() {
         HourTargets targets = HourTargets.allocate(DutyDay.of(SATURDAY), NIGHT, DAY, Map.of());
 
@@ -101,13 +95,13 @@ class HourTargetsTest {
     }
 
     @Test
-    @DisplayName("distributing over nobody is empty, not a crash")
+    @DisplayName("empty group")
     void emptyGroup() {
         assertTrue(HourTargets.distribute(16, List.of(), Map.of()).isEmpty());
     }
 
     @Test
-    @DisplayName("an exact division gives everyone the same number")
+    @DisplayName("exact division")
     void exactDivision() {
         Map<Trooper, Integer> out = HourTargets.distribute(12, NIGHT, Map.of());
 

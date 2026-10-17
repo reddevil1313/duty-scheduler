@@ -24,24 +24,15 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * The roster. Anyone signed in may read it; only an ADMIN may change it.
+ * The roster. Anyone in the team can read it; only an ADMIN can change it.
  *
  * <p>
- * The client cannot ask for a sheet without first knowing who there is to put
- * on it, and hard-coding the names into a React file would put the roster in
- * two places — the one that gets updated and the one that does not.
- *
- * <p>
- * Removing a Trooper archives them if they stand on any logged sheet or have
- * credited hours, and
- * deletes them outright otherwise. A logged sheet is the record of what was
- * actually used; deleting the Trooper with it would rewrite that record.
+ * Removing a Trooper who is on a logged sheet or has credited hours archives
+ * them, so old sheets stay intact. Otherwise they are deleted.
  */
 @RestController
 @RequestMapping("/api/troopers")
-// A team's own accounts only. The owner has no team, so would read nothing
-// here anyway; refusing them outright says so. Methods that write narrow this
-// to ADMIN with their own annotation, which takes precedence over this one.
+// Not the owner, who has no team. Write methods narrow this to ADMIN.
 @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
 public class TrooperController {
 
@@ -58,19 +49,15 @@ public class TrooperController {
 
     @GetMapping
     public List<TrooperResponse> list() {
-        // Ordered by id, which is the order they were added in and the order the
-        // paper board has always been written in. Alphabetical would be tidier
-        // and wrong.
+        // Order added, which is the order the paper board uses.
         return troopers.findByActiveTrueOrderByIdAsc().stream()
                 .map(TrooperResponse::from)
                 .toList();
     }
 
     /**
-     * Add a Trooper. A name that belongs to an archived Trooper brings that
-     * Trooper back, with these particulars, rather than refusing: names are
-     * unique across archived and active alike, so the alternative is a name
-     * nobody can ever use again.
+     * Adds a Trooper. An archived Trooper's name brings them back, since names
+     * are unique across archived ones too.
      */
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
@@ -92,7 +79,6 @@ public class TrooperController {
         return ResponseEntity.status(HttpStatus.CREATED).body(TrooperResponse.from(save(entity, name)));
     }
 
-    /** Replace a Trooper's particulars, name included. */
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     @Transactional
@@ -115,24 +101,19 @@ public class TrooperController {
         return TrooperResponse.from(save(entity, name));
     }
 
-    /** Take a Trooper off the roster: archived if they have logged duty, deleted if not. */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> remove(@PathVariable Long id) {
         TrooperEntity entity = onRoster(id);
-        // Credited hours are history too, and their foreign key would refuse
-        // the delete just the same.
         if (assignments.existsByTrooper_Id(id) || credits.existsByTrooper_Id(id)) {
             archive(entity);
             return ResponseEntity.noContent().build();
         }
         try {
-            // Their leave goes with them: absence cascades on delete in V1.
-            troopers.delete(entity);
+            troopers.delete(entity); // their leave cascades
             troopers.flush();
         } catch (DataIntegrityViolationException e) {
-            // A sheet naming them was logged between the check and the delete.
-            // The foreign key refused the delete, which is the point of it.
+            // A sheet with them on it was logged in the meantime.
             archive(troopers.findById(id).orElseThrow());
         }
         return ResponseEntity.noContent().build();
@@ -140,29 +121,22 @@ public class TrooperController {
 
     private void archive(TrooperEntity entity) {
         entity.setActive(false);
-        // Not a default night-group member, nor the default BUS Trooper, any
-        // more, should they be added back.
         entity.setOnNight(false);
         entity.setDefaultBus(false);
         troopers.save(entity);
     }
 
     private TrooperEntity onRoster(Long id) {
-        // Archived counts as not found. Editing someone who is not on the roster
-        // is a request about nobody the client can see.
+        // Archived counts as not found.
         return troopers.findByIdAndActiveTrue(id).orElseThrow(() -> new RosterException(
                 HttpStatus.NOT_FOUND, "No Trooper " + id + " on the roster."));
     }
 
     /**
-     * One default BUS Trooper at most: whoever had it gives it up first, or the
-     * partial unique index refuses the write. Called before the entity is
-     * changed: it is managed in this transaction, so the bulk update flushes it
-     * first, and flushed already holding the flag it would meet the old holder
-     * in the index. In the same transaction as the save, so a save refused
-     * later puts the old default back rather than leaving nobody holding it.
-     * A new Trooper has no id yet, and "id <> null" matches nobody in SQL, so
-     * -1 stands in for it.
+     * Clears the old default BUS so the unique index accepts the new one.
+     * Must run before the entity is changed: the bulk update flushes it, and
+     * flushed with the flag set it would clash with the old holder. A new
+     * Trooper has no id, and {@code id <> null} matches nothing, hence -1.
      */
     private void takeDefaultBus(Long id, TrooperRequest request) {
         if (Boolean.TRUE.equals(request.defaultBus())) {
@@ -174,27 +148,22 @@ public class TrooperController {
         try {
             return troopers.saveAndFlush(entity);
         } catch (DataIntegrityViolationException e) {
-            // The name checks lose a race with a concurrent add or rename to the
-            // same name; the UNIQUE constraint does not. Same answer either way.
+            // Lost a race to the same name.
             throw duplicate(name);
         }
     }
 
     private static String nameOf(TrooperRequest request) {
-        // Trimmed, because the name is matched exactly everywhere it is used. A
-        // trailing space would make a second Trooper that looks like the first
-        // and never matches a night-group tick.
+        // Names are matched exactly everywhere.
         return request.name().trim();
     }
 
     private static void checkConsistent(TrooperRequest request) {
-        // A stay-out is only available 0800–1800, so a default place in the
-        // night group is one they could never fill. Well formed, but impossible.
+        // Stay-outs are only in 0800-1800.
         if (request.stayOut() && request.onNight()) {
             throw new RosterException(HttpStatus.UNPROCESSABLE_CONTENT,
                     "A stay-out cannot be in the night group.");
         }
-        // Not in until 0800, so never able to take the 0700 run.
         if (request.stayOut() && Boolean.TRUE.equals(request.defaultBus())) {
             throw new RosterException(HttpStatus.UNPROCESSABLE_CONTENT,
                     "A stay-out cannot be the default BUS Trooper: they are not in until 0800.");
@@ -206,9 +175,7 @@ public class TrooperController {
         entity.setRank(request.rank() == null || request.rank().isBlank() ? null : request.rank().trim());
         entity.setStayOut(request.stayOut());
         entity.setOnNight(request.onNight());
-        // Left alone when the request does not say, so an edit of the name does
-        // not quietly clear it; given up when they become a stay-out, who could
-        // never take the run.
+        // null leaves it as is.
         if (request.defaultBus() != null) {
             entity.setDefaultBus(request.defaultBus());
         }
@@ -221,11 +188,7 @@ public class TrooperController {
         return new RosterException(HttpStatus.CONFLICT, name + " is already on the roster.");
     }
 
-    /**
-     * A roster change that cannot be made. Carries its own status: 404 for
-     * nobody on the roster with that id, 409 when the name is taken, 422 when
-     * the request contradicts itself.
-     */
+    /** 404 not on the roster, 409 name taken, 422 contradictory request. */
     public static class RosterException extends RuntimeException {
         private static final long serialVersionUID = 1L;
 

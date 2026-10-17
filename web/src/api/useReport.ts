@@ -2,14 +2,7 @@ import { useCallback } from 'react'
 import { useSession } from '../auth/session-context'
 import { ApiError } from './client'
 
-/**
- * One place where a failed call becomes something on screen.
- *
- * <p>The 401 branch is the reason this exists rather than a try/catch at each
- * call site. A session that has quietly expired makes every button fail, and
- * without the recheck the app would keep drawing a signed-in shell over an API
- * that refuses everything.
- */
+/** Turns a failed call into a message. A 401 re-checks the session. */
 export function useReport(setError: (message: string | null) => void) {
   const { recheck } = useSession()
   return useCallback(async (e: unknown) => {

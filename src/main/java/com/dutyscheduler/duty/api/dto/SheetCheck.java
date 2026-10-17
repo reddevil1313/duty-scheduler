@@ -18,21 +18,14 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * What a sheet breaks, and what it was supposed to cover.
+ * The result of checking a sheet.
  *
- * @param issues rule violations from the validator, then any hours someone is
- *               on duty during their own leave. Empty means the sheet is clean.
- * @param demand per slot, how many Troopers each post needs. The board uses it
- *               to draw coverage and to offer only the posts that stand at
- *               the hour being edited, so it never re-derives the demand rules.
- * @param sheet  the sheet as checked, with hours and span worked out again.
- *               Span is rest-aware, which is domain logic the board should
- *               show rather than copy.
- * @param away   per Trooper away during this sheet, 24 entries: the kind of
- *               leave covering that hour, {@code SO} for a stay-out on a sheet
- *               with no hour they can stand (a weekend), or null where they
- *               are free. Troopers away no hour of it are left out. The board
- *               greys these hours, or the whole row when every hour is away.
+ * @param issues validator violations, then duty during leave
+ * @param demand per slot, how many of each post are needed
+ * @param sheet  the sheet with hours and span recomputed
+ * @param away   per Trooper, 24 entries: leave kind, {@code SO} for a stay-out
+ *               on a weekend sheet, or null when free. Only Troopers away at
+ *               some hour are listed.
  */
 public record SheetCheck(List<Issue> issues, List<Map<Post, Integer>> demand, ScheduleResponse sheet,
         Map<String, List<String>> away) {
@@ -47,7 +40,7 @@ public record SheetCheck(List<Issue> issues, List<Map<Post, Integer>> demand, Sc
 
     public static final String ON_LEAVE = "ON_LEAVE";
 
-    /** A stay-out with no hour of this sheet open to them: the weekend, when they are not in. */
+    /** A stay-out on a sheet with no hour open to them (weekends). */
     public static final String STAY_OUT = "SO";
 
     public static SheetCheck of(Schedule schedule, ValidationResult result, List<Issue> leaveClashes,
@@ -70,13 +63,9 @@ public record SheetCheck(List<Issue> issues, List<Map<Post, Integer>> demand, Sc
     }
 
     /**
-     * Which hours each Trooper is away, and why. Where two bookings overlap,
-     * the first listed wins. A stay-out who could stand no hour of this sheet
-     * even with no leave at all — every weekend sheet — is away for every hour
-     * leave does not already cover, shown as they would be on leave rather than
-     * as an empty row nobody posted. Whether an hour is open is asked of
-     * {@link Availability}, which owns the stay-out window; this does not know
-     * which days are weekends.
+     * Which hours each Trooper is away, and why. Overlapping leave: the first
+     * wins. A stay-out with no open hour on this sheet is {@code SO} wherever
+     * leave doesn't already cover.
      */
     static Map<String, List<String>> away(DutyDay day, List<Absence> absences, List<Trooper> troopers) {
         Map<String, String[]> byName = new LinkedHashMap<>();
@@ -104,7 +93,7 @@ public record SheetCheck(List<Issue> issues, List<Map<Post, Integer>> demand, Sc
             }
         }
         Map<String, List<String>> out = new LinkedHashMap<>();
-        // Arrays.asList, not List.of: List.of refuses the nulls that mean "free".
+        // List.of rejects the nulls.
         byName.forEach((name, hours) -> out.put(name, Collections.unmodifiableList(Arrays.asList(hours))));
         return Collections.unmodifiableMap(out);
     }

@@ -36,11 +36,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * The records add up from four sources — logged grids, credits, opening hours
- * and the leave register — so each test plants a known amount in each and
- * checks the sums rather than trusting any one of them.
- */
+/** Records from logged grids, credits, opening hours and leave. */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
@@ -116,12 +112,12 @@ class RecordsIT {
     }
 
     @Test
-    @DisplayName("worked hours across everyone add up to the hours the logged sheets demanded")
+    @DisplayName("worked hours add up to demand")
     void workedAddsUp() throws Exception {
         logSheet("2026-09-10");
         logSheet("2026-09-11");
 
-        // Thursday's sheet is 47 post-hours and Friday's 44.
+        // 47 + 44
         mvc.perform(get("/api/records"))
                 .andExpect(jsonPath("$.days[*].date", contains("2026-09-11", "2026-09-10")))
                 .andExpect(jsonPath("$.days[*].worked", contains(44, 47)))
@@ -137,7 +133,7 @@ class RecordsIT {
     }
 
     @Test
-    @DisplayName("the total is opening plus worked plus credited")
+    @DisplayName("total = opening + worked + credited")
     void totalIsTheSumOfItsParts() throws Exception {
         logSheet("2026-09-10");
         mvc.perform(put("/api/records/opening").with(csrf())
@@ -166,7 +162,7 @@ class RecordsIT {
     }
 
     @Test
-    @DisplayName("crediting a day again replaces what was credited, rather than adding to it")
+    @DisplayName("crediting again replaces")
     void creditsReplace() throws Exception {
         logSheet("2026-09-10");
         for (int hours : new int[] { 6, 4 }) {
@@ -178,7 +174,7 @@ class RecordsIT {
     }
 
     @Test
-    @DisplayName("leave counts in days, a half day as half, an appointment as one")
+    @DisplayName("leave in days; half day 0.5, appointment 1")
     void leaveCounts() throws Exception {
         book("""
                 {"trooper":"TROOPER_D","kind":"MC","span":"FULL","from":"2026-09-10","to":"2026-09-12"}
@@ -198,7 +194,7 @@ class RecordsIT {
     }
 
     @Test
-    @DisplayName("a day logged with a broken rule says how many it breaks")
+    @DisplayName("a day logged anyway counts its issues")
     @SuppressWarnings("unchecked")
     void brokenDayIsCounted() throws Exception {
         String body = mvc.perform(post("/api/schedules/generate").with(csrf())
@@ -223,7 +219,7 @@ class RecordsIT {
     }
 
     @Test
-    @DisplayName("credits need a logged day (404), and bad numbers are refused (400)")
+    @DisplayName("credits need a logged day and valid hours")
     void refusals() throws Exception {
         mvc.perform(put("/api/schedules/2026-09-10/credits").with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"TROOPER_D\":6}"))
@@ -240,7 +236,7 @@ class RecordsIT {
                 .contentType(MediaType.APPLICATION_JSON).content("{\"TROOPER_D\":-1}"))
                 .andExpect(status().isBadRequest());
 
-        // All or nothing: the good entry beside a bad one is not saved either.
+        // All or nothing.
         mvc.perform(put("/api/records/opening").with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"TROOPER_D\":10,\"NOBODY\":3}"))
                 .andExpect(status().isBadRequest());
@@ -249,7 +245,7 @@ class RecordsIT {
 
     @Test
     @WithMockUser(username = "trooper_d", roles = "USER")
-    @DisplayName("a Trooper can read the records and change none of them")
+    @DisplayName("a Trooper can read but not change records")
     void usersReadOnly() throws Exception {
         mvc.perform(get("/api/records")).andExpect(status().isOk());
         mvc.perform(put("/api/records/opening").with(csrf())
@@ -261,7 +257,7 @@ class RecordsIT {
     }
 
     @Test
-    @DisplayName("someone whose only history is a credit is archived on removal, and kept in the records")
+    @DisplayName("credit-only history archives on removal")
     void creditOnlyHistoryArchives() throws Exception {
         TrooperEntity extra = troopers.save(new TrooperEntity("TROOPER_L", false));
         logSheet("2026-09-10");

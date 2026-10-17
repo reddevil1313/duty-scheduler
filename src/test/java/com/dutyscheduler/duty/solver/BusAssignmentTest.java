@@ -19,10 +19,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * BUS chosen by a person, as the night group is: the solver works around the
- * choice, and refuses it up front when it cannot stand.
- */
+/** A chosen BUS Trooper is pinned, or refused up front. */
 class BusAssignmentTest {
 
     private static final Trooper TROOPER_A = Trooper.of("TROOPER_A");
@@ -35,7 +32,7 @@ class BusAssignmentTest {
     private static final Trooper TROOPER_H = Trooper.stayOut("TROOPER_H");
     private static final Trooper TROOPER_I = Trooper.stayOut("TROOPER_I");
 
-    /** The dev seed's nine: A to G live in, A to C on night, H and I stay out. */
+    /** Same nine as the dev seed. */
     private static final List<Trooper> ROSTER = List.of(
             TROOPER_A, TROOPER_B, TROOPER_C, TROOPER_D, TROOPER_E, TROOPER_F, TROOPER_G, TROOPER_H, TROOPER_I);
     private static final List<Trooper> NIGHT = List.of(TROOPER_A, TROOPER_B, TROOPER_C);
@@ -69,19 +66,17 @@ class BusAssignmentTest {
     }
 
     @Test
-    @DisplayName("the BUS hours count toward the chosen Trooper's target, not on top of it")
+    @DisplayName("BUS hours count toward the target")
     void busCountsTowardTheTarget() {
         SolveResult chosen = solver.solve(SolveRequest.of(THURSDAY, ROSTER, NIGHT).withBus(TROOPER_D));
 
-        // Not "the same hours as without a choice": the solver tries several
-        // crossover amounts and keeps the best, and a pinned BUS can change which
-        // one wins. What holds is that the run is part of their hours.
+        // A pinned BUS can change which crossover wins, so only check it's included.
         assertEquals(chosen.targets().forTrooper(TROOPER_D), chosen.schedule().hours(TROOPER_D));
         assertEquals(47, chosen.schedule().rows().stream().mapToInt(Schedule.Row::hours).sum());
     }
 
     @Test
-    @DisplayName("a night Trooper may take BUS, the run being inside the hours night may cross into")
+    @DisplayName("a night Trooper can take BUS")
     void nightTrooperCanTakeBus() {
         SolveResult result = solver.solve(SolveRequest.of(THURSDAY, ROSTER, NIGHT).withBus(TROOPER_A));
 
@@ -91,7 +86,7 @@ class BusAssignmentTest {
     }
 
     @Test
-    @DisplayName("a stay-out is refused before any search: they are not in until 0800")
+    @DisplayName("stay-out BUS is refused")
     void stayOutIsRefused() {
         SolveResult result = solver.solve(SolveRequest.of(THURSDAY, ROSTER, NIGHT).withBus(TROOPER_H));
 
@@ -101,9 +96,9 @@ class BusAssignmentTest {
     }
 
     @Test
-    @DisplayName("someone on leave during the BUS run is refused before any search")
+    @DisplayName("BUS on leave is refused")
     void leaveIsRefused() {
-        // An appointment at 0830 on the 11th: inside the Thursday sheet's BUS run.
+        // 0830 on the 11th.
         Absence appointment = Absence.appointment(TROOPER_D, LocalDate.of(2026, 9, 11),
                 LocalTime.of(8, 30), LocalTime.of(9, 0));
         SolveResult result = solver.solve(SolveRequest.of(THURSDAY, ROSTER, NIGHT)
@@ -115,7 +110,7 @@ class BusAssignmentTest {
     }
 
     @Test
-    @DisplayName("on a sheet with no BUS, a choice changes nothing")
+    @DisplayName("no BUS on the sheet: choice ignored")
     void noBusNoEffect() {
         DutyDay saturday = DutyDay.of(LocalDate.of(2026, 9, 12));
         SolveResult free = solver.solve(SolveRequest.of(saturday, ROSTER, NIGHT));
@@ -126,19 +121,18 @@ class BusAssignmentTest {
     }
 
     @Test
-    @DisplayName("with nobody chosen, the solver still covers BUS itself")
+    @DisplayName("no choice: the solver covers BUS")
     void unchosenStillCovered() {
-        // Left to itself it may split the run, an hour each across different
-        // Troopers; choosing someone is how a person keeps it to one.
+        // It may split the run.
         SolveResult result = solver.solve(SolveRequest.of(THURSDAY, ROSTER, NIGHT));
         assertEquals(3, busCrew(result.schedule()).size(), "0700, 0800 and 0900 are all manned");
         assertTrue(validator.validate(result.schedule()).ok());
     }
 
     @Test
-    @DisplayName("the improvers never move a chosen BUS hour to someone else")
+    @DisplayName("improvers never move a pinned BUS hour")
     void improversLeaveThePinAlone() {
-        // Across the week, whoever is chosen still has every BUS hour at the end.
+
         for (int d = 6; d <= 10; d++) {
             DutyDay day = DutyDay.of(LocalDate.of(2026, 9, d));
             SolveResult result = solver.solve(SolveRequest.of(day, ROSTER, NIGHT).withBus(TROOPER_G));
@@ -148,7 +142,7 @@ class BusAssignmentTest {
     }
 
     @Test
-    @DisplayName("a request may not name a BUS Trooper who is not on the roster")
+    @DisplayName("BUS must be on the roster")
     void busMustBeOnRoster() {
         assertThrows(IllegalArgumentException.class,
                 () -> SolveRequest.of(THURSDAY, ROSTER, NIGHT).withBus(Trooper.of("NOBODY")));

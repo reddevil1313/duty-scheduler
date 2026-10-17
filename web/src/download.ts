@@ -1,7 +1,4 @@
-/**
- * Hand the browser a file to save. An object URL and a click on a temporary
- * link, revoked straight after, so nothing lingers in memory or the page.
- */
+/** Saves a blob via a temporary link. */
 export function download(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')

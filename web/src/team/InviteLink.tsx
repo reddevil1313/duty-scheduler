@@ -3,11 +3,7 @@ import type { Invite } from '../api/types'
 import { localDay, shortDate } from '../dates'
 import { inviteLink } from './invite'
 
-/**
- * A link just made, to copy and send. Shown once: the server keeps only a
- * hash of the token, so once this goes the link cannot be shown again, only
- * revoked and remade.
- */
+/** A new link, shown once. */
 export function InviteLink({ invite, lead }: { invite: Invite; lead: string }) {
   const [copied, setCopied] = useState<'yes' | 'no' | null>(null)
   if (!invite.token) return null
@@ -18,8 +14,7 @@ export function InviteLink({ invite, lead }: { invite: Invite; lead: string }) {
       await navigator.clipboard.writeText(link)
       setCopied('yes')
     } catch {
-      // Refused outside a secure context, or by the browser's permissions; the
-      // field is selected instead, so a copy shortcut takes it.
+      // No clipboard access: select the field instead.
       setCopied('no')
     }
   }

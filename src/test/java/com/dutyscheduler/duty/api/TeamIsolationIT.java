@@ -48,19 +48,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * No team sees or touches another team's data, through any endpoint.
- *
- * <p>
- * Two teams with the same nine Trooper names, so a leak cannot hide behind a
- * name that only one team has. Alpha has a logged sheet, leave, credited and
- * opening hours and a default BUS Trooper; Bravo has a roster and nothing
- * else. Every test then goes at Alpha's data as Bravo, signed in as real
- * accounts — not {@code @WithMockUser}, whose principal names no team.
- *
- * <p>
- * The reuse test has a control: the same request as Alpha does reuse the
- * sheet, so Bravo's "not reused" means isolation, not a reuse that never
- * fires.
+ * No team can see or change another team's data. Both teams use the same
+ * Trooper names. Alpha has data; Bravo only a roster. Uses real accounts,
+ * since {@code @WithMockUser} has no team.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -96,7 +86,7 @@ class TeamIsolationIT {
     DatabaseUserDetailsService accounts;
 
     static final String DATE = "2026-09-10";
-    /** A week on: the same weekday, demand and headcount, so Alpha's sheet is reusable for it. */
+    /** A week later, so Alpha's sheet could be reused. */
     static final String WEEK_ON = "2026-09-17";
     static final String GENERATE = """
             {"date":"%s","nightGroup":["TROOPER_A","TROOPER_B","TROOPER_C"]}
@@ -110,8 +100,7 @@ class TeamIsolationIT {
 
     @BeforeEach
     void twoTeams() throws Exception {
-        // Straight at the tables: a repository delete would itself be filtered
-        // to one team, and this has to clear both.
+        // Plain SQL: repository deletes are filtered to one team.
         jdbc.execute("TRUNCATE hour_credit, duty_assignment, duty_sheet, absence, trooper, app_user, team RESTART IDENTITY CASCADE");
         alpha = teams.save(new TeamEntity("Alpha")).getId();
         bravo = teams.save(new TeamEntity("Bravo")).getId();
@@ -121,7 +110,6 @@ class TeamIsolationIT {
         alphaIds = roster(alpha);
         bravoIds = roster(bravo);
 
-        // Alpha's history, made the way a user would make it.
         String sheet = body(as("alpha_admin", post("/api/schedules/generate")).content(GENERATE.formatted(DATE)));
         mvc.perform(as("alpha_admin", put("/api/schedules/" + DATE)).content(sheet)).andExpect(status().isOk());
         mvc.perform(as("alpha_admin", put("/api/schedules/" + DATE + "/credits")).content("""
@@ -143,7 +131,7 @@ class TeamIsolationIT {
         users.save(new AppUserEntity(username, username, encoder.encode("password"), role, team));
     }
 
-    /** Nine Troopers, A to C on night and H and I staying out, as the dev seed has. */
+    /** Same nine as the dev seed. */
     private List<Long> roster(long team) {
         return inTeam(team, () -> {
             List<Long> ids = new ArrayList<>();
@@ -163,7 +151,6 @@ class TeamIsolationIT {
         }
     }
 
-    /** A request signed in as this real account, with its team, and a CSRF token. */
     private MockHttpServletRequestBuilder as(String username, MockHttpServletRequestBuilder request) {
         RequestPostProcessor signedIn = user(accounts.loadUserByUsername(username));
         return request.with(signedIn).with(csrf()).contentType(MediaType.APPLICATION_JSON);
@@ -174,7 +161,7 @@ class TeamIsolationIT {
     }
 
     @Test
-    @DisplayName("each team's roster is its own, with the same names and different rows")
+    @DisplayName("each team has its own roster")
     void rosters() throws Exception {
         mvc.perform(as("bravo_admin", get("/api/troopers")))
                 .andExpect(status().isOk())
@@ -190,7 +177,7 @@ class TeamIsolationIT {
     }
 
     @Test
-    @DisplayName("another team's logged sheet is a 404, as a sheet and as an image")
+    @DisplayName("another team's sheet is a 404, also as an image")
     void sheets() throws Exception {
         mvc.perform(as("bravo_admin", get("/api/schedules/" + DATE))).andExpect(status().isNotFound());
         mvc.perform(as("bravo_admin", get("/api/schedules/" + DATE + "/image"))).andExpect(status().isNotFound());
@@ -201,7 +188,7 @@ class TeamIsolationIT {
     }
 
     @Test
-    @DisplayName("two teams can each log a sheet for the same evening")
+    @DisplayName("two teams can log the same date")
     void sameEvening() throws Exception {
         String before = body(as("alpha_admin", get("/api/schedules/" + DATE)));
         String sheet = body(as("bravo_admin", post("/api/schedules/generate")).content(GENERATE.formatted(DATE)));
@@ -212,7 +199,7 @@ class TeamIsolationIT {
     }
 
     @Test
-    @DisplayName("another team's logged sheet is never reused, while the team's own is")
+    @DisplayName("never reuses another team's sheet")
     void reuse() throws Exception {
         mvc.perform(as("alpha_admin", post("/api/schedules/generate")).content(GENERATE.formatted(WEEK_ON)))
                 .andExpect(status().isOk())
@@ -223,7 +210,7 @@ class TeamIsolationIT {
     }
 
     @Test
-    @DisplayName("another team's leave is not in the register, nor on the check, and cannot be cancelled")
+    @DisplayName("another team's leave is hidden and can't be cancelled")
     void leave() throws Exception {
         mvc.perform(as("bravo_admin", get("/api/absences"))).andExpect(jsonPath("$", hasSize(0)));
         mvc.perform(as("bravo_admin", delete("/api/absences/" + alphaAbsence))).andExpect(status().isNotFound());
@@ -240,7 +227,7 @@ class TeamIsolationIT {
     }
 
     @Test
-    @DisplayName("another team's Trooper cannot be edited or removed by id")
+    @DisplayName("can't edit or remove another team's Trooper")
     void trooperById() throws Exception {
         long theirs = alphaIds.get(4);
         mvc.perform(as("bravo_admin", put("/api/troopers/" + theirs)).content("""
@@ -253,7 +240,7 @@ class TeamIsolationIT {
     }
 
     @Test
-    @DisplayName("records count only the team's own sheets, credits, opening hours and leave")
+    @DisplayName("records only count the team's own data")
     void records() throws Exception {
         mvc.perform(as("bravo_admin", get("/api/records")))
                 .andExpect(status().isOk())
@@ -268,7 +255,7 @@ class TeamIsolationIT {
     }
 
     @Test
-    @DisplayName("each team has its own default BUS Trooper")
+    @DisplayName("default BUS is per team")
     void defaultBus() throws Exception {
         mvc.perform(as("bravo_admin", put("/api/troopers/" + bravoIds.get(4))).content("""
                 {"name":"TROOPER_E","stayOut":false,"onNight":false,"defaultBus":true}
@@ -281,7 +268,7 @@ class TeamIsolationIT {
     }
 
     @Test
-    @DisplayName("a name only another team has is not on this team's roster")
+    @DisplayName("names are per team")
     void namesAreTheTeams() throws Exception {
         inTeam(alpha, () -> troopers.save(new TrooperEntity("TROOPER_Z", false)));
         mvc.perform(as("bravo_admin", post("/api/absences")).content("""
@@ -297,7 +284,7 @@ class TeamIsolationIT {
     }
 
     @Test
-    @DisplayName("the database itself refuses a row that points at another team's Trooper")
+    @DisplayName("the database rejects cross-team references")
     void databaseHoldsTheLine() {
         assertThatThrownBy(() -> jdbc.update("""
                 INSERT INTO absence (team_id, trooper_id, kind, span, from_date, to_date)

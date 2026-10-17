@@ -29,10 +29,8 @@ type ThemeState = ReturnType<typeof useTheme>
 
 function Shell() {
   const { session } = useSession()
-  // Held above the sign-in form, so a chosen theme applies there too.
   const theme = useTheme()
-  // An invite link opens the app with its token in the fragment. Also followed
-  // when a link is pasted into a tab that is already open.
+  // Invite token from the URL fragment, also when pasted into an open tab.
   const [invite, setInvite] = useState(inviteToken)
   useEffect(() => {
     const follow = () => setInvite(inviteToken())
@@ -40,8 +38,7 @@ function Shell() {
     return () => window.removeEventListener('hashchange', follow)
   }, [])
 
-  // Null means the first session read has not come back. Rendering the sign-in
-  // form in the meantime would flash it at someone who is already signed in.
+  // null until the first session read, so the sign-in form doesn't flash.
   if (!session) {
     return <main className="loading"><p>Loading…</p></main>
   }
@@ -54,17 +51,11 @@ function Shell() {
   if (session.role === 'OWNER') {
     return <Owner theme={theme} />
   }
-  // Keyed on the user, so everything below starts fresh for each sign-in:
-  // roster ticks in particular are this user's scratch state and must not
-  // survive into the next person's session.
+  // Keyed on the user so roster ticks reset on every sign-in.
   return <SignedIn key={session.username} theme={theme} />
 }
 
-/**
- * The team is the heading, not the app: with one server holding many teams,
- * which team's sheets these are is the thing that must not be mistaken. The
- * tab title says it too, for a tab that is not in front.
- */
+/** The team name is the heading and the tab title. */
 function Masthead({ title }: { title: string }) {
   useEffect(() => {
     document.title = `${title} · Duty Scheduler`
@@ -99,7 +90,7 @@ function Who({ theme: { theme, cycle } }: { theme: ThemeState }) {
   )
 }
 
-/** The owner has no team, so none of the team tabs: only the teams themselves, and help. */
+/** The owner has no team tabs. */
 function Owner({ theme }: { theme: ThemeState }) {
   const [view, setView] = useState<'teams' | 'help'>('teams')
   return (
@@ -134,18 +125,13 @@ function SignedIn({ theme }: { theme: ThemeState }) {
   const isAdmin = session?.role === 'ADMIN'
   const [view, setView] = useState<View>('board')
   const [date, setDate] = useState(today)
-  // Roster load failures are rare and almost always an expired session, which
-  // the report hook turns into a sign-in prompt; anything else is shown here.
   const [rosterError, setRosterError] = useState<string | null>(null)
   const rosterState = useRoster(useReport(setRosterError))
 
   return (
     <div className="wrap">
-      {/* A team account always has a team; the fallback only covers a session
-          read that has not said. */}
       <Masthead title={session?.team ?? 'Duty Scheduler'} />
       <nav className="viewbar">
-        {/* Team is for admins: accounts and invites are theirs to manage. */}
         {[...VIEWS, ...(isAdmin ? [['team', 'Team'] as [View, string]] : []), ['help', 'Help'] as [View, string]]
           .map(([v, label]) => (
           <button
@@ -161,8 +147,7 @@ function SignedIn({ theme }: { theme: ThemeState }) {
         <Who theme={theme} />
       </nav>
       {rosterError && <p className="error banner" role="alert">{rosterError}</p>}
-      {/* All stay mounted and are hidden rather than swapped, so a generated
-          sheet that has not been logged yet survives a look at another tab. */}
+      {/* Hidden, not unmounted, so an unlogged sheet survives switching tabs. */}
       <main hidden={view !== 'board'}>
         <ScheduleBoard date={date} onDateChange={setDate} rosterState={rosterState} />
       </main>

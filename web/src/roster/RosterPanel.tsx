@@ -9,7 +9,7 @@ const TICK_KINDS: TickKind[] = ['MC', 'OL', 'AL']
 
 interface Props {
   roster: Trooper[]
-  /** False for a USER: the roster is shown, nothing can be changed or ticked. */
+  /** False for a USER: read only. */
   canEdit: boolean
   ticks: Ticks
   onTick: (name: string, kind: TickKind | null) => void
@@ -19,11 +19,6 @@ interface Props {
   onError: (e: unknown) => Promise<void>
 }
 
-/**
- * The roster: for an ADMIN to add to, edit, remove from and tick out; for
- * anyone else, to read. The server refuses every change from a USER
- * regardless of what this renders.
- */
 export function RosterPanel({ roster, canEdit, ticks, onTick, onAdded, onUpdated, onRemoved, onError }: Props) {
   return (
     <section className="roster" aria-label="Roster">
@@ -74,8 +69,7 @@ interface RowProps {
 function RosterRow({ trooper, canEdit, tick, onTick, onUpdated, onRemoved, onError }: RowProps) {
   const [mode, setMode] = useState<Mode>({ kind: 'view' })
   const [busy, setBusy] = useState(false)
-  // Shown while the default BUS change saves, so the box flips on the click
-  // rather than a round trip later.
+  // Optimistic default BUS tick while it saves.
   const [pendingBus, setPendingBus] = useState<boolean | null>(null)
 
   const save = async (e: FormEvent, draft: Draft) => {
@@ -91,7 +85,7 @@ function RosterRow({ trooper, canEdit, tick, onTick, onUpdated, onRemoved, onErr
     }
   }
 
-  /** The default BUS Trooper is a stored particular, saved as soon as it is ticked. */
+  /** Saved as soon as it is ticked. */
   const setDefaultBus = async (on: boolean) => {
     setBusy(true)
     setPendingBus(on)
@@ -109,7 +103,7 @@ function RosterRow({ trooper, canEdit, tick, onTick, onUpdated, onRemoved, onErr
     setBusy(true)
     try {
       await api.removeTrooper(trooper.id)
-      // No setBusy(false) on success: the row unmounts as the board drops it.
+      // No setBusy(false): the row unmounts.
       onRemoved(trooper)
     } catch (err) {
       setBusy(false)
@@ -148,7 +142,7 @@ function RosterRow({ trooper, canEdit, tick, onTick, onUpdated, onRemoved, onErr
             type="checkbox"
             aria-label={`${trooper.name} default BUS`}
             checked={pendingBus ?? trooper.defaultBus}
-            // A stay-out is not in until 0800; the server refuses them too.
+
             disabled={trooper.stayOut || busy}
             onChange={(e) => void setDefaultBus(e.target.checked)}
           />
@@ -160,15 +154,14 @@ function RosterRow({ trooper, canEdit, tick, onTick, onUpdated, onRemoved, onErr
             type="checkbox"
             aria-label={`${trooper.name} ${kind}`}
             checked={tick === kind}
-            // One reason at a time: ticking MC clears an OL tick.
+
             onChange={(e) => onTick(trooper.name, e.target.checked ? kind : null)}
           />
         </td>
       ))}
       {canEdit && <td className="row-actions">
         {mode.kind === 'confirm-remove' ? (
-          // Asked in the row rather than with window.confirm, which blocks the
-          // page and cannot say what removal will actually do.
+          // Inline confirm, so it can say what removal does.
           <>
             <span className="note">
               Off the roster. Kept on any sheet they already stood.

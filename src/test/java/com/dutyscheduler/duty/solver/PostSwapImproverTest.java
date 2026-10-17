@@ -10,16 +10,12 @@ import java.util.Arrays;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Like {@link SpanImproverTest}, these assert the move's guarantees — fewer
- * walks, nobody's hours moved, nothing made illegal — rather than one exact
- * grid, so a better move later does not read as a regression.
- */
+/** Tests the guarantees, not an exact grid: fewer walks, same hours, still legal. */
 class PostSwapImproverTest {
 
     private final PostSwapImprover improver = new PostSwapImprover();
 
-    /** "GG . AP" — one token per slot from slot 0, the rest of the sheet off. */
+    /** "GG . AP": one token per slot from slot 0, rest off. */
     private static Post[] row(String spec) {
         Post[] cells = new Post[DutyDay.SLOT_COUNT];
         String[] tokens = spec.trim().split("\\s+");
@@ -62,10 +58,9 @@ class PostSwapImproverTest {
     }
 
     @Test
-    @DisplayName("a one-hour hop to AP is traded away when the other Trooper can take it")
+    @DisplayName("one-hour hop to AP is traded")
     void removesAHop() {
-        // A walks GG, AP, GG. B is on GG at that same hour, with a break either
-        // side, so the two can trade it cleanly.
+        // A: GG, AP, GG. B is on GG then, with breaks either side.
         Post[][] grid = {
                 row("GG GG GG .  AP .  GG GG GG"),
                 row(".  .  .  .  GG .  .  .  . "),
@@ -78,7 +73,7 @@ class PostSwapImproverTest {
     }
 
     @Test
-    @DisplayName("hours, span and each hour's manning are exactly what they were")
+    @DisplayName("hours, span and manning unchanged")
     void movesNoHours() {
         Post[][] grid = {
                 row("GG GG GG .  AP .  GG GG GG"),
@@ -94,10 +89,9 @@ class PostSwapImproverTest {
     }
 
     @Test
-    @DisplayName("a trade that would put AP straight after GG with no break is refused")
+    @DisplayName("won't trade into GG then AP with no break")
     void refusesAnIllegalChange() {
-        // A's hop at slot 4 could only go to B, but B stands GG either side of
-        // it with no break, so taking AP there would be an illegal change.
+
         Post[][] grid = {
                 row("GG .  .  .  AP .  GG"),
                 row(".  .  .  GG GG GG . "),
@@ -109,7 +103,7 @@ class PostSwapImproverTest {
     }
 
     @Test
-    @DisplayName("it never adds a walk, and never makes a change the rules forbid")
+    @DisplayName("never adds a walk or breaks a rule")
     void neverWorseNeverIllegal() {
         Post[][] grid = {
                 row("AP AP .  GG GG .  AP .  GG GG GG"),
@@ -130,7 +124,7 @@ class PostSwapImproverTest {
     }
 
     @Test
-    @DisplayName("it leaves the input alone and hands back a copy")
+    @DisplayName("returns a copy")
     void doesNotMutate() {
         Post[][] grid = {
                 row("GG GG GG .  AP .  GG GG GG"),

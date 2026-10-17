@@ -32,22 +32,15 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Invite links: an admin makes them for their own team, and anyone holding
- * one can see what it is for and accept it.
- *
- * <p>
- * The two halves have opposite access. Making, listing and revoking are
- * ADMIN, and only ever in the caller's own team. Viewing and accepting are
- * open to anyone — the person accepting has no account yet — and are guarded
- * by the token alone, which is why every way a token can fail (unknown, used,
- * expired, revoked) gives the same 404: telling them apart would only tell
- * someone probing which of their guesses had once been real.
+ * Invite links. Making, listing and revoking are ADMIN, in their own team.
+ * Viewing and accepting are open, guarded by the token only. Every bad token
+ * (unknown, used, expired, revoked) gets the same 404.
  */
 @RestController
 @RequestMapping("/api/invites")
 public class InviteController {
 
-    /** Long enough to reach someone on leave; short enough that a link left in a chat dies. */
+    /** Long enough to reach someone on leave. */
     static final Duration LIFETIME = Duration.ofDays(7);
 
     private static final String NOT_VALID = "This invite link is not valid. It may have expired or been used.";
@@ -65,7 +58,7 @@ public class InviteController {
         this.encoder = encoder;
     }
 
-    /** Make an invite and hand back its token, once; shared by the owner's team creation. */
+    /** The only place the raw token is returned. Also used by TeamController. */
     static InviteResponse issue(InviteRepository invites, long teamId, String role, String createdBy) {
         String token = InviteTokens.newToken();
         InviteEntity saved = invites.save(new InviteEntity(teamId, role, InviteTokens.hash(token), createdBy,
@@ -82,7 +75,7 @@ public class InviteController {
                 .body(issue(invites, team, request.role(), account.getUsername()));
     }
 
-    /** The team's invites still waiting to be used. Their tokens are not stored, so not shown. */
+    /** Pending invites. Only hashes are stored, so no tokens. */
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     public List<InviteResponse> pending(@AuthenticationPrincipal Account account) {
@@ -90,7 +83,7 @@ public class InviteController {
                 Instant.now()).stream().map(i -> InviteResponse.from(i, null)).toList();
     }
 
-    /** Revoke: the row goes, so the link finds nothing. Another team's invite is a 404 like any unknown one. */
+    /** Another team's invite is a 404. */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> revoke(@PathVariable Long id, @AuthenticationPrincipal Account account) {
@@ -100,7 +93,7 @@ public class InviteController {
         return ResponseEntity.noContent().build();
     }
 
-    /** What a link is for, shown before anyone commits to it. Open to anyone with the token. */
+    /** Team, role and expiry, before accepting. */
     @GetMapping("/{token}")
     public InviteView view(@PathVariable String token) {
         InviteEntity invite = open(token);
@@ -108,11 +101,7 @@ public class InviteController {
         return new InviteView(team, invite.getRole(), invite.getExpiresAt());
     }
 
-    /**
-     * Accept: make the account, in the invite's team and role, and use the
-     * invite up. One transaction, so a username lost to a race leaves the
-     * invite unused for another try.
-     */
+    /** One transaction, so a username clash leaves the invite unused. */
     @PostMapping("/{token}/accept")
     @Transactional
     public ResponseEntity<InviteView> accept(@PathVariable String token, @Valid @RequestBody AcceptInviteRequest request) {

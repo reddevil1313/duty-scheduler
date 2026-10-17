@@ -20,12 +20,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * The image is checked by decoding it and reading pixels back: the grid is where
- * the layout says, and each cell is the colour of the post the sheet has there.
- * Text is not compared — fonts differ between machines — only the geometry and
- * the colours the sheet decides.
- */
+/** Reads pixels back. Text isn't checked since fonts vary. */
 class SheetImageTest {
 
     private static final List<Trooper> NINE = List.of(
@@ -47,14 +42,14 @@ class SheetImageTest {
         return ImageIO.read(new ByteArrayInputStream(png));
     }
 
-    /** A pixel just inside a cell's top-left corner: the cell's ground, clear of the label. In image pixels, at the scale. */
+    /** Just inside a cell's top-left corner, in image pixels. */
     private static Color groundAt(BufferedImage image, int row, int slot) {
         int s = SheetImage.SCALE;
         return new Color(image.getRGB((PAD + NAME_W + slot * HOUR_W + 3) * s, (FIRST_ROW_Y + row * ROW_H + 5) * s));
     }
 
     @Test
-    @DisplayName("it is a PNG, as wide as the grid and as tall as its rows, at twice the layout size")
+    @DisplayName("PNG at 2x the layout size")
     void sizeFollowsTheSheet() throws IOException {
         Schedule sheet = solve(null);
         int rows = (int) sheet.rows().stream().filter(r -> r.hours() > 0).count();
@@ -67,7 +62,7 @@ class SheetImageTest {
     }
 
     @Test
-    @DisplayName("every cell is the colour of the post the sheet has there, and empty hours are paper")
+    @DisplayName("cells are coloured by post")
     void cellsMatchTheSheet() throws IOException {
         Schedule sheet = solve(null);
         List<Schedule.Row> rows = sheet.rows().stream().filter(r -> r.hours() > 0).toList();
@@ -85,7 +80,7 @@ class SheetImageTest {
     }
 
     @Test
-    @DisplayName("a fixed-turnout sheet gets an MP row, coloured where the MP team covers")
+    @DisplayName("fixed turnout gets an MP row")
     void mpRow() throws IOException {
         Schedule sheet = solve(5);
         int rows = (int) sheet.rows().stream().filter(r -> r.hours() > 0).count();
@@ -103,7 +98,7 @@ class SheetImageTest {
     }
 
     @Test
-    @DisplayName("the same sheet draws the same image")
+    @DisplayName("deterministic")
     void deterministic() {
         Schedule sheet = solve(null);
         Instant at = Instant.parse("2026-09-10T12:00:00Z");
@@ -111,7 +106,7 @@ class SheetImageTest {
     }
 
     @Test
-    @DisplayName("the subtitle counts only Troopers with an hour on the sheet, as the board does")
+    @DisplayName("subtitle counts Troopers with hours")
     void subtitleCountsOnDuty() {
         Schedule solved = solve(null);
         Schedule.Builder builder = Schedule.builder(THURSDAY);
@@ -123,15 +118,14 @@ class SheetImageTest {
     }
 
     @Test
-    @DisplayName("a grid line runs down every hour's edge, heavier at midnight")
+    @DisplayName("hour lines, heavier at midnight")
     void gridLines() throws IOException {
         Schedule sheet = solve(null);
         List<Schedule.Row> rows = sheet.rows().stream().filter(r -> r.hours() > 0).toList();
         BufferedImage image = decode(SheetImage.png(sheet, null, "admin", Instant.now()));
         int s = SheetImage.SCALE;
 
-        // Read halfway down each row, on the edge between two hours, where nobody
-        // is on either side of it, so the pixel is the line and not a post.
+        // On an hour edge with nobody on either side.
         int checked = 0;
         for (int r = 0; r < rows.size(); r++) {
             for (int edge = 1; edge < DutyDay.SLOT_COUNT; edge++) {

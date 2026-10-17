@@ -21,17 +21,9 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * The accounts in the caller's team. ADMIN only, and only ever the caller's
- * own team: an account in another team is a 404, the same as one that does
- * not exist.
- *
- * <p>
- * A team always keeps at least one admin. Without one nobody could invite,
- * and only the owner could get anyone back in.
- *
- * <p>
- * These are accounts, not Troopers. Removing an account takes away someone's
- * sign-in; it leaves the roster, and every sheet they logged, as it was.
+ * The accounts in the caller's team (ADMIN only; other teams are 404). A team
+ * always keeps at least one admin. Removing an account leaves the roster and
+ * logged sheets alone.
  */
 @RestController
 @RequestMapping("/api/members")
@@ -50,7 +42,7 @@ public class MemberController {
                 .map(u -> MemberResponse.from(u, account.id())).toList();
     }
 
-    /** Make someone ADMIN or USER. Their next request signs them out, so the new role takes effect at once. */
+    /** The member is signed out on their next request, so the change is immediate. */
     @PutMapping("/{id}")
     @Transactional
     public MemberResponse setRole(@PathVariable Long id, @Valid @RequestBody RoleRequest request,
@@ -67,8 +59,7 @@ public class MemberController {
     @Transactional
     public ResponseEntity<Void> remove(@PathVariable Long id, @AuthenticationPrincipal Account account) {
         AppUserEntity member = member(id, account);
-        // Signing yourself out of your own team for good is never what was meant,
-        // and done by the last admin it would lock the team.
+        // Never what was meant, and it could remove the last admin.
         if (member.getId() == account.id()) {
             throw new AccountException(HttpStatus.UNPROCESSABLE_CONTENT,
                     "You cannot remove your own account. Ask another admin to.");

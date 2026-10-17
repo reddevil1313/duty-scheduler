@@ -15,12 +15,7 @@ public class TrooperEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /**
-     * The team this row belongs to. Hibernate fills it from the current team
-     * on insert and adds it to every query, so nothing here can read or write
-     * another team's rows; V6's composite foreign keys hold the same line in
-     * the database.
-     */
+    /** Filled on insert and added to every query by Hibernate. */
     @TenantId
     @Column(name = "team_id", nullable = false, updatable = false)
     private Long team;
@@ -53,7 +48,7 @@ public class TrooperEntity {
     @Column(name = "default_bus", nullable = false)
     private boolean defaultBus;
 
-    /** Hours done before this tracker existed; the starting point of their total. */
+    /** Hours done before the app was used. */
     @Column(name = "opening_hours", nullable = false)
     private int openingHours;
 
@@ -122,10 +117,7 @@ public class TrooperEntity {
         this.openingHours = openingHours;
     }
 
-    /**
-     * Renaming is safe for history: sheets, leave and hours all hold the id, so a
-     * renamed Trooper's past sheets simply show the new name.
-     */
+    /** Safe for history: everything refers to the id. */
     public void setName(String name) {
         this.name = name;
     }

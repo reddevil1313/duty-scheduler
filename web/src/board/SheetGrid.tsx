@@ -6,7 +6,7 @@ import { SLOT_COUNT, dateAt, isCrossover, labelAt } from './slots'
 
 export type Mode = 'view' | 'edit' | 'swap'
 
-/** A roster Trooper with no row on the sheet: shown as an empty row while editing, so they can be put on. */
+/** A roster Trooper with no row, shown empty while editing. */
 export interface SpareTrooper {
   name: string
   stayOut: boolean
@@ -14,21 +14,13 @@ export interface SpareTrooper {
 
 interface Props {
   sheet: Schedule
-  /** The rows the board's groups are read from: the sheet before any edits. */
+  /** The sheet before edits, for grouping rows. */
   orderBasis?: ScheduleRow[]
-  /**
-   * The latest check for this date, possibly of an earlier edit. Its numbers
-   * are shown while a newer check is on its way, so nothing blanks and reflows
-   * on every edit; only what points at particular hours waits for `fresh`.
-   */
+  /** Latest check, possibly of an earlier edit. Cell highlights wait for `fresh`. */
   check: SheetCheck | null
   /** Whether `check` was made of exactly this sheet. */
   fresh: boolean
-  /**
-   * A fixed-turnout sheet: hours the team does not reach are the MP team's, and
-   * a row under the grid shows which posts they cover. Never stored — a logged
-   * sheet has no MP row, only its gaps.
-   */
+  /** Fixed-turnout sheet: show the MP row. */
   mp: boolean
   mode: Mode
   spare: SpareTrooper[]
@@ -48,24 +40,20 @@ interface Menu {
 
 const POSTS: Post[] = ['AP', 'GG', 'PAC', 'BUS']
 
-// The menu's size in pixels, for placing it on screen before it renders: one
-// row per post, plus the heading and "Off duty", plus padding. Kept in step
-// with .cell-menu in index.css; erring large only places it a little higher.
+// Estimated menu size, for placing it before it renders. Matches .cell-menu.
 const MENU_ROW = 32
 const MENU_PAD = 12
 const MENU_WIDTH = 160
 
-/** Slot 4 is midnight, where the sheet's date changes: drawn with a heavier rule. */
+/** Midnight, drawn with a heavier line. */
 const MIDNIGHT = 4
 const mid = (slot: number) => (slot === MIDNIGHT ? ' mid' : '')
 
 export function SheetGrid({ sheet, check, fresh, mp, mode, spare, swapPick, onSetCell, onPickRow, orderBasis }: Props) {
   const [menu, setMenu] = useState<Menu | null>(null)
 
-  // A click elsewhere, Escape, or a resize closes the menu. A scroll does not:
-  // the menu is placed in page coordinates and scrolls with its cell. Closing
-  // on scroll was tried first, and lost the menu to the scroll that the click
-  // itself had set off.
+  // Close on outside click, Escape or resize. Not on scroll: the click itself
+  // can scroll the page.
   useEffect(() => {
     if (!menu) return
     const close = () => setMenu(null)
@@ -80,27 +68,20 @@ export function SheetGrid({ sheet, check, fresh, mp, mode, spare, swapPick, onSe
     }
   }, [menu])
 
-  // Leaving edit mode closes the menu: derived from the mode rather than an
-  // effect that resets state.
   const openMenu = mode === 'edit' ? menu : null
 
-  // Night, day, stay-outs, then anyone away the whole sheet, grouped by the
-  // sheet as it was before any edits so rows hold still while it is edited.
+  // Grouped by the unedited sheet so rows don't move while editing.
   const rows: ScheduleRow[] = boardOrder(mode === 'edit'
     ? [...sheet.rows, ...spare.map((s) => ({
         trooper: s.name, stayOut: s.stayOut, posts: Array(SLOT_COUNT).fill(null), hours: 0, span: 0,
       }))]
     : sheet.rows, check?.away, orderBasis)
 
-  // Hours as counted here, span as the server last worked it out — dimmed
-  // while a newer answer is on its way, but never blanked.
   const checked = new Map((check?.sheet.rows ?? []).map((r) => [r.trooper, r]))
   const cover = check ? coverage(sheet, check.demand) : null
   const mpPosts = mp && check ? mpShortfall(sheet, check.demand) : null
 
-  // Cells a rule names by Trooper and hour get outlined, so the eye goes
-  // straight to the hour a message is about. Only from a fresh check: an old
-  // one may point at an hour that has since been changed.
+  // Outline cells named by an issue, from a fresh check only.
   const flagged = new Set((fresh ? check?.issues ?? [] : [])
     .filter((i) => i.trooper !== null && i.slot !== null)
     .map((i) => `${i.trooper}@${i.slot}`))
@@ -109,9 +90,7 @@ export function SheetGrid({ sheet, check, fresh, mp, mode, spare, swapPick, onSe
     if (mode !== 'edit') return
     e.stopPropagation()
     const r = e.currentTarget.getBoundingClientRect()
-    // Opened where it can be read whole: above the cell when the window has no
-    // room below it, and inside the right edge. Then turned into page
-    // coordinates, so it stays beside its cell as the page scrolls.
+    // Keep it on screen; page coordinates so it scrolls with the cell.
     const height = MENU_ROW * (offeredAt(slot).length + 2) + MENU_PAD
     const below = r.bottom + 3
     const y = below + height > window.innerHeight ? Math.max(4, r.top - height - 3) : below
@@ -125,8 +104,7 @@ export function SheetGrid({ sheet, check, fresh, mp, mode, spare, swapPick, onSe
     setMenu(null)
   }
 
-  // Only the posts that stand at that hour are offered, from the server's
-  // demand. Before the first check lands, all four.
+  // Only posts that stand at that hour; all four before the first check.
   const offeredAt = (slot: number): Post[] =>
     check ? POSTS.filter((p) => (check.demand[slot]?.[p] ?? 0) > 0) : POSTS
   const offered = openMenu ? offeredAt(openMenu.slot) : []
@@ -138,8 +116,6 @@ export function SheetGrid({ sheet, check, fresh, mp, mode, spare, swapPick, onSe
         role="table"
         aria-label={`Duty sheet for ${sheet.date}`}
       >
-        {/* Presentational: the dates repeat what the hour labels and the
-            date picker already say, for the eye rather than a screen reader. */}
         <div className="row days" aria-hidden="true">
           <div className="eve">{shortDate(sheet.date)}</div>
           <div className="morn">{shortDate(dateAt(sheet.date, MIDNIGHT))}</div>
@@ -165,10 +141,7 @@ export function SheetGrid({ sheet, check, fresh, mp, mode, spare, swapPick, onSe
           const server = checked.get(row.trooper)
           const isSpare = !sheet.rows.some((r) => r.trooper === row.trooper)
           const away = check?.away[row.trooper]
-          // Away every hour: the row is one greyed band saying why, rather than
-          // twenty-four empty cells that look like a Trooper nobody posted.
-          // While editing it shows its cells, greyed, so it can still be posted
-          // — which the check will then flag.
+          // Away all sheet: one grey band, except while editing.
           const outAllSheet = !!away && away.every((k) => k !== null)
           const asBand = outAllSheet && mode !== 'edit'
           const nameClass = `name${mode === 'swap' && !isSpare && !asBand ? ' pickable' : ''}` +
@@ -189,20 +162,16 @@ export function SheetGrid({ sheet, check, fresh, mp, mode, spare, swapPick, onSe
               </div>
               {asBand ? (
                 <div className="band" role="cell">
-                  {/* A stay-out's SO tag is already by their name; the band says what it means. */}
                   <span className="why">{away[0] === 'SO' ? 'Not in' : away[0]}</span>
                 </div>
               ) : row.posts.map((post, slot) => (
                 <div
-                  // The index is the slot, and a slot is a fixed position on
-                  // the board — it is not a list that reorders, so it is a
-                  // legitimate key rather than the usual index-as-key mistake.
+                  // The index is the slot, which never reorders.
                   key={slot}
                   role="cell"
                   className={
                     `cell${post ? ` on ${post.toLowerCase()}` : ''}${mid(slot)}` +
-                    // A stint is drawn as one block: its first hour opens it
-                    // and carries the label, its last hour closes it.
+                    // One block per stint, labelled on its first hour.
                     `${post && row.posts[slot - 1] !== post ? ' s-start' : ''}` +
                     `${post && row.posts[slot + 1] !== post ? ' s-end' : ''}` +
                     `${away?.[slot] ? ' away' : ''}` +
@@ -218,9 +187,7 @@ export function SheetGrid({ sheet, check, fresh, mp, mode, spare, swapPick, onSe
                   )}
                 </div>
               ))}
-              {/* Hours are counted here, so they are always current. Span is
-                  the server's, kept and dimmed while a newer check is on its
-                  way rather than blanked. */}
+              {/* Span comes from the server, dimmed while stale. */}
               <div className="tally" role="cell">{row.hours}</div>
               <div className={`tally${fresh ? '' : ' stale'}`} role="cell">{server?.span ?? ''}</div>
             </div>

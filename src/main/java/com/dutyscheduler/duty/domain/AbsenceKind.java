@@ -12,6 +12,6 @@ public enum AbsenceKind {
     /** Annual leave. */
     AL,
 
-    /** Medical appointment — a couple of hours, not a day. */
+    /** Medical appointment, a few hours. */
     MA
 }

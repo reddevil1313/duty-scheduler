@@ -5,7 +5,7 @@ import com.dutyscheduler.duty.persistence.AppUserEntity;
 /**
  * An account in the caller's team.
  *
- * @param you whether this is the caller, whose own row cannot be removed
+ * @param you whether this is the caller
  */
 public record MemberResponse(long id, String username, String displayName, String role, boolean you) {
 

@@ -5,13 +5,8 @@ import jakarta.persistence.*;
 import java.time.Instant;
 
 /**
- * A one-time link to join a team in a role. Holds the token's hash, never the
- * token (V7).
- *
- * <p>
- * Not scoped by {@code @TenantId}: the person accepting is signed in to no
- * team yet, and the owner makes invites for teams that are not theirs. The
- * team is a plain column, and every admin-facing query names it.
+ * A one-time link to join a team. Stores only the token's hash. Not a
+ * {@code @TenantId} entity: whoever accepts has no team yet.
  */
 @Entity
 @Table(name = "invite")
@@ -33,7 +28,7 @@ public class InviteEntity {
     @Column(name = "created_by", nullable = false, updatable = false)
     private String createdBy;
 
-    /** Set here rather than by the column default, so a new row has it before it is read back. */
+    /** Set here so it isn't null before the row is read back. */
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

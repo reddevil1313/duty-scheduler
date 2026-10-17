@@ -1,13 +1,8 @@
 import type { Post, Schedule, ScheduleRow, SheetCheck } from '../api/types'
 import { SLOT_COUNT, isSilent } from './slots'
 
-/**
- * Hand edits to a sheet. Each returns a new sheet and leaves the old one
- * alone, which is what makes "undo my edits" a matter of keeping the original.
- *
- * <p>Hours are recounted here because the count is trivial; span is not,
- * because it is rest-aware, and comes back from the server's check instead.
- */
+// Hand edits. Each returns a new sheet. Hours are recounted here; span comes
+// from the server's check.
 
 function withHours(row: ScheduleRow): ScheduleRow {
   return { ...row, hours: row.posts.filter((p) => p !== null).length }
@@ -17,10 +12,7 @@ function totalled(sheet: Schedule, rows: ScheduleRow[]): Schedule {
   return { ...sheet, rows, totalHours: rows.reduce((sum, r) => sum + r.hours, 0) }
 }
 
-/**
- * Put a Trooper on a post for one hour, or take them off it. A Trooper with no
- * row yet — someone on the roster but not on a logged sheet — gets one.
- */
+/** Set or clear one hour. Adds a row if the Trooper has none. */
 export function setCell(sheet: Schedule, trooper: string, stayOut: boolean, slot: number, post: Post | null): Schedule {
   const exists = sheet.rows.some((r) => r.trooper === trooper)
   const rows = exists
@@ -52,11 +44,7 @@ export interface SlotCoverage {
   state: Coverage
 }
 
-/**
- * Bodies against demand, per hour. Only counting: what each hour needs comes
- * from the server's demand, so the rules for which posts stand when are never
- * written twice.
- */
+/** Manned vs needed per hour, using the server's demand. */
 export function coverage(sheet: Schedule, demand: SheetCheck['demand']): SlotCoverage[] {
   return Array.from({ length: SLOT_COUNT }, (_, slot) => {
     const need = demand[slot] ?? {}
@@ -79,10 +67,7 @@ export function coverage(sheet: Schedule, demand: SheetCheck['demand']): SlotCov
   })
 }
 
-/**
- * Per hour, the posts nobody from the team is on: what the MP team covers on a
- * fixed-turnout sheet. A post short twice at one hour appears twice.
- */
+/** Unmanned posts per hour, for the MP row. */
 export function mpShortfall(sheet: Schedule, demand: SheetCheck['demand']): Post[][] {
   return Array.from({ length: SLOT_COUNT }, (_, slot) => {
     const need = demand[slot] ?? {}
@@ -105,16 +90,9 @@ function groupOf(row: Placed, away: SheetCheck['away'] | undefined): number {
 }
 
 /**
- * Rows in board order: the night group, then day duty, then stay-outs, then
- * anyone away the whole sheet, each group in the order it came in. The server
- * generates sheets in this order too (ScheduleResponse.inBoardOrder), so a
- * new sheet does not move when its check arrives.
- *
- * Night is anyone with a silent hour. `basis`, when given, is the sheet those
- * groups are read from — the board passes the sheet as generated or loaded,
- * so a row does not jump to the top under the cursor when it is given a
- * silent hour mid-edit. Without it, as when logging, they are read from the
- * rows themselves.
+ * Night (any silent hour), day, stay-outs, then away, keeping order within
+ * each. Must match ScheduleResponse.inBoardOrder. `basis` is the sheet to
+ * group by, so rows stay put while editing.
  */
 export function boardOrder<R extends Placed>(rows: R[], away: SheetCheck['away'] | undefined, basis?: Placed[]): R[] {
   const from = new Map((basis ?? []).map((r) => [r.trooper, r]))

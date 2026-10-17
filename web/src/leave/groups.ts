@@ -11,17 +11,13 @@ export const KIND_TABLES: [AbsenceKind, string][] = [
 
 export interface KindGroup {
   kind: AbsenceKind
-  /** Not over yet, running or to come: soonest first, so the next to start leads. */
+  /** Running or upcoming, soonest first. */
   current: Absence[]
-  /** Over: the most recent first, since the latest is the one anyone asks about. */
+  /** Over, most recent first. */
   past: Absence[]
 }
 
-/**
- * Instants are compared as text to the minute. The server writes them
- * `YYYY-MM-DDTHH:MM[:SS]`, and seconds are always zero, so the first sixteen
- * characters order exactly as the times do.
- */
+/** Compare instants as text, to the minute (seconds are always zero). */
 const minute = (instant: string) => instant.slice(0, 16)
 
 export const isOver = (absence: Absence, now: string) => minute(absence.until) <= now
@@ -29,10 +25,8 @@ export const isRunning = (absence: Absence, now: string) =>
   minute(absence.covers) <= now && !isOver(absence, now)
 
 /**
- * The register split into one group per kind, every kind present even when
- * empty so each table keeps its place on the page. Over or not is judged on
- * the resolved interval the server sent, not on the dates as booked: an MC
- * "until the 12th" still holds the 11th's sheet until 2000 on the 12th.
+ * One group per kind, including empty ones. Past vs current uses the resolved
+ * interval, not the booked dates.
  */
 export function byKind(register: Absence[], now: string, trooper: string | null): KindGroup[] {
   const shown = trooper === null ? register : register.filter((a) => a.trooper === trooper)
@@ -51,11 +45,7 @@ export function byKind(register: Absence[], now: string, trooper: string | null)
 /** `09:30` or `09:30:00` → `0930`, the way times are written on the board. */
 const hhmm = (time: string | null) => (time ?? '').slice(0, 5).replace(':', '')
 
-/**
- * The leave as it was booked, in the words it was booked in: the dates
- * someone wrote down, not the interval the 2000 rule resolves them to. That
- * interval is shown alongside, and the sheets it reaches in their own column.
- */
+/** The dates as booked. */
 export function bookedAs(absence: Absence): string {
   const day = shortDate(absence.from)
   switch (absence.span) {
@@ -70,15 +60,11 @@ export function bookedAs(absence: Absence): string {
   }
 }
 
-/**
- * Days booked: calendar days for full days, a half for either half day.
- * Null for an appointment, which is a matter of hours.
- */
+/** Days booked; 0.5 for a half day, null for an appointment. */
 export function daysOf(absence: Absence): number | null {
   if (absence.span === 'WINDOW') return null
   if (absence.span !== 'FULL') return 0.5
-  // Through UTC on purpose: both ends are dates with no time, so the count
-  // cannot be bent by a daylight-saving change between them.
+  // UTC so daylight saving can't skew the count.
   const utc = (date: string) => {
     const [y, m, d] = date.split('-').map(Number)
     return Date.UTC(y, m - 1, d)

@@ -46,7 +46,7 @@ class LoginThrottleTest {
     }
 
     @Test
-    @DisplayName("nine failures are allowed; the tenth shuts the address out for fifteen minutes")
+    @DisplayName("tenth failure blocks the address for 15 minutes")
     void limit() {
         fail("10.0.0.1", LoginThrottle.LIMIT - 1);
         assertThat(throttle.refusedUntil("10.0.0.1")).isEmpty();
@@ -55,14 +55,14 @@ class LoginThrottleTest {
     }
 
     @Test
-    @DisplayName("only the address that failed is shut out")
+    @DisplayName("only that address is blocked")
     void perAddress() {
         fail("10.0.0.1", LoginThrottle.LIMIT);
         assertThat(throttle.refusedUntil("10.0.0.2")).isEmpty();
     }
 
     @Test
-    @DisplayName("the address is let back in when the fifteen minutes are up")
+    @DisplayName("unblocked after 15 minutes")
     void lifts() {
         fail("10.0.0.1", LoginThrottle.LIMIT);
         clock.advance(LoginThrottle.WINDOW.minusSeconds(1));
@@ -72,7 +72,7 @@ class LoginThrottleTest {
     }
 
     @Test
-    @DisplayName("failures spread wider than the window never add up to a refusal")
+    @DisplayName("failures outside the window don't add up")
     void windowForgets() {
         fail("10.0.0.1", LoginThrottle.LIMIT - 1);
         clock.advance(LoginThrottle.WINDOW);

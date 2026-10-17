@@ -25,24 +25,13 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * The search is tested against the validator, not against a fixed expected
- * grid.
- *
- * <p>
- * That distinction matters. Asserting on a particular arrangement would pin
- * one arbitrary answer out of thousands of equally legal ones, and every future
- * change to the search would break it for no reason. Asserting that the answer
- * passes an independently written rule checker tests the thing that is actually
- * required — and the checker shares no code with the search, so it cannot agree
- * with a bug by construction.
+ * Checked against the validator, not a fixed grid: there are many equally
+ * legal answers, and the validator shares no code with the solver.
  */
 class ScheduleSolverTest {
 
-    // The letters are not in roster order, and that is deliberate. HourTargets
-    // breaks a tie on Trooper::name, so these names decide who gets the spare
-    // hour when nobody has more history than anyone else. They were assigned so
-    // that alphabetical order is exactly what it was before the roster was
-    // anonymised — change a letter and you change a schedule.
+    // Not in roster order on purpose: HourTargets breaks ties by name, so
+    // changing a letter changes a schedule.
     private static final Trooper TROOPER_E = Trooper.of("TROOPER_E");
     private static final Trooper TROOPER_C = Trooper.of("TROOPER_C");
     private static final Trooper TROOPER_J = Trooper.of("TROOPER_J");
@@ -69,9 +58,9 @@ class ScheduleSolverTest {
             "2026-09-08, 47",
             "2026-09-09, 47",
             "2026-09-10, 47",
-            "2026-09-11, 44", // Friday — silent hours, then a Saturday
-            "2026-09-12, 48", // Saturday — AP and GG right through
-            "2026-09-13, 51" // Sunday — hands back to the weekday shape at Mon 0600
+            "2026-09-11, 44", // Friday: silent hours, then Saturday
+            "2026-09-12, 48", // Saturday: AP and GG all day
+            "2026-09-13, 51" // Sunday: weekday shape again from Mon 0600
     })
     @DisplayName("every day of the week")
     void solvesEveryDayOfTheWeek(String date, int expectedHours) {
@@ -87,7 +76,7 @@ class ScheduleSolverTest {
     }
 
     @Test
-    @DisplayName("every post is manned and nobody stands one that is not required")
+    @DisplayName("every post manned, none extra")
     void coverageIsExact() {
         SolveResult result = solve(LocalDate.of(2026, 9, 10));
 
@@ -98,7 +87,7 @@ class ScheduleSolverTest {
     }
 
     @Test
-    @DisplayName("everybody does exactly the hours they were allocated, to the hour")
+    @DisplayName("everyone does exactly their target hours")
     void hoursMatchTheTargetsExactly() {
         SolveResult result = solve(LocalDate.of(2026, 9, 10));
 
@@ -108,16 +97,9 @@ class ScheduleSolverTest {
         }
     }
 
-    /**
-     * Step 5 held a hard partition here. Step 6 relaxes it by exactly one thing:
-     * a night Trooper may pick up the first few day hours coming off the silent block,
-     * because AP straight onto the 0600 PAC needs no break and costs almost no
-     * span. Everything else about the split is unchanged — and on a full weekday
-     * the crossover earns nothing, so the hard partition is what actually comes
-     * back.
-     */
+    /** Night Troopers may only cross into the first few day hours. */
     @Test
-    @DisplayName("the split holds, give or take the crossover window")
+    @DisplayName("night/day split holds apart from the crossover window")
     void theNightDayPartitionHolds() {
         DutyDay day = DutyDay.of(LocalDate.of(2026, 9, 10));
         SolveResult result = solver.solve(SolveRequest.of(day, ROSTER, NIGHT));
@@ -142,7 +124,7 @@ class ScheduleSolverTest {
     }
 
     @Test
-    @DisplayName("on a full weekday the crossover earns nothing, so nobody crosses")
+    @DisplayName("no crossover on a full weekday")
     void aFullWeekdayKeepsTheHardPartition() {
         DutyDay day = DutyDay.of(LocalDate.of(2026, 9, 10));
         SolveResult result = solver.solve(SolveRequest.of(day, ROSTER, NIGHT));
@@ -159,14 +141,9 @@ class ScheduleSolverTest {
         }
     }
 
-    /**
-     * The case crossover exists for. Three Troopers on the silent hours can only reach
-     * five each while the four left on days sit near eight — and no choice of
-     * group size fixes that, because both groups are already as small as they can
-     * be. Letting the night group take a few early day hours does.
-     */
+    /** Without crossover, 3 night Troopers get 5h each while 4 day Troopers get about 8h. */
     @Test
-    @DisplayName("on a thin day the crossover brings both groups within an hour")
+    @DisplayName("crossover evens out a thin day")
     void crossoverRescuesAThinDay() {
         List<Trooper> thin = List.of(TROOPER_E, TROOPER_C, TROOPER_J, TROOPER_B, TROOPER_I, TROOPER_H, TROOPER_A);
 
@@ -182,23 +159,21 @@ class ScheduleSolverTest {
     }
 
     @Test
-    @DisplayName("the answer is scored, and a legal sheet is never returned in place of a better legal sheet")
+    @DisplayName("returns the best scoring sheet")
     void picksTheBestCandidateItFound() {
         SolveResult friday = solver.solve(SolveRequest.of(
                 DutyDay.of(LocalDate.of(2026, 9, 11)), ROSTER, NIGHT));
 
         assertTrue(friday.isSolved());
         assertTrue(validator.validate(friday.schedule()).ok());
-        // A Friday sheet is the silent hours and then a Saturday, and the stay-outs
-        // are gone for the whole weekend block — so 16 silent hours fall on three
-        // Troopers and 28 daylight hours on five. One hour of spread is the floor, and
-        // the search is expected to reach it rather than settle above it.
+        // Friday: 16 silent hours on 3 Troopers, 28 day hours on 5. A spread of
+        // 1 is the best possible.
         assertTrue(ScheduleScore.of(friday.schedule()).hourSpread() <= 1,
                 ScheduleScore.of(friday.schedule()).toString());
     }
 
     @Test
-    @DisplayName("nobody is on for more than three hours in a row")
+    @DisplayName("no stint over three hours")
     void stintsAreRespected() {
         SolveResult result = solve(LocalDate.of(2026, 9, 13));
 
@@ -213,7 +188,7 @@ class ScheduleSolverTest {
     }
 
     @Test
-    @DisplayName("leave is worked around rather than worked through")
+    @DisplayName("nobody is put on duty during leave")
     void solvesAroundLeave() {
         DutyDay day = DutyDay.of(LocalDate.of(2026, 9, 10));
         List<Absence> leave = List.of(
@@ -228,17 +203,16 @@ class ScheduleSolverTest {
         assertEquals(0, result.schedule().hours(TROOPER_K), "a Trooper on MC does nothing");
 
         Schedule.Row trooperB = result.schedule().row(TROOPER_B).orElseThrow();
-        assertNull(trooperB.at(13), "0900 — they are at their appointment");
+        assertNull(trooperB.at(13), "0900: at their appointment");
         assertNull(trooperB.at(14), "1000");
         assertNull(trooperB.at(15), "1100");
         assertTrue(trooperB.hours() > 0, "but they still work the rest of the sheet");
 
-        // The sheet still gets covered; the hours just land on other people.
         assertEquals(47, totalHours(result.schedule()));
     }
 
     @Test
-    @DisplayName("the same request twice gives the same sheet")
+    @DisplayName("deterministic")
     void isDeterministic() {
         DutyDay day = DutyDay.of(LocalDate.of(2026, 9, 10));
 
@@ -269,15 +243,10 @@ class ScheduleSolverTest {
     }
 
     @Test
-    @DisplayName("across a week the walks between AP and GG drop from 53 to 35")
+    @DisplayName("a week has at most 35 AP/GG walks")
     void weekOfWalks() {
-        // 53 is what this roster's week came to before post changes were scored,
-        // measured on 2026-10-16; most of the saving is at the weekend, when AP
-        // and GG stand all day and there is room to trade. Weekday nights stay
-        // at four, which is forced: once the hours are set, the two posts at
-        // each silent hour leave only one way to fill them.
-        // A later change to the solver may well move this number. It should
-        // only ever go down.
+        // Was 53 before walks were scored. Weekday nights are stuck at 4. This
+        // should only go down.
         int week = 0;
         for (int d = 7; d <= 13; d++) {
             week += walks(solver.solve(SolveRequest.of(DutyDay.of(LocalDate.of(2026, 9, d)), ROSTER, NIGHT)).schedule());
@@ -286,7 +255,7 @@ class ScheduleSolverTest {
     }
 
     @Test
-    @DisplayName("history moves the odd hour without changing the total")
+    @DisplayName("history moves the spare hour, not the total")
     void historyShiftsWhoGetsTheExtraHour() {
         DutyDay day = DutyDay.of(LocalDate.of(2026, 9, 10));
         Map<Trooper, Integer> history = Map.of(TROOPER_E, 100, TROOPER_C, 90, TROOPER_J, 80);
@@ -301,7 +270,7 @@ class ScheduleSolverTest {
     }
 
     @Test
-    @DisplayName("a night group that cannot hold the silent hours is refused, and says so")
+    @DisplayName("refuses a night group too small for the silent hours")
     void shortNightGroupIsRefused() {
         SolveResult result = solver.solve(SolveRequest.of(
                 DutyDay.of(LocalDate.of(2026, 9, 10)), ROSTER, List.of(TROOPER_E, TROOPER_C)));
@@ -311,7 +280,7 @@ class ScheduleSolverTest {
     }
 
     @Test
-    @DisplayName("too few Troopers is refused with the arithmetic, not a shrug")
+    @DisplayName("refuses too few Troopers, with the numbers")
     void thinRosterIsRefused() {
         SolveResult result = solver.solve(SolveRequest.of(
                 DutyDay.of(LocalDate.of(2026, 9, 10)),

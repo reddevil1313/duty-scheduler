@@ -34,12 +34,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * The seed is only worth having if it is usable: accounts that sign in through
- * the real login filter, and a roster the solver can actually cover. A row with
- * a hash the encoder cannot match, or a roster one Trooper short at the
- * weekend, would look seeded and still leave a fresh database stuck.
- */
+/** The dev accounts can sign in and the roster can cover every day. */
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("dev")
@@ -70,10 +65,7 @@ class DevDataSeederIT {
 
     private TeamScope.Opened devTeam;
 
-    /**
-     * Read the roster as the dev team, which is where the seeder put it; the
-     * test team every other test runs as has none.
-     */
+    /** As the dev team, not the test team. */
     @BeforeEach
     void openDevTeam() {
         devTeam = TeamScope.open(users.findByUsername("admin").orElseThrow().getTeamId());
@@ -107,7 +99,7 @@ class DevDataSeederIT {
     }
 
     @Test
-    @DisplayName("the roster is nine Troopers: A to C on night, H and I staying out")
+    @DisplayName("roster is A-I, A-C on night, H and I stay out")
     void seededRoster() {
         List<TrooperEntity> roster = troopers.findAllByOrderByIdAsc();
 
@@ -125,7 +117,7 @@ class DevDataSeederIT {
             "2026-09-07", "2026-09-08", "2026-09-09", "2026-09-10",
             "2026-09-11", "2026-09-12", "2026-09-13" })
     void everyDayOfTheWeekSolves(String date) throws Exception {
-        // The seeded admin itself, so the request runs as the dev team.
+
         mvc.perform(post("/api/schedules/generate").with(csrf()).with(user(accounts.loadUserByUsername("admin")))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -135,7 +127,7 @@ class DevDataSeederIT {
     }
 
     @Test
-    @DisplayName("a restart changes nothing: no duplicates, no reset password, no returning Trooper")
+    @DisplayName("restarting changes nothing")
     void seedingAgainChangesNothing() throws Exception {
         AppUserEntity admin = users.findByUsername("admin").orElseThrow();
         String originalHash = admin.getPasswordHash();
@@ -154,8 +146,7 @@ class DevDataSeederIT {
             assertThat(troopers.count()).isEqualTo(rosterBefore);
             assertThat(troopers.findByName("TROOPER_I")).isEmpty();
         } finally {
-            // The container is shared with the other tests here, which run in no
-            // fixed order relative to this one.
+            // Other tests share the container.
             admin.setPasswordHash(originalHash);
             users.save(admin);
             TrooperEntity restored = new TrooperEntity("TROOPER_I", true);

@@ -1,19 +1,5 @@
--- ---------------------------------------------------------------------------
--- V7 — invite links.
---
--- How anyone but the owner gets an account. An admin (or the owner, for a
--- team's first admin) makes an invite for a role; the link goes out by chat,
--- since there is no email; whoever opens it picks their own username and
--- password and joins that team. No one ever knows anyone else's password.
---
--- The token is never stored, only its SHA-256: a copy of this table, from a
--- backup or a leak, holds no link that works. SHA-256 rather than bcrypt
--- because the token is 32 random bytes, not a password — there is nothing to
--- guess, and it has to be found by hash, which a salted hash cannot be.
---
--- An invite is used once. used_at is set in the same statement that checks it
--- is still unset, so two people opening the same link cannot both join.
--- ---------------------------------------------------------------------------
+-- V7: invite links. Only the token's SHA-256 is stored (it is random, so no
+-- salt is needed, and it must be looked up by hash). Single use.
 
 CREATE TABLE invite (
     id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

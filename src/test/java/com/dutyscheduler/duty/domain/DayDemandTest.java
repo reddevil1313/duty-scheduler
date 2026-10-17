@@ -36,7 +36,7 @@ class DayDemandTest {
     }
 
     @Test
-    @DisplayName("a weekday sheet is empty for two hours, then two-manned, then three at the bus run")
+    @DisplayName("weekday: empty, then 2, then 3 at BUS")
     void weekdayHeadcountByHour() {
         DayDemand d = DayDemand.of(DutyDay.of(LocalDate.of(2026, 9, 10)));
 
@@ -52,7 +52,7 @@ class DayDemandTest {
     }
 
     @Test
-    @DisplayName("the Friday sheet is silent hours and then a Saturday")
+    @DisplayName("Friday sheet")
     void fridaySheetIsMostlyWeekend() {
         DayDemand d = DayDemand.of(DutyDay.of(LocalDate.of(2026, 9, 11)));
 
@@ -64,7 +64,7 @@ class DayDemandTest {
     }
 
     @Test
-    @DisplayName("the Sunday sheet hands back to the weekday shape at Monday 0600")
+    @DisplayName("Sunday sheet")
     void sundaySheetCrossesBackOnMondayMorning() {
         DayDemand d = DayDemand.of(DutyDay.of(LocalDate.of(2026, 9, 13)));
 
@@ -85,7 +85,7 @@ class DayDemandTest {
     }
 
     @Test
-    @DisplayName("the silent hours cannot hold as many duty hours as they look like they should")
+    @DisplayName("silent hours hold fewer duty hours than slots")
     void silentHoursAreEightNotSixteen() {
         DayDemand d = DayDemand.of(DutyDay.of(LocalDate.of(2026, 9, 10)));
 

@@ -10,14 +10,13 @@ server:
       cookie:
         secure: false
 
-# These passwords are public — they are in a public repo — which is fine only
-# because the accounts they open exist nowhere but a developer's own database.
+# Public dev-only passwords.
 dev:
   seed:
     admin-password: ${DEV_ADMIN_PASSWORD:admin}
     trooper-password: ${DEV_TROOPER_PASSWORD:trooper_d}
 
-# A dev owner, so the Teams console can be tried without setting anything.
+# Dev owner.
 owner:
   bootstrap:
     username: ${OWNER_USERNAME:owner}

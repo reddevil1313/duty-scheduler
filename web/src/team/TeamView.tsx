@@ -6,15 +6,11 @@ import { localDay, shortDate } from '../dates'
 import { InviteLink } from './InviteLink'
 
 interface Props {
-  /** True while the tab is showing; members and invites are re-read on each showing. */
+  /** Re-read each time the tab is shown. */
   active: boolean
 }
 
-/**
- * The team's accounts and invites, for an ADMIN. Accounts are who can sign
- * in; they are not the roster, and removing one leaves every Trooper and
- * every logged sheet as it was.
- */
+/** Accounts and invites (not the roster), for an ADMIN. */
 export function TeamView({ active }: Props) {
   const [members, setMembers] = useState<Member[] | null>(null)
   const [pending, setPending] = useState<Invite[]>([])
@@ -43,7 +39,7 @@ export function TeamView({ active }: Props) {
     return () => { stale = true }
   }, [active, report])
 
-  /** Run a change, then re-read both lists, so what is shown is what the server holds. */
+  /** Run a change, then re-read both lists. */
   const change = async (work: () => Promise<unknown>, done: string) => {
     setError(null)
     setNote(null)
@@ -185,8 +181,7 @@ function MemberRow({ member, onRole, onRemove }: MemberRowProps) {
       <td>{member.username}{member.you && <span className="tag">you</span>}</td>
       <td>{member.displayName}</td>
       <td>
-        {/* Your own role is not changed from here: stepping down would sign
-            you out mid-click. Another admin can change it. */}
+        {/* Changing your own role would sign you out mid-click. */}
         {member.you ? (
           <span className={`role${member.role === 'ADMIN' ? ' admin' : ''}`}>{member.role}</span>
         ) : (

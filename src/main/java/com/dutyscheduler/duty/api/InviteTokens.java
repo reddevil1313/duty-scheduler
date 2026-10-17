@@ -18,7 +18,7 @@ final class InviteTokens {
     private InviteTokens() {
     }
 
-    /** 256 bits: nobody guesses one, so no lockout or rate limit is needed to protect them. */
+    /** 256 bits, too many to guess. */
     static String newToken() {
         byte[] bytes = new byte[32];
         RANDOM.nextBytes(bytes);

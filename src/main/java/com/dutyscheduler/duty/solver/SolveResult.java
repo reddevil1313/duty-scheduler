@@ -9,10 +9,9 @@ import java.util.Optional;
 /**
  * What the search came back with.
  *
- * A failure carries a reason rather than an empty result.
+ * A failure carries a reason.
  *
- * @param reusedFrom the date of the logged sheet laid onto today's Troopers
- *                   instead of solving, or null when the sheet was solved
+ * @param reusedFrom date of the reused sheet, or null if solved
  */
 public record SolveResult(Schedule schedule, HourTargets targets, String reason, long nodes, LocalDate reusedFrom) {
 

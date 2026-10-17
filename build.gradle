@@ -40,18 +40,14 @@ dependencies {
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
-// bootRun is only ever local, so it seeds the dev accounts by default. An
-// explicit SPRING_PROFILES_ACTIVE still wins: a system property would otherwise
-// override it silently.
+// bootRun uses the dev profile unless SPRING_PROFILES_ACTIVE is set.
 tasks.named('bootRun') {
     systemProperty 'spring.profiles.active', System.getenv('SPRING_PROFILES_ACTIVE') ?: 'dev'
 }
 
 tasks.named('test') {
     useJUnitPlatform()
-    // The sheet image is drawn with Java2D. Headless, so tests on a Mac do not
-    // open a Dock icon and tests in CI need no display; the app itself is
-    // headless already, which Spring Boot sets by default.
+    // For the Java2D sheet image tests.
     systemProperty 'java.awt.headless', 'true'
     testLogging {
         events 'passed', 'skipped', 'failed'

@@ -17,34 +17,17 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Backtracking search that fills every post on a sheet.
+ * Backtracking search that fills every post on a sheet with a legal schedule.
+ * Positions are walked in time order; each tries every Trooper who could take it.
  *
  * <p>
- * One job: come back with a schedule that breaks no rule. It
- * does not care whether the result is a good schedule.
- * 
- * <p>
- * The search walks positions in
- * time order, and for each one tries every trooper who could legally take it,
- * recursing after each and undoing on the way back out.
- *
- * <p>
- * To keep the search from wandering into dead ends, it uses four
- * pruning techniques:
- *
+ * Pruning:
  * <ul>
- * <li><b>Hour targets as a budget.</b> Each Trooper arrives with an exact number of
- * hours to do. A position can only go to someone with hours left, so the
- * search cannot wander into schedules where one Trooper does everything.
- * <li><b>The night/day partition.</b> The night group takes the silent hours
- * and nobody else can; everyone else takes the rest. This halves the
- * branching and, more importantly, is what stops a Trooper being given 2200 and
- * 1800 on the same sheet.
- * <li><b>Symmetry breaking on PAC.</b> The two PAC positions at an hour are
- * interchangeable, so putting A on the first and B on the second is the
- * same schedule as the reverse. Only the ordered pair is explored.
- * <li><b>A capacity prune.</b> Before recursing, every Trooper who still owes hours
- * must have somewhere left to do them. If not, the branch is abandoned.
+ * <li>Hour targets: a position only goes to someone with hours left.
+ * <li>Night/day split: only the night group takes silent hours, so nobody gets
+ * both 2200 and 1800.
+ * <li>The two PAC positions at an hour are filled in trooper order only.
+ * <li>Anyone still owing hours must have room left to do them.
  * </ul>
  */
 public final class ScheduleSolver {
@@ -57,26 +40,16 @@ public final class ScheduleSolver {
     }
 
     /**
-     * Solves a sheet and returns the best arrangement it found.
-     *
-     * <p>
-     * It tries every crossover from zero to the maximum that could be absorbed
-     * by the crossover window, and returns the best schedule it finds.
-     * If none of the crossovers yield a solution, it returns a failure.
-     * The returned schedule is legal.
+     * Tries every crossover from zero up to what the crossover window can take,
+     * and returns the best scoring schedule.
      */
     public SolveResult solve(SolveRequest request) {
-        // A chosen BUS Trooper who cannot stand the BUS hours is refused before
-        // any search: the answer would only ever be "no solution", reached the
-        // slow way and explained worse.
+        // Searching would only end in "no solution", with a worse message.
         String busProblem = busProblem(request);
         if (busProblem != null) {
             return SolveResult.failed(busProblem, null, 0);
         }
-        // A day worked before, with the same posts, headcount and turnout, is
-        // worked the same way again: the latest logged sheet that can be laid
-        // onto today's Troopers is used as it is. Only when none can is the
-        // sheet solved.
+        // Reuse the latest logged sheet that fits today's Troopers.
         for (Schedule logged : request.reusable()) {
             var laid = SheetReuse.layOnto(request, logged);
             if (laid.isPresent()) {
@@ -112,10 +85,7 @@ public final class ScheduleSolver {
         return new SolveResult(best.schedule(), best.targets(), null, nodes);
     }
 
-    /**
-     * Why the chosen BUS Trooper cannot take the BUS hours on this sheet, or
-     * null when they can — or when nobody was chosen, or the sheet has no BUS.
-     */
+    /** Why the chosen BUS Trooper can't take the BUS hours, or null if they can. */
     static String busProblem(SolveRequest request) {
         Trooper bus = request.bus();
         if (bus == null) {
@@ -152,22 +122,15 @@ public final class ScheduleSolver {
     }
 
     /**
-     * Fixed-length turnouts: everyone does the same hours and the MP team takes
-     * whatever that leaves. The same search, the same rules and the same
-     * validator — only the space narrows, because the hour targets and the
-     * crossover are no longer choices but consequences of the turnout.
+     * Fixed turnouts: everyone does N hours (or what their availability allows)
+     * and the MP team takes the rest. Targets and crossover follow from N.
      *
      * <ul>
-     * <li>Everyone does {@code N}, or as near as their own availability allows.
-     * <li>The silent hours are always fully manned. If the night group at
-     * {@code N} each falls short of them, night Troopers go to {@code N + 1},
-     * fewest past hours first, until they do — and if even that falls short,
-     * the turnout is refused.
-     * <li>What the night group does beyond the silent hours spills into the
-     * morning crossover, as it would in the free split.
-     * <li>Every other hour with a post keeps at least one Trooper on; the rest
-     * of the post-hours go to the MP team. A turnout that would leave more
-     * hours than the sheet has to give is refused, not quietly shortened.
+     * <li>Silent hours are always fully manned. If the night group falls short,
+     * night Troopers go to N + 1, fewest past hours first; if still short, refuse.
+     * <li>Night hours past the silent block become the crossover.
+     * <li>Every other hour keeps at least one Trooper on.
+     * <li>A turnout giving more hours than the sheet needs is refused.
      * </ul>
      */
     private SolveResult solveFixed(SolveRequest request) {
@@ -193,8 +156,7 @@ public final class ScheduleSolver {
             hours.put(t, Math.min(n, cap));
         }
         int night = hours.values().stream().mapToInt(Integer::intValue).sum();
-        // Short of the silent hours: an hour over the turnout, fewest past
-        // hours first, as long as it takes and as far as each one has room.
+        // Short of the silent hours: give N + 1, fewest past hours first.
         List<Trooper> byHistory = request.nightGroup().stream()
                 .sorted(Comparator.comparingInt((Trooper t) -> request.history().getOrDefault(t, 0))
                         .thenComparing(Trooper::name))
@@ -242,9 +204,7 @@ public final class ScheduleSolver {
         return new SolveResult(result.schedule(), result.targets(), null, result.nodes());
     }
 
-    /**
-     * How many day hours to consider handing to the night group.
-     */
+    /** How many day hours to consider handing to the night group. */
     private static List<Integer> crossoverCandidates(SolveRequest request) {
         List<Integer> out = new ArrayList<>();
         int ceiling = Run.crossoverCeiling(request.day());
@@ -254,10 +214,7 @@ public final class ScheduleSolver {
         return out;
     }
 
-    // -----------------------------------------------------------------------
-    // One solve. Held in its own object so the solver itself stays stateless and
-    // can be shared across threads.
-    // -----------------------------------------------------------------------
+    // State for one solve, so the solver itself stays stateless and thread-safe.
     private static final class Run {
 
         private final SolveRequest request;
@@ -274,13 +231,10 @@ public final class ScheduleSolver {
         private final int[] owed; // hours each Trooper still has to do
         private final List<Position> positions;
         private final int[] filledBy; // [position] -> trooper index, -1 unset
-        // Cells placed by a human choice before the search, which neither the
-        // search nor the improvers may move. Today only the chosen BUS hours.
+        // Cells fixed before the search (the chosen BUS hours); nothing may move them.
         private final boolean[][] pinned; // [trooper][slot]
         private final int busTrooper; // index of the chosen BUS Trooper, -1 for none
-        // Fixed turnouts only: positions may be left to the MP team, never in
-        // the silent hours and never the last chance to man an hour, and
-        // exactly this many of them — what the turnouts do not reach.
+        // Fixed turnouts: how many positions may still go to the MP team.
         private final boolean fixed;
         private int mpBudget;
         private static final int TO_MP = -2; // filledBy marker: left to the MP team
@@ -320,8 +274,7 @@ public final class ScheduleSolver {
             Arrays.fill(filledBy, -1);
             this.pinned = new boolean[n][DutyDay.SLOT_COUNT];
 
-            // The chosen BUS Trooper's hours are placed now and count toward
-            // their target, exactly as if the search had chosen them.
+            // Place the chosen BUS hours now; they count toward the target.
             this.busTrooper = request.bus() == null ? -1 : troopers.indexOf(request.bus());
             if (busTrooper >= 0) {
                 for (int i = 0; i < positions.size(); i++) {
@@ -342,13 +295,10 @@ public final class ScheduleSolver {
             DayDemand demand = DayDemand.of(day);
             List<Position> out = new ArrayList<>();
             for (int slot = 0; slot < DutyDay.SLOT_COUNT; slot++) {
-                // The demand map is a multiset: PAC=2, BUS=1, etc. Each copy is a separate
-                // position.
+                // PAC=2 means two positions at that hour.
                 Map<Post, Integer> need = demand.at(slot);
                 for (Post post : Post.values()) {
                     int count = need.getOrDefault(post, 0);
-                    // Each copy of a post is a separate position, so PAC=2 means two positions at
-                    // that hour.
                     for (int copy = 0; copy < count; copy++) {
                         out.add(new Position(slot, post, copy));
                     }
@@ -363,12 +313,8 @@ public final class ScheduleSolver {
                 return SolveResult.failed(impossible, targets, 0);
             }
             if (search(0)) {
-                // Improve a legal schedule by swapping segments between rows to reduce wasted
-                // span.
                 Post[][] improved = new SpanImprover(troopers, this::eligible, pinned).improve(grid);
-                // Then cut walks between AP and GG. Second, and on its own,
-                // because it trades posts without moving hours: it cannot undo
-                // anything the span pass just won.
+                // Runs second: it only trades posts, so it can't undo the span gains.
                 improved = new PostSwapImprover(pinned).improve(improved);
                 for (int t = 0; t < troopers.size(); t++) {
                     grid[t] = improved[t];
@@ -380,13 +326,8 @@ public final class ScheduleSolver {
                     : "No legal arrangement of these hours exists for this manpower.", targets, nodes);
         }
 
-        /**
-         * Cheap checks worth doing before searching at all.
-         */
+        /** Cheap checks before searching. Most specific message first. */
         private String obviouslyImpossible() {
-            // Most specific first: a short night group and an over-cap sheet both
-            // show up as "not enough hours" if you check the total before them,
-            // and the general message is the least useful of the three.
             if (busTrooper >= 0) {
                 String who = troopers.get(busTrooper).name();
                 if (owed[busTrooper] < 0) {
@@ -408,7 +349,7 @@ public final class ScheduleSolver {
                 return "Covering every post would take more than " + DutyRules.HOUR_CAP
                         + " hours from at least one Trooper.";
             }
-            // With fixed turnouts a shortfall is the MP team's, by design.
+            // With fixed turnouts the MP team covers the shortfall.
             if (!fixed && targets.total() < positions.size()) {
                 return "Not enough available manpower: the sheet needs " + positions.size()
                         + " Trooper-hours and this roster can absorb " + targets.total() + ".";
@@ -431,11 +372,9 @@ public final class ScheduleSolver {
                             + " hours but only has room for " + room + " on this sheet.";
                 }
             }
-            // The hour that usually makes a thin day impossible: 0700 stands two
-            // PAC and the bus run, and a stay-out is not in yet.
+            // Enough people each hour? Usually 0700 fails: two PAC and BUS, and
+            // stay-outs are not in yet. Pinned positions are already covered.
             for (int slot = 0; slot < DutyDay.SLOT_COUNT; slot++) {
-                // Positions already pinned are covered, and the Trooper pinned
-                // there is not free for another post at the same hour.
                 int need = 0;
                 boolean manned = false;
                 for (int i = 0; i < positions.size(); i++) {
@@ -447,8 +386,7 @@ public final class ScheduleSolver {
                         }
                     }
                 }
-                // With fixed turnouts an hour outside the silent block only
-                // needs one Trooper; the rest can be the MP team's.
+                // Fixed turnouts: outside silent hours, one Trooper is enough.
                 if (fixed && !silent[slot]) {
                     need = manned ? 0 : Math.min(need, 1);
                 }
@@ -469,11 +407,7 @@ public final class ScheduleSolver {
             return null;
         }
 
-        /**
-         * The night group takes the silent hours, the day group the rest — except that a
-         * night Trooper may also be given one of the first few day hours, which is
-         * what "crossover" buys.
-         */
+        /** Night group: silent hours, plus the crossover window if any. Day group: the rest. */
         private boolean rightGroup(int trooper, int slot) {
             if (onNight[trooper]) {
                 return silent[slot] || (crossover > 0 && crossSlots[slot]);
@@ -492,23 +426,17 @@ public final class ScheduleSolver {
                 return false;
             }
             if (index == positions.size()) {
-                // Every position decided; with fixed turnouts that is only done
-                // when everyone has done their hours, not just when the list ends.
+                // Fixed turnouts also need everyone's hours used up.
                 return !fixed || Arrays.stream(owed).allMatch(o -> o == 0);
             }
             if (filledBy[index] >= 0) {
-                // Pinned before the search began; nothing to choose.
-                return search(index + 1);
+                return search(index + 1); // pinned
             }
             Position position = positions.get(index);
             int slot = position.slot();
 
-            // The two PAC positions at one hour are interchangeable, so only ever
-            // fill them in increasing trooper order. Without this the search
-            // explores every arrangement twice. For the same reason, once the
-            // first copy is left to the MP team the second goes the same way:
-            // "first to MP, second filled" is the mirror of "first filled,
-            // second to MP".
+            // PAC copies are interchangeable: fill them in increasing trooper
+            // order, and if the first went to MP the second does too.
             boolean previousToMp = position.copy() > 0 && filledBy[index - 1] == TO_MP;
             int floor = position.copy() == 0 || previousToMp ? 0 : filledBy[index - 1] + 1;
 
@@ -516,19 +444,14 @@ public final class ScheduleSolver {
                 grid[t][slot] = position.post();
                 owed[t]--;
                 filledBy[index] = t;
-                // If the trooper can take this position and the rest of the sheet can still be
-                // filled, recurse.
                 if (capacityOk(slot) && search(index + 1)) {
                     return true;
                 }
-
-                // Undo and try the next candidate.
                 grid[t][slot] = null;
                 owed[t]++;
                 filledBy[index] = -1;
             }
-            // Fixed turnouts: hand this one to the MP team, if that is allowed
-            // and the hours still owed can still man what must be manned.
+            // Fixed turnouts: try leaving it to the MP team.
             if (canLeaveToMp(index)) {
                 filledBy[index] = TO_MP;
                 mpBudget--;
@@ -542,9 +465,8 @@ public final class ScheduleSolver {
         }
 
         /**
-         * Whether a position may go to the MP team: only with fixed turnouts,
-         * while there is budget, never in the silent hours, and never as the last
-         * chance to have someone from the team on at that hour.
+         * Fixed turnouts with budget left, not a silent hour, and not the last
+         * chance to have someone on at that hour.
          */
         private boolean canLeaveToMp(int index) {
             if (!fixed || mpBudget <= 0) {
@@ -558,8 +480,7 @@ public final class ScheduleSolver {
                 if (positions.get(i).slot() != slot || i == index) {
                     continue;
                 }
-                // Someone already on at this hour, or a later position here that
-                // can still be filled: leaving this one does not empty the hour.
+                // Someone already on, or a later position here still open.
                 if ((i < index && filledBy[i] >= 0) || i > index) {
                     return true;
                 }
@@ -568,9 +489,8 @@ public final class ScheduleSolver {
         }
 
         /**
-         * Positions from {@code from} on that must have a Trooper: every silent
-         * one, and one per other hour not yet manned. A lower bound on the hours
-         * the search still needs, used to prune.
+         * Lower bound on hours still needed from {@code from}: every silent
+         * position, plus one per other hour not yet manned.
          */
         private int mandatory(int from) {
             if (!fixed) {
@@ -586,7 +506,7 @@ public final class ScheduleSolver {
             for (int i = from; i < positions.size(); i++) {
                 int slot = positions.get(i).slot();
                 if (filledBy[i] >= 0) {
-                    counted[slot] = true; // pinned ahead: already manned
+                    counted[slot] = true; // pinned
                     continue;
                 }
                 if (silent[slot]) {
@@ -600,12 +520,10 @@ public final class ScheduleSolver {
         }
 
         /**
-         * Who could take this position, most-committed first. Trying the Trooper with
-         * the most hours still owed puts the tightest constraint at the top of the
-         * tree, where failing is cheap.
-         * 
-         * @param floor The lowest trooper index to consider, for symmetry breaking on
-         *              PAC.
+         * Who could take this position, most hours owed first so the tightest
+         * choice fails early.
+         *
+         * @param floor lowest trooper index to consider (PAC symmetry)
          */
         private List<Integer> candidates(int slot, Post post, int floor) {
             List<Integer> out = new ArrayList<>();
@@ -618,9 +536,6 @@ public final class ScheduleSolver {
             return out;
         }
 
-        /**
-         * Can the given trooper take this position at this slot?
-         */
         private boolean canPlace(int t, int slot, Post post) {
             if (owed[t] <= 0 || !available[t][slot] || grid[t][slot] != null) {
                 return false;
@@ -628,9 +543,7 @@ public final class ScheduleSolver {
             if (!rightGroup(t, slot)) {
                 return false;
             }
-            // Positions are filled in time order, so past this slot only pinned
-            // cells are set. The run is counted both ways so a placement that
-            // runs into a pinned BUS is judged as the stint it makes.
+            // Count both ways: later cells can already be set if pinned (BUS).
             int run = 1;
             for (int k = slot - 1; k >= 0 && grid[t][k] != null; k--) {
                 run++;
@@ -638,14 +551,9 @@ public final class ScheduleSolver {
             for (int k = slot + 1; k < DutyDay.SLOT_COUNT && grid[t][k] != null; k++) {
                 run++;
             }
-
-            // The stint length rule is a hard limit, so if the run is already too long
-            // this branch is dead.
             if (run > DutyRules.MAX_STINT) {
                 return false;
             }
-            // The "free after" rule is a hard limit, in both directions: the post
-            // before this one, and a pinned post straight after it.
             if (slot > 0 && grid[t][slot - 1] != null && !DutyRules.followsWithoutBreak(grid[t][slot - 1], post)) {
                 return false;
             }
@@ -667,9 +575,8 @@ public final class ScheduleSolver {
         }
 
         /**
-         * Upper bound on the hours a Trooper can still take from {@code frontier} on.
-         * Over-estimating only costs a branch that turns out to be a dead end;
-         * under-estimating would cut off a schedule that exists.
+         * Upper bound on the hours a Trooper can still take from {@code frontier}.
+         * Must never under-estimate, or a real schedule gets pruned.
          */
         private int capacityFrom(int t, int frontier) {
             int run = 0;
@@ -686,12 +593,10 @@ public final class ScheduleSolver {
             return total + DutyRules.stintCapacity(run);
         }
 
-        /** Availability and group in one question, for the improver. */
         private boolean eligible(int trooper, int slot) {
             return available[trooper][slot] && rightGroup(trooper, slot);
         }
 
-        /** Generate a copyof the schedule with the hours filled in. */
         private Schedule toSchedule() {
             Schedule.Builder builder = Schedule.builder(day);
             for (int t = 0; t < troopers.size(); t++) {

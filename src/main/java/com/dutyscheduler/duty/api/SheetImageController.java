@@ -24,18 +24,12 @@ import java.time.Instant;
 import java.time.LocalDate;
 
 /**
- * The finalised sheet as an image, for sending on.
- *
- * <p>
- * Producing the image logs the sheet. What was sent is then always what was
- * recorded: there is no image of a sheet that was never logged, and no logged
- * sheet that differs from the image that went out.
+ * The sheet as an image. Making the image logs the sheet, so every image sent
+ * out matches the record.
  */
 @RestController
 @RequestMapping("/api/schedules")
-// A team's own accounts only. The owner has no team, so would read nothing
-// here anyway; refusing them outright says so. Methods that write narrow this
-// to ADMIN with their own annotation, which takes precedence over this one.
+// Not the owner, who has no team. Write methods narrow this to ADMIN.
 @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
 public class SheetImageController {
 
@@ -51,14 +45,8 @@ public class SheetImageController {
     }
 
     /**
-     * Draw the sheet, log it, and send the drawing.
-     *
-     * <p>
-     * In that order, so the two either both happen or neither does. The image
-     * is drawn first, in memory: if drawing fails, nothing has been logged.
-     * Then the sheet is logged in one transaction: if that fails, the image is
-     * thrown away and the caller gets the error instead. Only once the log has
-     * committed are the bytes sent.
+     * Draw, then log, then send. If drawing fails nothing is logged; if
+     * logging fails nothing is sent.
      */
     @PostMapping("/{date}/image")
     @PreAuthorize("hasRole('ADMIN')")
@@ -72,10 +60,7 @@ public class SheetImageController {
         return image(date, png);
     }
 
-    /**
-     * The image of a sheet already logged, drawn from the record, for sending it
-     * on again. Anyone signed in may have it; it changes nothing.
-     */
+    /** An already logged sheet, drawn again. */
     @GetMapping("/{date}/image")
     public ResponseEntity<byte[]> draw(@PathVariable LocalDate date) {
         return store.loadLogged(date)

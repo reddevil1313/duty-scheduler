@@ -6,14 +6,10 @@ import { TrooperFields } from './TrooperFields'
 
 interface Props {
   onAdded: (trooper: Trooper) => void
-  /** Failures go to the board's own banner, so a 401 still triggers its session recheck. */
+
   onError: (e: unknown) => Promise<void>
 }
 
-/**
- * Add a Trooper to the roster. ADMIN only — the board does not render it for
- * anyone else, and the server refuses it regardless.
- */
 export function AddTrooperForm({ onAdded, onError }: Props) {
   const [draft, setDraft] = useState(emptyDraft)
   const [busy, setBusy] = useState(false)

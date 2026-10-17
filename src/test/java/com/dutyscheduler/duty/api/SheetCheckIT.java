@@ -31,11 +31,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * Checking a hand-edited sheet. The point of the endpoint is that a person's
- * edits meet the same validator that proves the solver right, so each test
- * starts from a solver sheet and breaks it the way a careless edit would.
- */
+/** Checking hand-edited sheets. Each test breaks a solved sheet. */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
@@ -110,21 +106,21 @@ class SheetCheckIT {
     }
 
     @Test
-    @DisplayName("a solver sheet checks clean, and the demand comes back hour by hour")
+    @DisplayName("solved sheet is clean, with demand per hour")
     void solverSheetIsClean() throws Exception {
         mvc.perform(post("/api/schedules/" + DATE + "/check").with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(generate())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.issues", hasSize(0)))
                 .andExpect(jsonPath("$.demand", hasSize(24)))
-                // Thursday 2000: no posts stand. 2200: the silent hours, AP and GG.
+                // 2000: nothing. 2200: AP and GG.
                 .andExpect(jsonPath("$.demand[0]").isEmpty())
                 .andExpect(jsonPath("$.demand[2].AP").value(1))
                 .andExpect(jsonPath("$.demand[2].GG").value(1));
     }
 
     @Test
-    @DisplayName("taking someone off an hour leaves it under-manned, and says which hour")
+    @DisplayName("removing someone flags the hour")
     void clearingACellIsUnderManned() throws Exception {
         Map<String, Object> sheet = generate();
         List<Object> posts = postsOf(sheet, "TROOPER_A");
@@ -137,17 +133,17 @@ class SheetCheckIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.issues[*].rule", hasItem("UNDER_MANNED")))
                 .andExpect(jsonPath("$.issues[*].slot", hasItem(slot)))
-                // The edited sheet comes back with its numbers worked out again.
+
                 .andExpect(jsonPath("$.sheet.rows[?(@.trooper == 'TROOPER_A')].hours", hasItem(hoursBefore - 1)))
                 .andExpect(jsonPath("$.sheet.totalHours").value(46));
     }
 
     @Test
-    @DisplayName("duty during the Trooper's own leave is flagged, which the validator alone cannot see")
+    @DisplayName("duty during leave is flagged")
     void dutyDuringLeaveIsFlagged() throws Exception {
         Map<String, Object> sheet = generate();
         int slot = firstOnDuty(postsOf(sheet, "TROOPER_D"));
-        // An MC that runs the whole sheet, booked after the sheet was generated.
+        // Booked after generating.
         mvc.perform(post("/api/absences").with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -162,7 +158,7 @@ class SheetCheckIT {
     }
 
     @Test
-    @DisplayName("the check says which hours each Trooper is away: every hour for an MC, three for a 0930-1130 appointment")
+    @DisplayName("away hours: all for an MC, three for a 0930-1130 appointment")
     @SuppressWarnings("unchecked")
     void awayHours() throws Exception {
         mvc.perform(post("/api/absences").with(csrf())
@@ -171,7 +167,7 @@ class SheetCheckIT {
                         {"trooper":"TROOPER_D","kind":"MC","span":"FULL","from":"2026-09-10","to":"2026-09-11"}
                         """))
                 .andExpect(status().isCreated());
-        // 0930 to 1130 on the 11th: the 0900, 1000 and 1100 hours of the 10th's sheet.
+
         mvc.perform(post("/api/absences").with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -189,14 +185,14 @@ class SheetCheckIT {
         List<String> e = away.get("TROOPER_E");
         assertThat(e).hasSize(24);
         for (int slot = 0; slot < 24; slot++) {
-            // Slot 13 is 0900, so 13 to 15 are the three hours the appointment touches.
+            // Slots 13-15 are 0900-1100.
             assertThat(e.get(slot)).isEqualTo(slot >= 13 && slot <= 15 ? "MA" : null);
         }
         assertThat(away).doesNotContainKey("TROOPER_A");
     }
 
     @Test
-    @DisplayName("a sheet that breaks a rule can still be logged: the log records what was used")
+    @DisplayName("a sheet that breaks a rule can still be logged")
     void ruleBreakingSheetStillLogs() throws Exception {
         Map<String, Object> sheet = generate();
         postsOf(sheet, "TROOPER_A").set(firstOnDuty(postsOf(sheet, "TROOPER_A")), null);
@@ -209,7 +205,7 @@ class SheetCheckIT {
 
     @Test
     @WithMockUser(username = "trooper_d", roles = "USER")
-    @DisplayName("anyone signed in may check a sheet, because a check writes nothing")
+    @DisplayName("any user may check")
     void usersMayCheck() throws Exception {
         mvc.perform(post("/api/schedules/" + DATE + "/check").with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)

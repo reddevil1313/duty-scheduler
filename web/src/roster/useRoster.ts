@@ -3,13 +3,8 @@ import { api } from '../api/client'
 import type { TickKind, Ticks, Trooper } from '../api/types'
 
 /**
- * The roster, the night group and the roster ticks, held once for the whole
- * app. The Roster tab changes them, the board generates from them and the
- * leave register shows the ticks, so none of the three keeps its own copy.
- *
- * <p>Ticks are browser state only. They are sent with each generate and check
- * and never saved; signing out drops them, because the app remounts this per
- * signed-in user.
+ * Roster, night group and ticks, shared by the Roster tab, the board and the
+ * leave register. Ticks are never saved and reset on sign-out.
  */
 export function useRoster(report: (e: unknown) => Promise<void>) {
   const [roster, setRoster] = useState<Trooper[]>([])
@@ -37,12 +32,10 @@ export function useRoster(report: (e: unknown) => Promise<void>) {
   }
 
   const updated = (before: Trooper, after: Trooper) => {
-    // The server keeps one default BUS Trooper; when this one takes it, the
-    // others have given it up there, so they do here too.
+    // Only one default BUS, as on the server.
     setRoster((current) => current.map((t) =>
       t.id === after.id ? after : after.defaultBus ? { ...t, defaultBus: false } : t))
-    // Night group and ticks are held by name, so a rename carries them across,
-    // and someone who has become a stay-out can no longer hold the night.
+    // Carry names across a rename; stay-outs leave the night group.
     setNightGroup((current) => {
       const without = current.filter((n) => n !== before.name)
       const wasTicked = without.length !== current.length
@@ -69,7 +62,7 @@ export function useRoster(report: (e: unknown) => Promise<void>) {
       current.includes(name) ? current.filter((n) => n !== name) : [...current, name])
   }
 
-  /** One reason at a time: ticking MC clears an OL tick. Null unticks. */
+  /** One kind at a time. Null unticks. */
   const tick = (name: string, kind: TickKind | null) => {
     setTicks((current) => {
       const { [name]: _old, ...rest } = current

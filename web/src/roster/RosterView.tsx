@@ -9,7 +9,6 @@ interface Props {
   rosterState: RosterState
 }
 
-/** The Roster tab: who is on the team, and who is ticked out of the next sheet. */
 export function RosterView({ rosterState }: Props) {
   const { session } = useSession()
   const isAdmin = session?.role === 'ADMIN'

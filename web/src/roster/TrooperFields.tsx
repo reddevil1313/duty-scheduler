@@ -5,7 +5,7 @@ interface Props {
   onChange: (draft: Draft) => void
 }
 
-/** The inputs for a Trooper's particulars, shared by the add form and the edit row. */
+/** Shared by the add form and the edit row. */
 export function TrooperFields({ draft, onChange }: Props) {
   return (
     <>
@@ -30,8 +30,7 @@ export function TrooperFields({ draft, onChange }: Props) {
         <input
           type="checkbox"
           checked={draft.stayOut}
-          // A stay-out cannot hold night hours, and the server says so with a
-          // 422. Clearing the night tick here stops the form offering the mistake.
+          // Stay-outs can't be on night.
           onChange={(e) => onChange({
             ...draft,
             stayOut: e.target.checked,

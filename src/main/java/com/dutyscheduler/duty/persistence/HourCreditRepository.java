@@ -12,7 +12,7 @@ import java.util.List;
 @Repository
 public interface HourCreditRepository extends JpaRepository<HourCreditEntity, Long> {
 
-    /** Every credit, with its sheet and Trooper, for building the records in one query. */
+    /** With sheet and Trooper fetched. */
     @EntityGraph(attributePaths = { "sheet", "trooper" })
     List<HourCreditEntity> findAllBy();
 
@@ -20,6 +20,6 @@ public interface HourCreditRepository extends JpaRepository<HourCreditEntity, Lo
     @Query("DELETE FROM HourCreditEntity c WHERE c.sheet = :sheet")
     void deleteBySheet(@Param("sheet") DutySheetEntity sheet);
 
-    /** Whether this Trooper has any credited hours — like logged duty, it means archive, not delete. */
+    /** Like logged duty, this means archive instead of delete. */
     boolean existsByTrooper_Id(Long trooperId);
 }

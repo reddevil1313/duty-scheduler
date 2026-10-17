@@ -36,11 +36,7 @@ class ScheduleValidatorTest {
 
     private final ScheduleValidator validator = new ScheduleValidator();
 
-    /**
-     * A real, legal Thursday sheet: 47 post-hours over eleven Troopers, three on the
-     * silent hours, the bus run on TROOPER_G, and the three stay-outs kept inside
-     * 0800-1800. Every negative case below is this grid with one cell changed.
-     */
+    /** A legal Thursday: 47 post-hours, 11 Troopers. The failing cases change one cell. */
     private static Schedule validThursday() {
         return Schedule.builder(DutyDay.of(THURSDAY))
                 //                     2000 2100 2200 2300 0000 0100 0200 0300 0400 0500 0600 0700 0800 0900 1000 1100 1200 1300 1400 1500 1600 1700 1800 1900
@@ -59,14 +55,14 @@ class ScheduleValidatorTest {
     }
 
     @Test
-    @DisplayName("a real Thursday sheet comes back clean")
+    @DisplayName("valid Thursday sheet passes")
     void knownGoodScheduleHasNoViolations() {
         ValidationResult result = validator.validate(validThursday());
         assertTrue(result.ok(), () -> "expected a clean sheet but got:\n" + result.describe());
     }
 
     @Test
-    @DisplayName("the fixture really is the 47-hour day, spread over eleven Troopers")
+    @DisplayName("fixture is 47 hours over 11 Troopers")
     void fixtureMatchesTheDaysDemand() {
         Schedule s = validThursday();
         int total = s.rows().stream().mapToInt(Schedule.Row::hours).sum();
@@ -82,7 +78,7 @@ class ScheduleValidatorTest {
     class Coverage {
 
         @Test
-        @DisplayName("taking a Trooper off a manned post reports the hour as under-manned")
+        @DisplayName("removing someone leaves the hour under-manned")
         void missingManIsCaught() {
             Schedule broken = validThursday().with(TROOPER_A, 5, null);   // 0100, was AP
 
@@ -91,13 +87,12 @@ class ScheduleValidatorTest {
             assertFalse(result.ok());
             assertTrue(result.has(Rule.UNDER_MANNED), result.describe());
             assertEquals(1, result.of(Rule.UNDER_MANNED).size(), "one hour short, not more");
-            // slot() is an Integer, so unbox it and there is no doubt which
-            // assertEquals overload is being called.
+            // Unbox to pick the right assertEquals overload.
             assertEquals(5, (int) result.of(Rule.UNDER_MANNED).get(0).slot());
         }
 
         @Test
-        @DisplayName("a post that does not stand at that hour is over-manned")
+        @DisplayName("post that doesn't stand then is over-manned")
         void postStandingWhenItShouldNotIsCaught() {
             // 0200 is a silent hour: AP and GG only, no PAC anywhere near it.
             Schedule broken = validThursday().with(TROOPER_F, 6, Post.PAC);
@@ -109,7 +104,7 @@ class ScheduleValidatorTest {
         }
 
         @Test
-        @DisplayName("a third Trooper on the two PAC positions is over-manned")
+        @DisplayName("third PAC is over-manned")
         void doublingUpOnAPostIsCaught() {
             Schedule broken = validThursday().with(TROOPER_F, 10, Post.PAC);   // 0600 already has two
 
@@ -120,7 +115,7 @@ class ScheduleValidatorTest {
         }
 
         @Test
-        @DisplayName("an empty sheet is short every single post-hour")
+        @DisplayName("empty sheet is short every post-hour")
         void emptySheetIsShortEverything() {
             Schedule empty = Schedule.builder(DutyDay.of(THURSDAY))
                     .empty(TROOPER_A)
@@ -129,9 +124,7 @@ class ScheduleValidatorTest {
             ValidationResult result = validator.validate(empty);
 
             assertFalse(result.ok());
-            // One violation per post per hour: 8 silent hours x AP and GG = 16,
-            // 14 day hours of PAC = 14, plus the 3 bus hours. Nothing is manned,
-            // so nothing can be over-manned either.
+            // 8 silent hours x 2 = 16, 14 PAC hours, 3 BUS hours.
             assertEquals(16 + 14 + 3, result.of(Rule.UNDER_MANNED).size(), result.describe());
             assertFalse(result.has(Rule.OVER_MANNED));
         }
@@ -142,7 +135,7 @@ class ScheduleValidatorTest {
     class Stints {
 
         @Test
-        @DisplayName("four consecutive hours is one hour too many")
+        @DisplayName("four hours in a row is too many")
         void fourInARowIsCaught() {
             // TROOPER_E has AP at 0100-0300. Give them 0400 as well and the run is four.
             Schedule broken = validThursday().with(TROOPER_A, 8, Post.AP);
@@ -154,7 +147,7 @@ class ScheduleValidatorTest {
         }
 
         @Test
-        @DisplayName("three consecutive hours is fine")
+        @DisplayName("three in a row is fine")
         void threeInARowIsFine() {
             ValidationResult result = validator.validate(validThursday());
 
@@ -164,8 +157,7 @@ class ScheduleValidatorTest {
         @Test
         @DisplayName("AP straight onto PAC needs no break")
         void apToPacIsLegal() {
-            // A clean two-Trooper sheet: this is about the transition rule alone, so
-            // coverage violations are expected and ignored.
+            // Only checking transitions; coverage is ignored.
             Schedule s = Schedule.builder(DutyDay.of(THURSDAY))
                     .row(TROOPER_A, ". . . . . . . . . AP PAC . . . . . . . . . . . . .")
                     .build();
@@ -178,7 +170,7 @@ class ScheduleValidatorTest {
 
         @ParameterizedTest(name = "{0} straight onto {1} needs a break")
         @CsvSource({ "GG, PAC", "PAC, GG", "AP, GG", "GG, AP", "PAC, BUS", "BUS, PAC" })
-        @DisplayName("every other post change needs a break")
+        @DisplayName("other post changes need a break")
         void otherTransitionsNeedABreak(String first, String second) {
             Schedule s = Schedule.builder(DutyDay.of(THURSDAY))
                     .row(TROOPER_A, ". . . . . . . . . " + first + " " + second + " . . . . . . . . . . . . .")
@@ -191,7 +183,7 @@ class ScheduleValidatorTest {
         }
 
         @Test
-        @DisplayName("a break resets the stint, so 3 on, 1 off, 3 on is legal")
+        @DisplayName("3 on, 1 off, 3 on is legal")
         void breakResetsTheRun() {
             Schedule s = Schedule.builder(DutyDay.of(THURSDAY))
                     .row(TROOPER_A, ". . GG GG GG . AP AP AP . . . . . . . . . . . . . . .")
@@ -209,7 +201,7 @@ class ScheduleValidatorTest {
     class StayOuts {
 
         @Test
-        @DisplayName("a stay-out posted before 0800 is caught")
+        @DisplayName("stay-out before 0800")
         void beforeTheWindowIsCaught() {
             Schedule broken = validThursday().with(TROOPER_H, 11, Post.PAC);   // 0700
 
@@ -220,30 +212,29 @@ class ScheduleValidatorTest {
         }
 
         @Test
-        @DisplayName("a stay-out posted at 1800 is caught — the window closes at 1800")
+        @DisplayName("stay-out at 1800")
         void theWindowIsHalfOpenAtSixPm() {
             Schedule broken = validThursday().with(TROOPER_H, 22, Post.PAC);   // 1800
 
             ValidationResult result = validator.validate(broken);
 
             assertTrue(result.has(Rule.STAY_OUT_WINDOW), result.describe());
-            // Four-digit times, as the board writes them: "0800", never "800".
+
             assertTrue(result.of(Rule.STAY_OUT_WINDOW).get(0).message().endsWith("outside 0800-1800"),
                     result.describe());
         }
 
         @Test
-        @DisplayName("1700 is inside the window")
+        @DisplayName("stay-out at 1700 is fine")
         void theWindowIncludesFivePm() {
             // TROOPER_J already works 1700 on the good sheet.
             assertFalse(validator.validate(validThursday()).has(Rule.STAY_OUT_WINDOW));
         }
 
         @Test
-        @DisplayName("a stay-out anywhere on the weekend block is caught, even at noon")
+        @DisplayName("stay-out on the weekend, even at noon")
         void weekendBlockIsOutEntirely() {
-            // The Saturday sheet: every hour of it is inside the block, so a time
-            // that would be perfectly legal midweek is not legal here.
+
             Schedule saturday = Schedule.builder(DutyDay.of(LocalDate.of(2026, 9, 12)))
                     .row(TROOPER_H, ". . . . . . . . . . . . . . . . AP . . . . . . .")   // 1200 Sunday
                     .build();
@@ -255,7 +246,7 @@ class ScheduleValidatorTest {
         }
 
         @Test
-        @DisplayName("the same hours on a Trooper who is not a stay-out are fine")
+        @DisplayName("same hours fine for a live-in")
         void onlyAppliesToStayOuts() {
             Schedule s = Schedule.builder(DutyDay.of(THURSDAY))
                     .row(TROOPER_A, ". . AP . . . . . . . . . . . . . . . . . . . . .")   // 2200
@@ -298,7 +289,7 @@ class ScheduleValidatorTest {
     }
 
     @Test
-    @DisplayName("one broken rule does not drag the others in with it")
+    @DisplayName("one broken rule doesn't trigger others")
     void violationsAreReportedIndependently() {
         Schedule broken = validThursday().with(TROOPER_A, 8, Post.AP);   // four in a row
 
@@ -312,9 +303,9 @@ class ScheduleValidatorTest {
     }
 
     @Test
-    @DisplayName("a weekend sheet is judged by its own demand, not a weekday's")
+    @DisplayName("weekend sheet uses weekend demand")
     void weekendSheetUsesWeekendDemand() {
-        // Saturday: AP and GG right through, no PAC and no bus run anywhere.
+        // Saturday: AP and GG only.
         Schedule saturdayPac = Schedule.builder(DutyDay.of(LocalDate.of(2026, 9, 12)))
                 .row(TROOPER_A, ". . . . . . . . . . . . PAC . . . . . . . . . . .")
                 .build();

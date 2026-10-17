@@ -19,20 +19,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import java.util.List;
 
 /**
- * Enough data that a fresh development database can be signed into and
- * scheduled: a team, two accounts in it and a nine-Trooper roster.
+ * Dev profile only: a team, two accounts and a nine-Trooper roster. Not a
+ * migration, so it never runs in production.
  *
  * <p>
- * A runner under the {@code dev} profile rather than a Flyway migration. A
- * migration runs everywhere Flyway does, production included, and would put a
- * known password hash in a public repo. Here the hash is made at startup by the
- * same {@link PasswordEncoder} that checks it, so the two cannot drift.
- *
- * <p>
- * It only ever inserts. An account that already exists is left alone, so a
- * password changed by hand survives a restart instead of being reset under you.
- * The roster is seeded only while it is empty — per name would bring back a
- * Trooper you had deliberately removed, every time the server started.
+ * Insert-only: existing accounts are left alone, and the roster is only
+ * seeded when empty, so removed Troopers stay removed.
  */
 @Configuration
 @Profile("dev")
@@ -41,11 +33,8 @@ public class DevDataSeeder {
     private static final Logger log = LoggerFactory.getLogger(DevDataSeeder.class);
 
     /**
-     * Enough to cover every day of the week, which {@code DevDataSeederIT}
-     * proves by generating all seven. The weekend is the tight part: stay-outs
-     * are not available at all then, so the seven who live in carry Sunday's 51
-     * Trooper-hours on their own. A, B and C are the default night group —
-     * three is what the silent hours need.
+     * Enough for every day of the week (see {@code DevDataSeederIT}). Weekends
+     * are tightest since stay-outs are away. A-C are the night group.
      */
     static final List<SeedTrooper> ROSTER = List.of(
             new SeedTrooper("TROOPER_A", false, true),
@@ -69,9 +58,8 @@ public class DevDataSeeder {
             @Value("${dev.seed.admin-password}") String adminPassword,
             @Value("${dev.seed.trooper-password}") String trooperPassword) {
         return args -> {
-            // The dev admin's team, wherever it is: on a database that predates
-            // teams, V6 put the old accounts and roster into "First team", and
-            // seeding a second team beside it would hide that data from them.
+            // Use the dev admin's existing team if there is one (V6 put old data
+            // in "First team").
             long team = users.findByUsername("admin")
                     .map(AppUserEntity::getTeamId)
                     .orElseGet(() -> teams.findByNameIgnoreCase(TEAM)
@@ -79,8 +67,7 @@ public class DevDataSeeder {
                             .getId());
             seedAccount(users, encoder, "admin", "Admin", adminPassword, "ADMIN", team);
             seedAccount(users, encoder, "trooper_d", "Trooper D", trooperPassword, "USER", team);
-            // Nobody is signed in at startup, so the roster is seeded under an
-            // explicit scope; without one it would be written to no team at all.
+            // Nobody is signed in at startup.
             TeamScope.run(team, () -> seedRoster(troopers));
         };
     }

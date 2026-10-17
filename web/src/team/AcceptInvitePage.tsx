@@ -8,15 +8,11 @@ type State = { kind: 'loading' } | { kind: 'invalid'; message: string } | { kind
 
 interface Props {
   token: string
-  /** Leave the invite: clears the link from the address bar. */
+  /** Also clears the link from the address bar. */
   onDone: () => void
 }
 
-/**
- * Where an invite link lands. Says which team and role it is for, then makes
- * the account and signs it in, so the next thing the person sees is their
- * team's board.
- */
+/** Shows the invite, makes the account and signs in. */
 export function AcceptInvitePage({ token, onDone }: Props) {
   const { session, signIn, signOut } = useSession()
   const [state, setState] = useState<State>({ kind: 'loading' })
@@ -43,9 +39,7 @@ export function AcceptInvitePage({ token, onDone }: Props) {
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
-    // The one check made here: two copies of a password are the user's own to
-    // compare. Everything about what a username or password may be is the
-    // server's to say.
+    // Everything else is validated by the server.
     if (password !== confirm) {
       setError('The two passwords are not the same.')
       return

@@ -5,13 +5,8 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 /**
- * The account someone makes by accepting an invite.
- *
- * <p>
- * The username is lower case so that two accounts cannot differ only by case
- * and be mistaken for each other at sign-in. The password is 10 characters at
- * least, and 72 bytes at most because bcrypt ignores anything past that — a
- * longer one would quietly be checked only in part.
+ * The account made by accepting an invite. Usernames are lower case. Passwords
+ * are 10 characters to 72 bytes; bcrypt ignores anything longer.
  */
 public record AcceptInviteRequest(
         @NotBlank(message = "Choose a username.")

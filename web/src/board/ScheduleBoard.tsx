@@ -24,51 +24,38 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
   const { session } = useSession()
   const isAdmin = session?.role === 'ADMIN'
   const { roster, nightGroup, ticks, toggleNight } = rosterState
-  // The sheet as it came — generated or logged — and the sheet as it now is.
-  // They are the same object until someone edits, which is all "edited" means.
+  // The sheet as loaded and as edited; the same object until the first edit.
   const [original, setOriginal] = useState<Schedule | null>(null)
   const [schedule, setSchedule] = useState<Schedule | null>(null)
   const [source, setSource] = useState<Source | null>(null)
   const [mode, setMode] = useState<Mode>('view')
   const [swapPick, setSwapPick] = useState<string | null>(null)
-  // The check and the exact sheet it was made for. A check of an older sheet
-  // is never shown against a newer one.
+  // A check, paired with the sheet it was for.
   const [check, setCheck] = useState<{ of: Schedule; result: SheetCheck } | null>(null)
   const [note, setNote] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  // Who takes the BUS run, chosen like the night group; null lets the solver
-  // choose, and undefined means nobody has picked yet, so the roster's default
-  // BUS Trooper stands. Read through busPick, so a Trooper since removed,
-  // renamed or ticked out falls back to the solver's choice instead of a
-  // request that fails.
+  // null = solver chooses, undefined = roster default. Read via busPick, which
+  // falls back to null if that Trooper is gone or ticked out.
   const [bus, setBus] = useState<string | null | undefined>(undefined)
   const defaultBus = roster.find((t) => t.defaultBus)?.name ?? null
   const wanted = bus === undefined ? defaultBus : bus
   const busPick = wanted !== null && roster.some((t) => t.name === wanted) && !(wanted in ticks) ? wanted : null
-  // The turnout to generate with (null for the free split), and the one the
-  // sheet on the board was made with — generated now, or logged with it. The
-  // MP hours themselves are never stored; the turnout is, and it is what tells
-  // an MP hour from a gap.
+  // Turnout to generate with, and the one the current sheet was made with.
+  // MP hours are derived from the latter.
   const [turnout, setTurnout] = useState<number | null>(null)
   const [sheetTurnout, setSheetTurnout] = useState<number | null>(null)
   const report = useReport(setError)
 
   const edited = schedule !== original
   const current = check && check.of === schedule ? check.result : null
-  // The most recent check for this date, even if of an earlier edit: what the
-  // grid shows while a newer one is on its way, so nothing blanks and reflows.
+  // Latest check for this date, shown while a newer one loads.
   const latest = check && schedule && check.of.date === schedule.date ? check.result : null
 
-  /**
-   * The sheet as it goes to the server: rows in board order by what each
-   * Trooper now stands, edits included, so the logged sheet and its image read
-   * night first even where an edit moved someone onto or off the night.
-   */
+  /** Re-sorted by what was actually stood, so the logged sheet reads in board order. */
   const asShown = (sheet: Schedule): Schedule =>
     ({ ...sheet, rows: boardOrder(sheet.rows, latest?.away), turnout: sheetTurnout })
 
-  /** A fresh sheet on the board: nothing edited, nothing picked. */
   const show = (sheet: Schedule | null, from: Source | null, withTurnout: number | null = null) => {
     setOriginal(sheet)
     setSchedule(sheet)
@@ -78,10 +65,6 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
     setSwapPick(null)
   }
 
-  // Clearing the banners happens in the branches below rather than at the top of
-  // the effect. Setting state synchronously as an effect opens schedules a second
-  // render before the browser has painted the first; doing it in the handlers
-  // costs nothing and keeps each outcome to one update.
   useEffect(() => {
     let cancelled = false
     api.schedule(date)
@@ -94,8 +77,7 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
       .catch((e: unknown) => {
         if (cancelled) return
         if (e instanceof ApiError && e.status === 404) {
-          // Not an error. Most dates have no sheet yet, and a red banner for the
-          // normal case trains people to ignore red banners.
+          // Normal, so not shown as an error.
           show(null, null)
           setError(null)
           setNote('Nothing logged for this date yet.')
@@ -106,15 +88,12 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
     return () => { cancelled = true }
   }, [date, report])
 
-  // Every change to the sheet is checked by the server's validator, a moment
-  // after the last edit. The same oracle that proves the solver right judges a
-  // person's edits; there is no copy of the rules in the browser.
+  // Check with the server shortly after each edit.
   useEffect(() => {
     if (!schedule) return
     let stale = false
     const timer = setTimeout(() => {
-      // Ticks go too, so someone ticked out shows greyed and is flagged if
-      // posted — exactly as they would be with a booked MC.
+
       api.check(date, schedule, ticks)
         .then((result) => { if (!stale) setCheck({ of: schedule, result }) })
         .catch((e: unknown) => { if (!stale) void report(e) })
@@ -130,8 +109,7 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
     setError(null)
     setNote(null)
     try {
-      // Someone ticked out stays out of the night group sent; the server drops
-      // them too, but sending it right keeps the request saying what it means.
+
       const sheet = await api.generate(date, {
         nightGroup: nightGroup.filter((n) => !(n in ticks)),
         ticks,
@@ -140,7 +118,7 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
         turnout,
       })
       show(sheet, 'generated', turnout)
-      // The default gave way when the sheet came back with BUS on someone else.
+      // The default BUS gave way.
       const gaveWay = bus === undefined && busPick !== null && sheet.rows.some((r) =>
         r.trooper !== busPick && r.posts.includes('BUS'))
       const notes = [
@@ -161,8 +139,7 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
     setError(null)
     try {
       const count = issues.length
-      // The turnout goes with the sheet, so the logged sheet keeps its MP row
-      // and can be reused for another day made the same way.
+
       const saved = await api.log(date, asShown(schedule))
       show(saved, 'logged', saved.turnout ?? null)
       setNote(count > 0 ? `Logged, with ${count} issue${count === 1 ? '' : 's'} on record.` : 'Logged.')
@@ -173,10 +150,6 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
     }
   }
 
-  /**
-   * Log the sheet and save its image, in one request: the server draws, then
-   * logs, then sends, so the image saved is always the sheet recorded.
-   */
   const logAndImage = async () => {
     if (!schedule) return
     setBusy(true)
@@ -194,7 +167,6 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
     }
   }
 
-  /** The image of the sheet as logged, for sending it on again. */
   const saveImage = async () => {
     setBusy(true)
     setError(null)
@@ -231,37 +203,29 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
     setNote(null)
   }
 
-  // Roster Troopers with no row, offered as empty rows while editing a sheet
-  // that left them off.
+  // Roster Troopers missing from the sheet, offered as empty rows when editing.
   const spare = schedule
     ? roster.filter((t) => !schedule.rows.some((r) => r.trooper === t.name))
       .map((t) => ({ name: t.name, stayOut: t.stayOut }))
     : []
 
-  // MP hours on a fixed-turnout sheet: the posts nobody from the team is on.
   const mpHours = sheetTurnout !== null && latest && schedule
     ? mpShortfall(schedule, latest.demand).reduce((n, posts) => n + posts.length, 0)
     : 0
-  // The posts this date stands, from the server's demand rather than a copy of
-  // the weekday rules, for the tag in the sheet's header.
+
   const postsStanding = latest
     ? (['AP', 'GG', 'PAC', 'BUS'] as Post[]).filter((p) => latest.demand.some((d) => (d[p] ?? 0) > 0))
     : []
-  // Who holds the silent hours on the sheet as it stands, edits included.
+
   const nightOn = schedule
     ? schedule.rows.filter((r) => r.posts.some((p, slot) => p !== null && isSilent(slot))).map((r) => r.trooper)
     : []
-  // Troopers with an hour on the sheet as it stands, edits included: not the
-  // rows of anyone away all of it. The sheet image counts the same way
-  // (SheetImage.subtitle), so the two always agree.
+  // Same count as SheetImage.subtitle.
   const available = schedule ? schedule.rows.filter((r) => r.posts.some((p) => p !== null)).length : 0
   const manned = (slot: number) => !!schedule?.rows.some((r) => r.posts[slot] !== null)
 
-  // From the latest check, dimmed while a newer one is on its way, so the list
-  // does not vanish and reappear around every edit. On a fixed-turnout sheet an
-  // under-manned hour is the MP team's, and listed in their row instead — but
-  // only where the rules let it be: never a silent hour, never an hour with
-  // nobody from the team on. Those still show as broken, because they are.
+  // On a fixed-turnout sheet, hide UNDER_MANNED where the MP team may cover it
+  // (not silent, someone still on).
   const issues = (latest?.issues ?? []).filter((issue) => !(
     sheetTurnout !== null && issue.rule === 'UNDER_MANNED' && issue.slot !== null
     && !isSilent(issue.slot) && manned(issue.slot)))
@@ -282,8 +246,7 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
           <fieldset className="night">
             <legend>Night group</legend>
             {roster.filter((t) => !t.stayOut).map((t) => (
-              // Ticked out on the roster: shown, so the gap is explained, but
-              // not tickable for the night while the tick stands.
+
               <label key={t.name} className={`pill${t.name in ticks ? ' ticked' : ''}`}>
                 <input
                   type="checkbox"
@@ -305,8 +268,6 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
               <input type="radio" name="bus" checked={busPick === null} onChange={() => setBus(null)} />
               Any
             </label>
-            {/* Stay-outs are not in until 0800, so they are never offered;
-                the server refuses them regardless. */}
             {roster.filter((t) => !t.stayOut).map((t) => (
               <label key={t.name} className={`pill${t.name in ticks ? ' ticked' : ''}`}>
                 <input
@@ -352,14 +313,11 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
               type="button"
               className={`log${issues.length > 0 && canLog ? ' danger' : ''}`}
               onClick={log}
-              // Not while a check is on its way: logging a sheet nobody has
-              // looked at yet would skip the warning this button exists to give.
+              // Wait for the check, so the warning isn't skipped.
               disabled={busy || !canLog || current === null}
             >
               {logLabel}
             </button>
-            {/* One button for both, so nothing shifts: a sheet still to log is
-                logged by saving its image; a logged one just saves it again. */}
             <button
               type="button"
               className="image"
@@ -381,8 +339,7 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
         )
       )}
 
-      {/* Always rendered, one line tall, so a message arriving or clearing
-          never moves the board below it. */}
+      {/* Always rendered so the layout doesn't jump. */}
       <p className={`message${error ? ' error' : ' note'}`} role={error ? 'alert' : 'status'}>
         {error ?? note ?? ''}
       </p>
@@ -408,8 +365,6 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
             )}
             {isAdmin && (
               <div className="actions">
-                {/* Fixed widths, and Undo kept in place but hidden, so the
-                    buttons do not slide about as their labels change. */}
                 <button type="button" className="mode" aria-pressed={mode === 'edit'} onClick={() => toggleMode('edit')}>
                   {mode === 'edit' ? 'Done editing' : 'Edit'}
                 </button>
@@ -429,8 +384,6 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
               </div>
             )}
           </div>
-          {/* The hint line is always there, empty outside the modes, so
-              entering one does not push the grid down a line. */}
           <p className="hint note">
             {mode === 'edit' ? 'Click any hour to change its post.'
               : mode === 'swap' ? 'Click two names to trade their whole day.' : ''}
@@ -456,8 +409,7 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
               {issues.length > 0 && (
                 <ul className={`issues${current ? '' : ' stale'}`} aria-label="What this sheet breaks">
                   {issues.map((issue, i) => (
-                    // Issues have no id, and the list is rebuilt whole on every
-                    // check, so position is a stable enough key here.
+                    // No id; the list is rebuilt on every check.
                     <li key={i} className={issue.rule === 'ON_LEAVE' ? 'leave' : 'breaks'}>
                       <b>{issue.rule === 'ON_LEAVE' ? 'LEAVE' : 'BREAKS'}</b>
                       {issue.message}

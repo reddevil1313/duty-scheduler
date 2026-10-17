@@ -4,25 +4,10 @@ import type {
   TrooperParticulars,
 } from './types'
 
-/**
- * Everything that talks to the server, in one file.
- *
- * <p>Components call named functions, never `fetch` directly. That keeps three
- * things — credentials, the CSRF header, and error shape — in a single place
- * rather than repeated at every call site with one of them forgotten.
- */
+// All server calls. Components use these, never fetch directly, so
+// credentials, the CSRF header and error handling live in one place.
 
-/**
- * A failed request, carrying the status so callers can branch on it.
- *
- * <p>Written the long way — fields declared, then assigned — rather than as
- * constructor parameter properties. `erasableSyntaxOnly` is on in this template
- * and forbids any TypeScript that does not vanish when the types are stripped;
- * `constructor(readonly status: number)` quietly emits an assignment, so it is
- * not erasable and the compiler rejects it. Node can now run .ts files directly
- * by stripping types, and that only works if nothing in the file compiles to
- * behaviour.
- */
+// No parameter properties: erasableSyntaxOnly forbids them.
 export class ApiError extends Error {
   readonly status: number
   readonly title?: string
@@ -37,12 +22,11 @@ export class ApiError extends Error {
 
 let csrfToken: string | null = null
 
-/** Held from the last session read. Every write presents it. */
+/** From the last session read; sent with every write. */
 export function setCsrfToken(token: string | null) {
   csrfToken = token
 }
 
-/** The one place a request is sent: credentials, CSRF header and error shape, for JSON and bytes alike. */
 async function send(path: string, init: RequestInit = {}): Promise<Response> {
   const method = init.method ?? 'GET'
   const headers = new Headers(init.headers)
@@ -59,8 +43,6 @@ async function send(path: string, init: RequestInit = {}): Promise<Response> {
   const response = await fetch(path, {
     ...init,
     headers,
-    // The session is a cookie. Without this the browser sends the request
-    // unauthenticated and every call comes back 401 for no visible reason.
     credentials: 'include',
   })
 
@@ -78,7 +60,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (await response.json()) as T
 }
 
-/** A binary response, such as the sheet image. Failures still come back as ApiErrors. */
+/** For binary responses like the sheet image. */
 async function requestBlob(path: string, init: RequestInit = {}): Promise<Blob> {
   return (await send(path, init)).blob()
 }
@@ -91,10 +73,9 @@ async function errorFor(response: Response): Promise<ApiError> {
       return new ApiError(response.status, detail, problem.title)
     }
   } catch {
-    // Fall through: not every failure has a JSON body.
+    // Not every failure has a JSON body.
   }
-  // A 401 or 403 from the security filter chain never reaches a controller, so
-  // it has no problem-detail body to parse and needs wording of its own.
+  // 401/403 from the security filters have no problem body.
   if (response.status === 401) {
     return new ApiError(401, 'Your session has expired. Sign in again.')
   }
@@ -105,24 +86,10 @@ async function errorFor(response: Response): Promise<ApiError> {
 }
 
 export const api = {
-  /**
-   * Who am I, and what token do writes need?
-   *
-   * <p>Always 200, signed in or not. Called on load, again after signing in and
-   * again after signing out — the last two are not tidiness: Spring rotates the
-   * CSRF token on both events, so the token held from before either one is dead.
-   */
+  /** Call again after sign-in and sign-out: the CSRF token rotates. */
   session: () => request<Session>('/api/session'),
 
-  /**
-   * Sign in.
-   *
-   * <p>Form-encoded, not JSON. Spring Security's `formLogin` reads `username`
-   * and `password` as request parameters; posting JSON to it authenticates
-   * nobody. Hence the explicit Content-Type — it still goes through `request`,
-   * so it still carries the CSRF token, which a POST to a permitAll URL needs
-   * just as much as any other.
-   */
+  /** Form-encoded, because formLogin reads request parameters. */
   async login(username: string, password: string): Promise<Session> {
     await request<void>('/api/session/login', {
       method: 'POST',
@@ -137,10 +104,6 @@ export const api = {
     return api.session()
   },
 
-  /**
-   * Ticks shape this one sheet and are not stored; see `Ticks`. `bus` pins the
-   * BUS run to one Trooper, and is refused with a 422 if they cannot stand it.
-   */
   generate: (date: string, options: GenerateOptions) =>
     request<Schedule>('/api/schedules/generate', {
       method: 'POST',
@@ -156,26 +119,20 @@ export const api = {
 
   schedule: (date: string) => request<Schedule>(`/api/schedules/${date}`),
 
-  /**
-   * ADMIN only. Logs the sheet and returns its image, in one step: an image
-   * that comes back means the sheet is logged, and a failure logs nothing.
-   */
+  /** Logs the sheet and returns its image. */
   logAndImage: (date: string, schedule: Schedule) =>
     requestBlob(`/api/schedules/${date}/image`, { method: 'POST', body: JSON.stringify(schedule) }),
 
-  /** The image of a sheet already logged. Anyone signed in; changes nothing. */
   image: (date: string) => requestBlob(`/api/schedules/${date}/image`),
 
-  /** What a sheet breaks, saving nothing. Called after every hand edit. */
   check: (date: string, schedule: Schedule, ticks: Ticks = {}) =>
-    // Ticks travel as out=NAME:KIND, because the body is the sheet itself.
+    // Ticks go as out=NAME:KIND since the body is the sheet.
     request<SheetCheck>(`/api/schedules/${date}/check?${new URLSearchParams(
       Object.entries(ticks).map(([name, kind]) => ['out', `${name}:${kind}`]))}`, {
       method: 'POST',
       body: JSON.stringify(schedule),
     }),
 
-  /** ADMIN only. Replaces the day's credited hours; a name left out or at 0 has none. */
   credit: (date: string, hours: Record<string, number>) =>
     request<void>(`/api/schedules/${date}/credits`, {
       method: 'PUT',
@@ -184,7 +141,6 @@ export const api = {
 
   records: () => request<Records>('/api/records'),
 
-  /** ADMIN only. Names left out keep what they had. */
   setOpening: (hours: Record<string, number>) =>
     request<Records>('/api/records/opening', {
       method: 'PUT',
@@ -197,14 +153,11 @@ export const api = {
       body: JSON.stringify(schedule),
     }),
 
-  /** The leave register, latest first. Anyone signed in. */
   absences: () => request<Absence[]>('/api/absences'),
 
-  /** ADMIN only. 400 with the reason when the booking does not make sense. */
   bookAbsence: (absence: AbsenceRequest) =>
     request<Absence>('/api/absences', { method: 'POST', body: JSON.stringify(absence) }),
 
-  /** What a booking would reach, saving nothing. Still a POST, so still needs the CSRF token. */
   previewAbsence: (absence: AbsenceRequest) =>
     request<AbsenceReach>('/api/absences/preview', { method: 'POST', body: JSON.stringify(absence) }),
 
@@ -214,52 +167,41 @@ export const api = {
 
   troopers: () => request<Trooper[]>('/api/troopers'),
 
-  /**
-   * ADMIN only. 409 when the name is taken, 422 for a stay-out on the night
-   * group. An archived Trooper's name brings that Trooper back.
-   */
   addTrooper: (trooper: TrooperParticulars) =>
     request<Trooper>('/api/troopers', {
       method: 'POST',
       body: JSON.stringify(trooper),
     }),
 
-  /** ADMIN only. Same refusals as adding, plus 404 for someone no longer on the roster. */
   updateTrooper: (id: number, trooper: TrooperParticulars) =>
     request<Trooper>(`/api/troopers/${id}`, {
       method: 'PUT',
       body: JSON.stringify(trooper),
     }),
 
-  /** ADMIN only. Archived if they stand on a logged sheet, deleted if not — 204 either way. */
   removeTrooper: (id: number) =>
     request<void>(`/api/troopers/${id}`, { method: 'DELETE' }),
 
   /** OWNER only. */
   teams: () => request<Team[]>('/api/teams'),
 
-  /** OWNER only. The team and the invite for its first admin; 409 for a name taken, ignoring case. */
   createTeam: (name: string) =>
     request<TeamCreated>('/api/teams', { method: 'POST', body: JSON.stringify({ name }) }),
 
-  /** OWNER only. Another way in, for a team whose admins have gone. */
   inviteToTeam: (teamId: number, role: Invite['role']) =>
     request<Invite>(`/api/teams/${teamId}/invites`, { method: 'POST', body: JSON.stringify({ role }) }),
 
-  /** ADMIN only: the team's invites still waiting, without their tokens. */
   invites: () => request<Invite[]>('/api/invites'),
 
-  /** ADMIN only. The one response that carries the token. */
+  /** The only response with the token. */
   createInvite: (role: Invite['role']) =>
     request<Invite>('/api/invites', { method: 'POST', body: JSON.stringify({ role }) }),
 
-  /** ADMIN only. The link stops working at once. */
   revokeInvite: (id: number) => request<void>(`/api/invites/${id}`, { method: 'DELETE' }),
 
-  /** Anyone, signed in or not. 404 for a link that is unknown, used or expired. */
   inviteView: (token: string) => request<InviteView>(`/api/invites/${encodeURIComponent(token)}`),
 
-  /** Anyone. Makes the account; signing in is a separate call. 409 for a username taken. */
+  /** Doesn't sign in; that's a separate call. */
   acceptInvite: (token: string, account: NewAccount) =>
     request<InviteView>(`/api/invites/${encodeURIComponent(token)}/accept`, {
       method: 'POST',
@@ -269,10 +211,8 @@ export const api = {
   /** ADMIN only. */
   members: () => request<Member[]>('/api/members'),
 
-  /** ADMIN only. 422 when it would leave the team with no admin. */
   setMemberRole: (id: number, role: Member['role']) =>
     request<Member>(`/api/members/${id}`, { method: 'PUT', body: JSON.stringify({ role }) }),
 
-  /** ADMIN only. 422 for your own account, or the last admin. */
   removeMember: (id: number) => request<void>(`/api/members/${id}`, { method: 'DELETE' }),
 }

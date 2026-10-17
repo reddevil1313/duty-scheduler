@@ -27,7 +27,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** The app's own metrics move when the things they count happen. */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
@@ -79,7 +78,7 @@ class MetricsIT {
     }
 
     @Test
-    @DisplayName("making a sheet is timed, by whether it was solved, reused or could not be covered")
+    @DisplayName("generate is timed by outcome")
     void generateIsTimed() throws Exception {
         long solved = timed("solved"), reused = timed("reused"), unsolvable = timed("unsolvable");
 
@@ -96,7 +95,7 @@ class MetricsIT {
     }
 
     @Test
-    @DisplayName("logging a sheet is counted, by where it was logged from")
+    @DisplayName("logging is counted by source")
     void loggingIsCounted() throws Exception {
         var counter = registry.find("duty.sheet.logged").tag("via", "board").counter();
         double before = counter == null ? 0 : counter.count();

@@ -6,24 +6,20 @@ import { useSession } from '../auth/session-context'
 import { shortDate } from '../dates'
 
 interface Props {
-  /** True while the tab is showing; the records are re-read on each showing. */
+  /** Re-read each time the tab is shown. */
   active: boolean
-  /** Show a logged day on the board, where its grid can be corrected and logged again. */
+
   onOpen: (date: string) => void
 }
 
-/** Leave in days drops a needless ".0", and keeps a half day as ".5". */
+/** 2 not 2.0; 1.5 stays. */
 function days(n: number): string {
   return n === 0 ? '' : String(Math.round(n * 10) / 10)
 }
 
 /**
- * The records: every Trooper's running totals, and a line per day logged.
- *
- * <p>Correcting what someone stood is done on the board, by opening the day
- * and logging it again, so the hours always match a real grid. What is edited
- * here is only what has no grid: hours from before the tracker, and hours
- * credited for a day not stood.
+ * Totals per Trooper and a line per logged day. Only opening and credited
+ * hours are edited here; anything on the grid is fixed on the board.
  */
 export function RecordsView({ active, onOpen }: Props) {
   const { session } = useSession()
@@ -205,7 +201,7 @@ function OpeningForm({ troopers, onSaved, onCancel, onError }: OpeningProps) {
     e.preventDefault()
     setBusy(true)
     try {
-      // Only what changed is sent; the server leaves everyone else alone.
+
       const changed = Object.fromEntries(troopers
         .filter((t) => Number(hours[t.name] || 0) !== t.opening)
         .map((t) => [t.name, Number(hours[t.name] || 0)]))
@@ -255,8 +251,7 @@ function CreditForm({ day, troopers, onSaved, onCancel, onError }: CreditProps) 
     e.preventDefault()
     setBusy(true)
     try {
-      // The whole day is sent: the server replaces the day's credits, so
-      // anyone left blank has none.
+      // The server replaces the whole day's credits.
       await api.credit(day.date, Object.fromEntries(
         Object.entries(hours).filter(([, h]) => Number(h) > 0).map(([name, h]) => [name, Number(h)])))
       await onSaved()

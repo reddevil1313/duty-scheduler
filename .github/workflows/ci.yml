@@ -18,8 +18,6 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v4
-      # Unit tests and the integration tests, which start their own Postgres
-      # containers; the runner has Docker.
       - run: ./gradlew test
       - if: failure()
         uses: actions/upload-artifact@v4
@@ -63,8 +61,7 @@ jobs:
           tags: duty-scheduler:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      # The one-command deploy, as the README gives it, against the image just
-      # built: the stack has to come up healthy and serve the client.
+      # Bring the stack up and check it serves.
       - run: docker compose --profile app up -d --no-build
       - name: Wait for the app to report healthy
         run: |

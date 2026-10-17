@@ -13,7 +13,7 @@ class DutyDayTest {
     private static final LocalDate THU = LocalDate.of(2026, 9, 10);
 
     @Test
-    @DisplayName("a sheet runs 2000 on its own date to 2000 the next day")
+    @DisplayName("runs 2000 to 2000 the next day")
     void spansTwentyFourHoursFromEightPm() {
         DutyDay day = DutyDay.of(THU);
 
@@ -23,7 +23,7 @@ class DutyDayTest {
     }
 
     @Test
-    @DisplayName("slot 0 is 2000 tonight, slot 4 is midnight, slot 23 is 1900 tomorrow")
+    @DisplayName("slot times")
     void slotsCarryTheirOwnDate() {
         DutyDay day = DutyDay.of(THU);
 
@@ -33,7 +33,7 @@ class DutyDayTest {
     }
 
     @Test
-    @DisplayName("slot labels read the way the sheet does")
+    @DisplayName("slot labels")
     void labelsMatchTheSheet() {
         DutyDay day = DutyDay.of(THU);
 
@@ -44,25 +44,25 @@ class DutyDayTest {
     }
 
     @Test
-    @DisplayName("an instant maps back to the slot that covers it, or to nothing")
+    @DisplayName("instant to slot")
     void findsTheSlotCoveringAnInstant() {
         DutyDay day = DutyDay.of(THU);
 
         assertEquals(0, day.slotAt(LocalDateTime.of(2026, 9, 10, 20, 30)));
         assertEquals(12, day.slotAt(LocalDateTime.of(2026, 9, 11, 8, 0)));
-        // 2000 the next evening belongs to the next sheet, not this one.
+        // Next sheet.
         assertEquals(-1, day.slotAt(LocalDateTime.of(2026, 9, 11, 20, 0)));
         assertEquals(-1, day.slotAt(LocalDateTime.of(2026, 9, 10, 19, 59)));
     }
 
     @Test
-    @DisplayName("a slot overlaps a half-open interval only where it really does")
+    @DisplayName("slot overlap with half-open intervals")
     void overlapIsHalfOpen() {
         Slot nine = DutyDay.of(THU).slot(13);   // 0900 on the 11th
 
         assertTrue(nine.overlaps(
                 LocalDateTime.of(2026, 9, 11, 9, 30), LocalDateTime.of(2026, 9, 11, 11, 30)));
-        // Touching at the boundary is not overlapping.
+
         assertFalse(nine.overlaps(
                 LocalDateTime.of(2026, 9, 11, 10, 0), LocalDateTime.of(2026, 9, 11, 11, 0)));
         assertFalse(nine.overlaps(
@@ -70,7 +70,7 @@ class DutyDayTest {
     }
 
     @Test
-    @DisplayName("a slot index outside the sheet is rejected")
+    @DisplayName("rejects out-of-range slots")
     void rejectsBadSlotIndex() {
         DutyDay day = DutyDay.of(THU);
 

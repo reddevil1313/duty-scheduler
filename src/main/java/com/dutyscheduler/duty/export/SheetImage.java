@@ -26,25 +26,12 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * A duty sheet as a PNG, for sending on.
- *
- * <p>
- * Drawn with Java2D, which ships with the JDK, so there is nothing to install
- * and nothing to keep in step with the board's CSS — the colours are chosen
- * here for paper and phone screens, light and high-contrast, rather than copied
- * from the dark board. It draws exactly the sheet it is given; logging that
- * same sheet is the caller's job, done after the drawing succeeds.
- *
- * <p>
- * No Spring and no persistence: give it a sheet, get bytes.
+ * A duty sheet as a PNG, drawn with Java2D. Light, high-contrast colours for
+ * phones and paper. No Spring, no persistence.
  */
 public final class SheetImage {
 
-    /**
-     * Drawn at twice its layout size. A sheet is sent on to phones and zoomed
-     * into there, and at 1x the hour labels blur; every coordinate below is in
-     * layout pixels, and the scale is applied once, to the whole drawing.
-     */
+    /** 2x so it stays sharp when zoomed on a phone. Coordinates are in layout pixels. */
     static final int SCALE = 2;
 
     private static final int PAD = 24;
@@ -59,14 +46,14 @@ public final class SheetImage {
     private static final Color LINE = new Color(0xCCD6DF);
     private static final Color PAPER = Color.WHITE;
     private static final Color BAND = new Color(0xF3F6F9);
-    /** The board's grid lines: light between hours, stronger at midnight and at the edges of the hours. */
+    /** Grid lines, as on the board. */
     static final Color GRID = new Color(0xDFE6EC);
     static final Color GRID_STRONG = new Color(0xB6C4CF);
 
-    /** Slot 4 is midnight, where the date changes; the board rules it heavier too. */
+    /** Midnight, drawn heavier. */
     private static final int MIDNIGHT = 4;
 
-    /** Post colours: a light ground and a dark ink, each pair well above 4.5:1. */
+    /** Post fill and ink, each pair above 4.5:1 contrast. */
     static final Map<Post, Color[]> POST_COLOURS = new EnumMap<>(Map.of(
             Post.AP, new Color[] { new Color(0xDDE4F8), new Color(0x2D4699) },
             Post.GG, new Color[] { new Color(0xD4EAE5), new Color(0x125A4E) },
@@ -82,10 +69,7 @@ public final class SheetImage {
     }
 
     /**
-     * @param turnout  the fixed turnout, or null for the free split. With one,
-     *                 the posts nobody is on are drawn as the MP team's row.
-     * @param loggedBy who logged it, for the footer
-     * @param loggedAt when, for the footer
+     * @param turnout  null for the free split; otherwise an MP row is drawn
      */
     public static byte[] png(Schedule sheet, Integer turnout, String loggedBy, Instant loggedAt) {
         DutyDay day = sheet.day();
@@ -151,11 +135,7 @@ public final class SheetImage {
         return out.toByteArray();
     }
 
-    /**
-     * The line under the title. Counts the Troopers with an hour on the sheet,
-     * as the board's summary does, so a row for someone away all of it — on
-     * leave, or a stay-out on a weekend — is not counted as someone on duty.
-     */
+    /** Counts only Troopers with an hour on the sheet, as the board does. */
     static String subtitle(DutyDay day, List<Schedule.Row> rows, Integer turnout, int mpHours) {
         int hours = rows.stream().mapToInt(Schedule.Row::hours).sum();
         long onDuty = rows.stream().filter(r -> r.hours() > 0).count();
@@ -165,11 +145,7 @@ public final class SheetImage {
                 + (mpHours > 0 ? " · " + mpHours + " post-hour" + (mpHours == 1 ? "" : "s") + " to the MP team" : "");
     }
 
-    /**
-     * A line down every hour's edge, so an hour can be read across a printed
-     * or forwarded sheet without a ruler. Drawn on the cells' own edges, which
-     * the post blocks stop one pixel short of, so no block is cut through.
-     */
+    /** Hour lines, on the cell edges so they don't cut through post blocks. */
     private static void drawGrid(Graphics2D g, int x0, int top, int bottom) {
         int hours = x0 + NAME_W;
         for (int slot = 0; slot <= DutyDay.SLOT_COUNT; slot++) {
@@ -248,7 +224,7 @@ public final class SheetImage {
         centre(g, String.valueOf(total), x0 + NAME_W + DutyDay.SLOT_COUNT * HOUR_W, TALLY_W, y + 17);
     }
 
-    /** Per hour, the posts nobody is on: the MP team's share of a fixed-turnout sheet. */
+    /** Unmanned posts per hour, for the MP row. */
     static List<List<Post>> shortfall(Schedule sheet) {
         DayDemand demand = DayDemand.of(sheet.day());
         List<List<Post>> out = new ArrayList<>();
@@ -271,8 +247,7 @@ public final class SheetImage {
         g.drawString(text, x + (w - m.stringWidth(text)) / 2, baseline);
     }
 
-    // Spelled out by hand, as the board does: locale data differs between JDKs
-    // ("Sept" or "Sep"), and a sheet should not change its spelling with them.
+    // Not from locale data, which differs between JDKs ("Sept" vs "Sep").
     private static String shortDate(LocalDate date) {
         return DAYS[date.getDayOfWeek().getValue() - 1] + " " + date.getDayOfMonth() + " " + MONTHS[date.getMonthValue() - 1];
     }

@@ -3,13 +3,8 @@ package com.dutyscheduler.duty.domain;
 import java.time.LocalDateTime;
 
 /**
- * One hour of a duty sheet.
- *
- * <p>
- * {@code index} is the column on the sheet, 0 through 23. {@code start} is the
- * absolute instant that column begins, which is what everything else is decided
- * from — a slot knows its own date, so nothing downstream has to remember that
- * column 12 is "the following morning".
+ * One hour of a duty sheet. {@code index} is the column, 0 to 23;
+ * {@code start} is the actual date and time it begins.
  */
 public record Slot(int index, LocalDateTime start) {
 

@@ -7,16 +7,12 @@ import java.util.Map;
 
 /**
  * Which posts stand at a given hour.
- *
- * <p>
- * The standing rules, in one place:
  * <ul>
- * <li>2000–2200 on a weekday: no posts.</li>
- * <li>2200–0600, the silent hours: AP and GG.</li>
- * <li>0600–2000: two PAC.</li>
- * <li>0700–1000: BUS as well.</li>
- * <li>Fri 2200 through Mon 0600, the weekend block: AP and GG throughout,
- * and nothing else — no PAC, no BUS.</li>
+ * <li>2000-2200 on a weekday: none.</li>
+ * <li>2200-0600 (silent hours): AP and GG.</li>
+ * <li>0600-2000: two PAC.</li>
+ * <li>0700-1000: BUS as well.</li>
+ * <li>Fri 2200 to Mon 0600 (weekend): AP and GG only.</li>
  * </ul>
  */
 public final class Demand {
@@ -24,9 +20,7 @@ public final class Demand {
     private Demand() {
     }
 
-    /**
-     * The weekend block runs from Friday 2200 to Monday 0600.
-     */
+    /** Friday 2200 to Monday 0600. */
     public static boolean isWeekend(LocalDateTime t) {
         DayOfWeek d = t.getDayOfWeek();
         int h = t.getHour();

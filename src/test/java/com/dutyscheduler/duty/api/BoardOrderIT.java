@@ -32,13 +32,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * The order rows come in, and stay-outs on a weekend.
- *
- * <p>
- * The roster is seeded shuffled — stay-outs first, the night group scattered
- * — so an order that merely kept the roster's would fail here.
- */
+/** Row order, and stay-outs on a weekend. The roster is seeded shuffled. */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
@@ -50,9 +44,9 @@ class BoardOrderIT {
     static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:16-alpine");
 
     static final String THURSDAY = "2026-09-10";
-    /** Friday's sheet runs into Saturday: no hour of it is open to a stay-out. */
+    /** Runs into Saturday, so no hour is open to a stay-out. */
     static final String FRIDAY = "2026-09-11";
-    /** Sunday's sheet runs into Monday, whose daytime is. */
+    /** Runs into Monday daytime. */
     static final String SUNDAY = "2026-09-13";
     static final String NIGHT = "\"TROOPER_A\",\"TROOPER_B\",\"TROOPER_C\"";
 
@@ -99,7 +93,7 @@ class BoardOrderIT {
     }
 
     @Test
-    @DisplayName("night first, then day duty, then stay-outs, then anyone away, each in roster order")
+    @DisplayName("night, day, stay-outs, then away, in roster order")
     void weekdayOrder() throws Exception {
         String sheet = generate(THURSDAY, "{\"trooper\":\"TROOPER_F\",\"kind\":\"AL\"}");
         assertThat(order(sheet)).containsExactly(
@@ -110,7 +104,7 @@ class BoardOrderIT {
     }
 
     @Test
-    @DisplayName("on a weekend sheet the stay-outs, who cannot stand an hour of it, are listed with the away")
+    @DisplayName("weekend stay-outs are listed with the away")
     void weekendStayOutsGoLast() throws Exception {
         String sheet = generate(FRIDAY, "");
         assertThat(order(sheet)).containsExactly(
@@ -120,7 +114,7 @@ class BoardOrderIT {
     }
 
     @Test
-    @DisplayName("the check marks a weekend stay-out away every hour, as SO")
+    @DisplayName("weekend stay-outs are SO every hour")
     void weekendStayOutsAreAway() throws Exception {
         mvc.perform(post("/api/schedules/" + FRIDAY + "/check").with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content(generate(FRIDAY, "")))
@@ -128,13 +122,13 @@ class BoardOrderIT {
                 .andExpect(jsonPath("$.away.TROOPER_I", hasSize(24)))
                 .andExpect(jsonPath("$.away.TROOPER_I", everyItem(is("SO"))))
                 .andExpect(jsonPath("$.away.TROOPER_K", everyItem(is("SO"))))
-                // Live-ins are not away, and nothing here is a leave clash.
+
                 .andExpect(jsonPath("$.away.TROOPER_D").doesNotExist())
                 .andExpect(jsonPath("$.issues", hasSize(0)));
     }
 
     @Test
-    @DisplayName("a stay-out with Monday's daytime on the sheet is not away")
+    @DisplayName("stay-outs aren't away on a Sunday sheet")
     void sundayStayOutsAreIn() throws Exception {
         mvc.perform(post("/api/schedules/" + SUNDAY + "/check").with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content(generate(SUNDAY, "")))
@@ -143,7 +137,7 @@ class BoardOrderIT {
     }
 
     @Test
-    @DisplayName("leave on a weekend stay-out still shows as the leave")
+    @DisplayName("leave wins over SO")
     void leaveWinsOverSo() throws Exception {
         String sheet = generate(FRIDAY, "{\"trooper\":\"TROOPER_J\",\"kind\":\"MC\"}");
         mvc.perform(post("/api/schedules/" + FRIDAY + "/check").param("out", "TROOPER_J:MC").with(csrf())

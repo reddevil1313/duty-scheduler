@@ -6,11 +6,7 @@ export type Theme = 'system' | 'light' | 'dark'
 const KEY = 'duty-scheduler.theme'
 const NEXT: Record<Theme, Theme> = { system: 'light', light: 'dark', dark: 'system' }
 
-/**
- * The theme, kept on <html> as data-theme and remembered in this browser.
- * Storage can be refused (a private window, blocked site data); the page then
- * just follows the system each visit.
- */
+/** Set on <html> as data-theme and saved in localStorage when allowed. */
 export function useTheme() {
   const [theme, setTheme] = useState<Theme>(() => {
     try {

@@ -28,7 +28,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** The BUS choice end to end: sent with a generate, refused with a reason when it cannot stand. */
+/** Choosing the BUS Trooper through the API. */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
@@ -72,7 +72,7 @@ class BusChoiceIT {
     }
 
     @Test
-    @DisplayName("the chosen Trooper has every BUS hour on the sheet that comes back")
+    @DisplayName("chosen Trooper gets every BUS hour")
     void chosenGetsBus() throws Exception {
         mvc.perform(post("/api/schedules/generate").with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content(body("TROOPER_F", "")))
@@ -83,7 +83,7 @@ class BusChoiceIT {
     }
 
     @Test
-    @DisplayName("a stay-out as BUS is a 422 that says why")
+    @DisplayName("stay-out as BUS is a 422")
     void stayOutIs422() throws Exception {
         mvc.perform(post("/api/schedules/generate").with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content(body("TROOPER_H", "")))
@@ -93,7 +93,7 @@ class BusChoiceIT {
     }
 
     @Test
-    @DisplayName("someone ticked out on the roster cannot be the BUS Trooper either")
+    @DisplayName("ticked-out Trooper can't be BUS")
     void tickedOutIs422() throws Exception {
         mvc.perform(post("/api/schedules/generate").with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
@@ -104,7 +104,7 @@ class BusChoiceIT {
     }
 
     @Test
-    @DisplayName("the roster's default BUS Trooper, out today, gives way: the solver chooses and the sheet comes back")
+    @DisplayName("default BUS who is out today gives way to the solver")
     void defaultGivesWay() throws Exception {
         mvc.perform(post("/api/schedules/generate").with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
@@ -116,7 +116,7 @@ class BusChoiceIT {
     }
 
     @Test
-    @DisplayName("a BUS name not on the roster is a 400")
+    @DisplayName("unknown BUS name is a 400")
     void unknownIs400() throws Exception {
         mvc.perform(post("/api/schedules/generate").with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content(body("NOBODY", "")))

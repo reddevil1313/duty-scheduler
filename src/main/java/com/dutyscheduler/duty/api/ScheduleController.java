@@ -34,14 +34,10 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/**
- * Generating, reading and logging duty sheets.
- */
+/** Generating, reading and logging duty sheets. */
 @RestController
 @RequestMapping("/api/schedules")
-// A team's own accounts only. The owner has no team, so would read nothing
-// here anyway; refusing them outright says so. Methods that write narrow this
-// to ADMIN with their own annotation, which takes precedence over this one.
+// Not the owner, who has no team. Write methods narrow this to ADMIN.
 @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
 public class ScheduleController {
 
@@ -60,9 +56,7 @@ public class ScheduleController {
         this.metrics = metrics;
     }
 
-    /**
-     * Works out a sheet without saving it.
-     */
+    /** Works out a sheet without saving it. */
     @PostMapping("/generate")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ScheduleResponse> generate(@Valid @RequestBody GenerateRequest request) {
@@ -70,8 +64,7 @@ public class ScheduleController {
         List<Trooper> roster = troopers.findByActiveTrueOrderByIdAsc().stream()
                 .map(TrooperEntity::toDomain).toList();
         List<Absence> ticked = ticked(day, request.out());
-        // Someone ticked out cannot hold the silent hours, whatever box was left
-        // ticked for them on the board.
+        // Ticked out wins over a night-group tick.
         List<Trooper> night = roster.stream()
                 .filter(t -> request.nightGroup().contains(t.name()))
                 .filter(t -> ticked.stream().noneMatch(a -> a.trooper().equals(t)))
@@ -85,18 +78,14 @@ public class ScheduleController {
                     .orElseThrow(() -> new IllegalArgumentException(request.bus() + " is not on the roster."));
         }
 
-        // A BUS choice the chosen Trooper cannot stand comes back unsolved, with
-        // the reason, before any search — and leaves as a 422 like any sheet
-        // that cannot be covered.
         List<Schedule> reusable = reusable(day, roster, absences, request.turnout());
         Trooper pick = bus;
         SolveResult result = metrics.generate(request.turnout(), () -> {
             SolveResult first = solver.solve(
                     new SolveRequest(day, roster, night, absences, store.history(day.date()), pick,
                             request.turnout(), reusable));
-            // The roster's default is a starting point, not a choice made for this
-            // sheet: on leave, or unable to stand BUS today, they give way and the
-            // solver chooses. Only a pick made for this sheet is refused.
+            // If the roster's default BUS can't do it today, let the solver pick.
+            // Only an explicit pick is refused.
             if (!first.isSolved() && pick != null && Boolean.TRUE.equals(request.busDefault())) {
                 return solver.solve(
                         new SolveRequest(day, roster, night, absences, store.history(day.date()), null,
@@ -108,9 +97,7 @@ public class ScheduleController {
         if (!result.isSolved()) {
             throw new UnsolvableException(result.reason());
         }
-        // Night, day, stay-outs, then anyone who cannot stand any hour — a
-        // stay-out on a weekend sheet among them — so the board, the logged
-        // sheet and its image all read in that order.
+        // Night, day, stay-outs, then anyone with no free hour (weekend stay-outs too).
         Set<String> unavailable = roster.stream()
                 .filter(t -> !availableAtAll(t, day, absences))
                 .map(Trooper::name)
@@ -119,7 +106,6 @@ public class ScheduleController {
                 .inBoardOrder(Availability.silentSlots(day), unavailable));
     }
 
-    /** Whether any hour of the sheet is free of leave and ticks for this Trooper. */
     private static boolean availableAtAll(Trooper trooper, DutyDay day, List<Absence> absences) {
         for (boolean free : Availability.mask(trooper, day, absences)) {
             if (free) {
@@ -130,14 +116,9 @@ public class ScheduleController {
     }
 
     /**
-     * Logged sheets the solver may reuse for this one, latest first: the same
-     * posts at the same hours (so any Monday-to-Thursday sheet matches any
-     * other), the same headcount, and the same turnout. Not this date's own
-     * sheet — regenerating a day is asking for something new.
-     *
-     * <p>
-     * Headcount is who can work at all: a roster Trooper with any hour free of
-     * leave and ticks, against those who stood any hour on the logged sheet.
+     * Logged sheets that could be reused, latest first: same posts by hour
+     * (Mon-Thu all match), same headcount, same turnout. Never this date's own
+     * sheet, since regenerating should give something new.
      */
     private List<Schedule> reusable(DutyDay day, List<Trooper> roster, List<Absence> absences, Integer turnout) {
         long headcount = roster.stream().filter(t -> availableAtAll(t, day, absences)).count();
@@ -160,14 +141,8 @@ public class ScheduleController {
     }
 
     /**
-     * Check a sheet without saving it: what rules it breaks, who it has on duty
-     * during their own leave, and what each hour needed. The board calls this
-     * after every hand edit, so the validator that proves the solver correct is
-     * the same one that checks a person's changes — there is no second copy of
-     * the rules in the browser to drift from it.
-     *
-     * <p>
-     * Saves nothing, so any signed-in user may ask.
+     * Rule breaks, duty during leave, and each hour's demand. The board calls
+     * this after every edit so the rules only live on the server. Saves nothing.
      */
     @PostMapping("/{date}/check")
     public SheetCheck check(@PathVariable LocalDate date, @Valid @RequestBody ScheduleResponse body,
@@ -178,11 +153,7 @@ public class ScheduleController {
         return SheetCheck.of(schedule, validator.validate(schedule), leaveClashes(schedule, absences), absences);
     }
 
-    /**
-     * Ticks from the roster as leave covering the whole sheet: from midnight on
-     * its date, past 2000 the next evening when it ends. Never saved; they live
-     * as long as the request.
-     */
+    /** Roster ticks as whole-sheet leave, for this request only. */
     private List<Absence> ticked(DutyDay day, List<QuickLeave> out) {
         if (out == null) {
             return List.of();
@@ -193,8 +164,7 @@ public class ScheduleController {
                 throw new IllegalArgumentException(
                         "A tick is MC, OL or AL. Book an appointment in the leave register.");
             }
-            // The roster's own Trooper, not one built from the name: the solver
-            // matches leave to a Trooper by name and stay-out together.
+            // Must be the roster's Trooper: leave matches on name and stay-out.
             Trooper trooper = troopers.findByNameAndActiveTrue(tick.trooper())
                     .orElseThrow(() -> new IllegalArgumentException(tick.trooper() + " is not on the roster."))
                     .toDomain();
@@ -203,11 +173,7 @@ public class ScheduleController {
         return absences;
     }
 
-    /**
-     * Ticks on a check arrive as {@code out=NAME:KIND} query parameters, because
-     * the body is the sheet itself. Split on the last colon, so a colon in a
-     * name cannot shift the kind.
-     */
+    /** {@code out=NAME:KIND} params (the body is the sheet). Splits on the last colon. */
     private static List<QuickLeave> parseTicks(List<String> out) {
         if (out == null) {
             return List.of();
@@ -224,9 +190,8 @@ public class ScheduleController {
     }
 
     /**
-     * Hours someone is on duty while their own leave covers them. Not a rule the
-     * validator knows — a schedule carries no leave — so it is worked out here,
-     * one issue per unbroken run rather than one per hour.
+     * Duty during the person's own leave, one issue per run. The validator
+     * can't see this since a schedule has no leave in it.
      */
     static List<SheetCheck.Issue> leaveClashes(Schedule schedule, List<Absence> absences) {
         List<SheetCheck.Issue> out = new ArrayList<>();
@@ -257,13 +222,9 @@ public class ScheduleController {
     }
 
     /**
-     * Log a sheet as the one actually used. Replaces whatever was there.
-     *
-     * <p>
-     * Deliberately not validated. The log is the record of what was used, and
-     * sometimes what was used broke a rule; refusing it would leave the record
-     * wrong instead. The board shows what a sheet breaks, from {@link #check},
-     * and asks before logging it anyway.
+     * Logs the sheet actually used, replacing any earlier one. Not validated:
+     * the record should match what happened, even if it broke a rule. The board
+     * warns first.
      */
     @PutMapping("/{date}")
     @PreAuthorize("hasRole('ADMIN')")
@@ -277,12 +238,7 @@ public class ScheduleController {
         return ResponseEntity.ok(ScheduleResponse.from(schedule, turnout, null));
     }
 
-    /**
-     * Replace a logged day's credited hours: hours counted toward someone's
-     * total for a day they did not stand, such as an MC or OL day. The grid is
-     * left alone. It is the record of who stood what, and editing it to reach
-     * a number would put people on posts they never stood.
-     */
+    /** Replaces a logged day's credited hours (counted, but not on the grid). */
     @PutMapping("/{date}/credits")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> credit(@PathVariable LocalDate date, @RequestBody Map<String, Integer> hours) {
@@ -291,7 +247,7 @@ public class ScheduleController {
                 : ResponseEntity.status(HttpStatus.NOT_FOUND).build();
     }
 
-    /** A logged turnout is 5 to 7 hours, or null for the free split. Shared with the image, which logs too. */
+    /** 5 to 7, or null for the free split. */
     static Integer checkedTurnout(Integer turnout) {
         if (turnout != null && (turnout < SolveRequest.MIN_TURNOUT || turnout > SolveRequest.MAX_TURNOUT)) {
             throw new IllegalArgumentException("A fixed turnout is 5 to 7 hours, not " + turnout + ".");

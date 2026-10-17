@@ -13,13 +13,8 @@ import java.util.List;
 public interface AbsenceRepository extends JpaRepository<AbsenceEntity, Long> {
 
     /**
-     * Every booking that could possibly touch a sheet.
-     *
-     * <p>Deliberately generous: it filters on dates, and whether an absence really
-     * reaches a given sheet is settled by {@link com.dutyscheduler.duty.domain.Absence}
-     * comparing intervals. The 2000 cut-off is a domain rule and it is not going
-     * to be re-expressed in JPQL, where it would be a second definition free to
-     * drift from the first.
+     * Bookings that might touch a sheet, by date only. The exact check is
+     * {@link com.dutyscheduler.duty.domain.Absence#touches}, not duplicated in JPQL.
      */
     @Query("""
             SELECT a FROM AbsenceEntity a
@@ -28,13 +23,7 @@ public interface AbsenceRepository extends JpaRepository<AbsenceEntity, Long> {
             """)
     List<AbsenceEntity> findTouching(@Param("from") LocalDate from, @Param("to") LocalDate to);
 
-    /*
-     * The two register reads fetch the Trooper in the same query. The response
-     * names the Trooper on every entry, and open-in-view is off, so a lazy
-     * Trooper is loaded after the session has closed and the read fails with a
-     * LazyInitializationException — but only once the register has an entry,
-     * which is how it hid behind tests that read an empty one.
-     */
+    // Fetch the Trooper too: open-in-view is off, so lazy loading would fail.
     @EntityGraph(attributePaths = "trooper")
     List<AbsenceEntity> findByTrooperNameOrderByFromDateDesc(String name);
 

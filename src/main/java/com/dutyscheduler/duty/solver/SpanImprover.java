@@ -9,22 +9,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Local search, used as a repair step.
- *
- * It takes the finished sheet and hill-climbs on it.
- *
- * <p>
- * The move is a swap of two equal-length segments between two Troopers.
- * Every candidate swap is re-checked for stint length, legal transitions,
- * availability and group before it is taken, and it is only taken if
- * the score strictly improves — so the sheet that comes out is still legal
- * and never worse than the one that went in.
+ * Hill-climbs on a finished sheet by swapping equal-length segments between
+ * two Troopers. A swap is only kept if it stays legal and strictly improves
+ * the score.
  */
 final class SpanImprover {
 
-    /**
-     * Whether a Trooper may stand a post at an hour at all — availability and group.
-     */
+    /** Availability and group: may this Trooper stand at this hour at all. */
     interface Eligibility {
         boolean allows(int trooper, int slot);
     }
@@ -34,7 +25,7 @@ final class SpanImprover {
 
     private final List<Trooper> troopers;
     private final Eligibility eligibility;
-    /** [trooper][slot]: cells a human chose, such as the BUS hours. Never moved. */
+    /** [trooper][slot]: pinned cells, never moved. */
     private final boolean[][] pinned;
 
     SpanImprover(List<Trooper> troopers, Eligibility eligibility) {
@@ -109,7 +100,7 @@ final class SpanImprover {
         int worstBefore = Math.max(cost(a.trooper, grid[a.trooper]), cost(b.trooper, grid[b.trooper]));
         int worstAfter = Math.max(cost(a.trooper, rowA), cost(b.trooper, rowB));
 
-        // Same rule as the score: never flatten one Trooper's day by wrecking another's.
+        // Don't fix one Trooper's day by making another's worse.
         if (worstAfter > worstBefore || after >= before) {
             return false;
         }
@@ -173,8 +164,7 @@ final class SpanImprover {
                 }
                 for (int from = start; from < slot; from++) {
                     for (int to = from; to < slot && to - from < DutyRules.MAX_STINT; to++) {
-                        // A segment holding a pinned cell would carry it to
-                        // someone else, so it is never offered for a swap.
+                        // Pinned cells never move.
                         if (isPinned(t, to)) {
                             break;
                         }

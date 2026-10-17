@@ -26,16 +26,8 @@ import java.security.Principal;
 import java.util.List;
 
 /**
- * The owner's view of the server: which teams there are, and the way into a
- * new one.
- *
- * <p>
- * The owner sees each team's name and how many accounts it has, and nothing
- * of its roster, sheets or leave — their session has no team, so those
- * queries would return nothing, and the team endpoints refuse them outright.
- * A team is made with an invite for its first admin, because an empty team
- * with no way in would be useless, and the owner joining it to get in would
- * break "one team per account".
+ * Owner only: list teams (names and account counts, no data) and create one.
+ * A new team comes with an invite for its first admin.
  */
 @RestController
 @RequestMapping("/api/teams")
@@ -75,10 +67,7 @@ public class TeamController {
                 .body(new TeamCreated(summary(team), invite));
     }
 
-    /**
-     * Another invite into a team, for when its admins have all gone or a
-     * first-admin link expired unused — the owner's way back in for them.
-     */
+    /** For when a team has lost its admins, or the first link expired. */
     @PostMapping("/{id}/invites")
     public ResponseEntity<InviteResponse> invite(@PathVariable Long id, @Valid @RequestBody InviteRequest request,
             Principal principal) {

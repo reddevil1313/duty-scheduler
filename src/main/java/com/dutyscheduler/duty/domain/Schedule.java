@@ -137,9 +137,7 @@ public record Schedule(DutyDay day, List<Row> rows) {
         /** A row for a trooper, with a list of posts, one per hour. Null means off. */
         public Builder row(Trooper trooper, List<Post> posts) {
             if (rows.stream().anyMatch(r -> r.trooper().equals(trooper))) {
-                // Two rows for one Trooper is always a mistake, and a quiet one: the
-                // hours would come back from whichever row was added first, and a
-                // change aimed at one of them would land on both.
+                // Would silently read from the first row and write to both.
                 throw new IllegalArgumentException(
                         trooper.name() + " already has a row on this sheet.");
             }
@@ -147,7 +145,7 @@ public record Schedule(DutyDay day, List<Row> rows) {
             return this;
         }
 
-        /** A row with nobody on anything — a Trooper on the sheet but off all day. */
+        /** A Trooper on the sheet but off all day. */
         public Builder empty(Trooper trooper) {
             return row(trooper, ". ".repeat(DutyDay.SLOT_COUNT).trim());
         }

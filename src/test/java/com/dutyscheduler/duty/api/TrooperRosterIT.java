@@ -32,11 +32,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * Editing and removing Troopers, and above all what removal does to history.
- * Who may do it is {@link ApiSecurityIT}'s business; this is what happens when
- * an ADMIN does.
- */
+/** Editing and removing Troopers, and what removal does to history. */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
@@ -88,7 +84,7 @@ class TrooperRosterIT {
                 """.formatted(name, stayOut, onNight);
     }
 
-    /** Generate the Thursday sheet and log it as used, so everyone on it has history. */
+    /** Logs Thursday so everyone on it has history. */
     private void logASheet() throws Exception {
         String sheet = mvc.perform(post("/api/schedules/generate").with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
@@ -103,7 +99,7 @@ class TrooperRosterIT {
     }
 
     @Test
-    @DisplayName("an edit changes the particulars, and the Trooper keeps their place")
+    @DisplayName("edit keeps roster position")
     void editKeepsPlace() throws Exception {
         long id = idOf("TROOPER_D");
 
@@ -121,7 +117,7 @@ class TrooperRosterIT {
     }
 
     @Test
-    @DisplayName("a rename shows on the sheets they already stood, because sheets hold the id")
+    @DisplayName("rename shows on old sheets")
     void renameCarriesIntoHistory() throws Exception {
         logASheet();
 
@@ -135,7 +131,7 @@ class TrooperRosterIT {
     }
 
     @Test
-    @DisplayName("an edit is refused for a taken name (409), a stay-out on night (422), or nobody (404)")
+    @DisplayName("edit refusals: 409, 422, 404")
     void editRefusals() throws Exception {
         long id = idOf("TROOPER_D");
 
@@ -153,7 +149,7 @@ class TrooperRosterIT {
     }
 
     @Test
-    @DisplayName("keeping your own name is not a clash with yourself")
+    @DisplayName("keeping the same name is fine")
     void editWithSameName() throws Exception {
         mvc.perform(put("/api/troopers/" + idOf("TROOPER_D")).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content(body("TROOPER_D", false, false)))
@@ -162,7 +158,7 @@ class TrooperRosterIT {
     }
 
     @Test
-    @DisplayName("removing a Trooper with no logged duty deletes them, and their leave with them")
+    @DisplayName("no logged duty: deleted with their leave")
     void removeWithoutHistoryDeletes() throws Exception {
         mvc.perform(post("/api/absences").with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
@@ -179,7 +175,7 @@ class TrooperRosterIT {
     }
 
     @Test
-    @DisplayName("removing a Trooper who stood a logged sheet archives them, and the sheet is untouched")
+    @DisplayName("logged duty: archived, sheet untouched")
     void removeWithHistoryArchives() throws Exception {
         logASheet();
         long id = idOf("TROOPER_A");
@@ -194,7 +190,6 @@ class TrooperRosterIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.rows[*].trooper", hasItem("TROOPER_A")));
 
-        // Gone means gone: a second remove, an edit, or a booking all miss.
         mvc.perform(delete("/api/troopers/" + id).with(csrf())).andExpect(status().isNotFound());
         mvc.perform(put("/api/troopers/" + id).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content(body("TROOPER_A", false, false)))
@@ -208,7 +203,7 @@ class TrooperRosterIT {
     }
 
     @Test
-    @DisplayName("an archived Trooper is never scheduled, even with leave still on the books")
+    @DisplayName("archived Troopers are never scheduled")
     void archivedIsNeverScheduled() throws Exception {
         logASheet();
         mvc.perform(post("/api/absences").with(csrf())
@@ -230,7 +225,7 @@ class TrooperRosterIT {
     }
 
     @Test
-    @DisplayName("adding an archived Trooper's name brings them back, history and all")
+    @DisplayName("re-adding an archived name restores them")
     void addingBackRevives() throws Exception {
         logASheet();
         long id = idOf("TROOPER_A");
@@ -256,7 +251,7 @@ class TrooperRosterIT {
     }
 
     @Test
-    @DisplayName("a default BUS Trooper can be set, and there is only ever one")
+    @DisplayName("only one default BUS")
     void oneDefaultBus() throws Exception {
         setDefaultBus("TROOPER_D", true);
         mvc.perform(get("/api/troopers"))
@@ -272,7 +267,7 @@ class TrooperRosterIT {
     }
 
     @Test
-    @DisplayName("an edit that does not mention the default BUS leaves it alone")
+    @DisplayName("edit without defaultBus keeps it")
     void editKeepsDefaultBus() throws Exception {
         setDefaultBus("TROOPER_D", true);
         mvc.perform(put("/api/troopers/" + idOf("TROOPER_D")).with(csrf())
@@ -282,7 +277,7 @@ class TrooperRosterIT {
     }
 
     @Test
-    @DisplayName("a stay-out cannot be the default BUS (422); becoming one, or being archived, gives it up")
+    @DisplayName("stay-outs and archived Troopers lose default BUS")
     void stayOutAndArchiveClearIt() throws Exception {
         mvc.perform(put("/api/troopers/" + idOf("TROOPER_I")).with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
@@ -304,7 +299,7 @@ class TrooperRosterIT {
     }
 
     @Test
-    @DisplayName("a new Trooper can be added as the default BUS, taking it from whoever had it")
+    @DisplayName("new Trooper can take default BUS")
     void addAsDefaultBus() throws Exception {
         setDefaultBus("TROOPER_D", true);
         mvc.perform(post("/api/troopers").with(csrf())
@@ -318,7 +313,7 @@ class TrooperRosterIT {
     }
 
     @Test
-    @DisplayName("renaming someone to an archived Trooper's name is a 409 that says what to do instead")
+    @DisplayName("renaming to an archived name is a 409")
     void renameOntoArchivedName() throws Exception {
         logASheet();
         mvc.perform(delete("/api/troopers/" + idOf("TROOPER_A")).with(csrf()))

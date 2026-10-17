@@ -27,8 +27,8 @@ hosts many teams, and no team sees another's data.
   sheets each booking reaches. Roster tickboxes take someone out of a sheet
   without booking anything.
 - **Records** of hours, nights, BUS runs and leave per Trooper.
-- **Teams and invite links.** The owner makes teams; admins invite members by a
-  one-time link and manage the roster and leave; users read.
+- **Teams and invite links.** The owner makes teams. Admins invite members
+  with one-time links and manage the roster and leave. Users can read.
 - **Light and dark themes**, and a **Help** tab written for each role.
 
 | | |
@@ -62,8 +62,8 @@ filtered by team in the persistence layer.
   1959. Silent hours are 2200–0559. Posts are `AP`, `GG`, `PAC` and `BUS`.
 - **Hard rules**: at most 3 hours in a row, a break of at least 1 hour, at
   most 9 hours a sheet, and stay-outs only 0800–1800 on weekdays.
-- Sheets are **scored** on hour spread first, then excess hours, then walks
-  between AP and GG, so fewer walks never cost fairness.
+- Sheets are **scored** on hour spread first, then excess span, then walks
+  between AP and GG.
 - An independent **validator** checks every rule against the solver's output.
 
 ## Running it locally

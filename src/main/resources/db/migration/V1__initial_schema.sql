@@ -1,6 +1,4 @@
--- ---------------------------------------------------------------------------
--- V1 — the duty scheduler's first schema.
--- ---------------------------------------------------------------------------
+-- V1: initial schema.
 
 -- Who is on the team.
 CREATE TABLE trooper (
@@ -15,8 +13,7 @@ CREATE TABLE trooper (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- One sheet per duty date. The date is the natural key and is unique, but the
--- table still carries a surrogate id.
+-- One sheet per duty date.
 CREATE TABLE duty_sheet (
     id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     duty_date   DATE        NOT NULL UNIQUE,
@@ -41,7 +38,7 @@ CREATE TABLE duty_assignment (
 CREATE INDEX duty_assignment_sheet_idx   ON duty_assignment (sheet_id);
 CREATE INDEX duty_assignment_trooper_idx ON duty_assignment (trooper_id);
 
--- Leave, as an interval rather than a set of day flags.
+-- Leave, as an interval.
 --   FULL        whole days, midnight on from_date to 2000 on to_date
 --   DAY_HALF    0800-2000 on from_date
 --   NIGHT_HALF  2000 on from_date to 0800 the next morning
@@ -61,8 +58,7 @@ CREATE TABLE absence (
     CONSTRAINT absence_kind_known CHECK (kind IN ('MC', 'OL', 'AL', 'MA')),
     CONSTRAINT absence_span_known CHECK (span IN ('FULL', 'DAY_HALF', 'NIGHT_HALF', 'WINDOW')),
     CONSTRAINT absence_dates_ordered CHECK (to_date >= from_date),
-    -- Only a full-day booking spans more than one date, and only a window has
-    -- times.
+    -- Only FULL spans dates; only WINDOW has times.
     CONSTRAINT absence_shape CHECK (
         (span = 'FULL'   AND start_time IS NULL AND end_time IS NULL)
      OR (span IN ('DAY_HALF', 'NIGHT_HALF') AND from_date = to_date

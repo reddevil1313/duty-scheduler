@@ -11,9 +11,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Two views of the same table. The <em>roster</em> is the active Troopers — who
- * can be scheduled, booked on leave, or shown on the board. The plain lookups
- * also see archived Troopers, because a logged sheet still names them.
+ * The roster means active Troopers. The plain lookups include archived ones,
+ * which logged sheets still refer to.
  */
 @Repository
 public interface TrooperRepository extends JpaRepository<TrooperEntity, Long> {
@@ -33,11 +32,7 @@ public interface TrooperRepository extends JpaRepository<TrooperEntity, Long> {
 
     List<TrooperEntity> findByOnNightTrue();
 
-    /**
-     * Clear the default BUS flag from everyone else, before setting it on one.
-     * Flushed straight away: the partial unique index allows only one, so the
-     * old one has to be gone before the new one is written.
-     */
+    /** Clears everyone else's default BUS; the unique index allows only one. */
     @Modifying(flushAutomatically = true, clearAutomatically = false)
     @Transactional
     @Query("UPDATE TrooperEntity t SET t.defaultBus = false WHERE t.defaultBus = true AND t.id <> :keep")

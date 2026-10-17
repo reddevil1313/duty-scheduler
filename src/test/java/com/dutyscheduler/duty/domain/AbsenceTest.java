@@ -25,11 +25,7 @@ class AbsenceTest {
         assertEquals(LocalDateTime.of(2026, 9, 12, 20, 0), mc.endsAt());
     }
 
-    /**
-     * The case the whole interval model exists for. An MC "until the 12th" ends
-     * at 2000 on the 12th, which is the exact moment the 12th's sheet begins — so
-     * it takes the 11th's sheet whole and the 12th's not at all.
-     */
+    /** Ends at 2000 on the 12th, exactly when the 12th's sheet starts. */
     @ParameterizedTest(name = "the {0} sheet loses {1} of its 24 hours")
     @CsvSource({
             "2026-09-09, 20",   // the MC starts at midnight, four hours into this sheet
@@ -49,7 +45,7 @@ class AbsenceTest {
     }
 
     @Test
-    @DisplayName("a day half is 0800 to 2000 and lands on the previous evening's sheet")
+    @DisplayName("day half lands on the previous evening's sheet")
     void dayHalfLandsOnYesterdaysSheet() {
         Absence off = Absence.dayHalf(TROOPER_K, AbsenceKind.OL, LocalDate.of(2026, 9, 11));
 
@@ -60,7 +56,7 @@ class AbsenceTest {
     }
 
     @Test
-    @DisplayName("a night half is 2000 to 0800 and lands on that evening's own sheet")
+    @DisplayName("night half lands on that evening's sheet")
     void nightHalfLandsOnTonightsSheet() {
         Absence off = Absence.nightHalf(TROOPER_K, AbsenceKind.OL, LocalDate.of(2026, 9, 10));
 
@@ -70,7 +66,7 @@ class AbsenceTest {
     }
 
     @Test
-    @DisplayName("an appointment costs every hour it touches, part-hours included")
+    @DisplayName("appointment takes every hour it touches")
     void appointmentCostsWholeHours() {
         Absence ma = Absence.appointment(TROOPER_K, LocalDate.of(2026, 9, 11),
                 LocalTime.of(9, 30), LocalTime.of(11, 30));
@@ -79,12 +75,12 @@ class AbsenceTest {
         String hours = sheet.slots().stream().filter(ma::covers)
                 .map(Slot::label).reduce("", (a, b) -> a.isEmpty() ? b : a + " " + b);
 
-        // 0930 to 1130 spills into three clock hours, and you cannot man half of one.
+        // 0930-1130 touches three hours.
         assertEquals("0900 1000 1100", hours);
     }
 
     @Test
-    @DisplayName("nonsense bookings are refused at construction")
+    @DisplayName("invalid bookings throw")
     void badBookingsAreRejected() {
         assertThrows(IllegalArgumentException.class, () -> Absence.fullDays(
                 TROOPER_K, AbsenceKind.AL, LocalDate.of(2026, 9, 12), LocalDate.of(2026, 9, 10)));

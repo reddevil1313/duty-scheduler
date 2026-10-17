@@ -31,10 +31,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * The leave register as the client uses it: which sheets a booking reaches, the
- * note, the order, and the preview the form shows before anything is saved.
- */
+/** The leave register: reach, notes, order and preview. */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
@@ -66,10 +63,7 @@ class LeaveRegisterIT {
         troopers.save(new TrooperEntity("TROOPER_B", false));
     }
 
-    /**
-     * The 2000 rule, one span at a time. A sheet is named by the evening it
-     * starts, so the answers are mostly the day before the date booked.
-     */
+    /** Mostly the day before the date booked. */
     @ParameterizedTest(name = "{0}: {5}")
     @CsvSource(delimiter = '|', textBlock = """
             MC | FULL       | 2026-09-10 | 2026-09-12 |             | 2026-09-09 2026-09-10 2026-09-11 | an MC until the 12th never touches the 12th's sheet
@@ -94,7 +88,7 @@ class LeaveRegisterIT {
     }
 
     @Test
-    @DisplayName("the note is kept, trimmed, and a blank one is no note at all")
+    @DisplayName("notes are trimmed; blank means none")
     void noteIsKept() throws Exception {
         mvc.perform(post("/api/absences").with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
@@ -113,7 +107,7 @@ class LeaveRegisterIT {
     }
 
     @Test
-    @DisplayName("the register lists the latest leave first")
+    @DisplayName("latest leave first")
     void latestFirst() throws Exception {
         for (String from : new String[] { "2026-09-10", "2026-09-20", "2026-09-01" }) {
             mvc.perform(post("/api/absences").with(csrf())
@@ -126,14 +120,14 @@ class LeaveRegisterIT {
 
         mvc.perform(get("/api/absences"))
                 .andExpect(jsonPath("$[*].from", contains("2026-09-20", "2026-09-10", "2026-09-01")));
-        // The filtered read had the same lazy-Trooper failure, so it gets a look too.
+        // The filtered read too.
         mvc.perform(get("/api/absences").param("trooper", "TROOPER_A"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[*].trooper", contains("TROOPER_A", "TROOPER_A", "TROOPER_A")));
     }
 
     @Test
-    @DisplayName("a preview answers what a booking would reach, and books nothing")
+    @DisplayName("preview books nothing")
     void previewSavesNothing() throws Exception {
         mvc.perform(post("/api/absences/preview").with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
@@ -149,7 +143,7 @@ class LeaveRegisterIT {
     }
 
     @Test
-    @DisplayName("a preview of an impossible booking says what is wrong")
+    @DisplayName("preview of a bad booking says why")
     void previewExplainsAMistake() throws Exception {
         mvc.perform(post("/api/absences/preview").with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
@@ -162,7 +156,7 @@ class LeaveRegisterIT {
 
     @Test
     @WithMockUser(username = "trooper_d", roles = "USER")
-    @DisplayName("anyone signed in may preview, because a preview writes nothing")
+    @DisplayName("any user may preview")
     void previewIsOpenToUsers() throws Exception {
         mvc.perform(post("/api/absences/preview").with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)

@@ -32,10 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * The image and the log go together: an image that comes back means the sheet
- * is logged, and a request that fails leaves nothing logged.
- */
+/** An image means the sheet is logged; a failure logs nothing. */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
@@ -102,7 +99,7 @@ class SheetImageIT {
     }
 
     @Test
-    @DisplayName("the image comes back as a PNG download, and the sheet it shows is now logged")
+    @DisplayName("returns a PNG and logs the sheet")
     void imageLogs() throws Exception {
         String sheet = generate(",\"turnout\":5").replaceFirst("\"turnout\":null", "\"turnout\":5");
 
@@ -122,7 +119,7 @@ class SheetImageIT {
     }
 
     @Test
-    @DisplayName("a sheet that cannot be logged gets no image, and nothing is logged")
+    @DisplayName("no image if it can't be logged")
     void failureLogsNothing() throws Exception {
         String sheet = generate("").replace("TROOPER_D", "NOBODY");
 
@@ -135,7 +132,7 @@ class SheetImageIT {
     }
 
     @Test
-    @DisplayName("a logged sheet's image can be had again, by anyone signed in, without logging anything")
+    @DisplayName("any user can download a logged sheet's image")
     void imageOfALoggedSheet() throws Exception {
         mvc.perform(post("/api/schedules/" + DATE + "/image").with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content(generate("")))
@@ -149,13 +146,13 @@ class SheetImageIT {
     }
 
     @Test
-    @DisplayName("there is no image of a day nothing was logged for")
+    @DisplayName("no image for an unlogged day")
     void noImageWithoutALog() throws Exception {
         mvc.perform(get("/api/schedules/" + DATE + "/image")).andExpect(status().isNotFound());
     }
 
     @Test
-    @DisplayName("a Trooper cannot make the image, because making it logs the sheet")
+    @DisplayName("a Trooper can't make the image")
     void usersCannotLogByImage() throws Exception {
         String sheet = generate("");
         mvc.perform(post("/api/schedules/" + DATE + "/image").with(csrf()).with(user("trooper_d").roles("USER"))

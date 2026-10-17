@@ -1,20 +1,11 @@
 package com.dutyscheduler.duty.api.dto;
 
 /**
- * Who the caller is, and the token their writes must carry.
+ * Who the caller is, plus the CSRF token. Returned to anonymous callers too,
+ * since the login POST needs the token.
  *
- * <p>
- * The two answers travel together on purpose. A client needs a CSRF token
- * before it can POST to the login endpoint — the login POST is itself protected
- * — so the endpoint that hands the token out cannot be one that requires being
- * signed in. Making this a 200 with {@code authenticated: false} rather than a
- * 401 is what lets one call serve both the anonymous and the signed-in case.
- *
- * @param authenticated false for an anonymous caller; the rest of the identity
- *                      fields are then null
- * @param team          the name of the caller's team; null when anonymous, and
- *                      for the owner, who belongs to none
- * @param csrfToken     always present, and always current for this request
+ * @param authenticated false when anonymous; identity fields are then null
+ * @param team          null when anonymous and for the owner
  */
 public record SessionResponse(boolean authenticated,
         String username,

@@ -1,8 +1,4 @@
-/*
- * Light and dark from one set of tokens. The page follows the system unless
- * the masthead's theme button has set data-theme on <html>; both blocks below
- * are needed because a stated choice has to beat the media query either way.
- */
+/* Follows the system unless data-theme is set on <html>. */
 :root {
   --ground: #e9edf1; --surface: #ffffff; --surface-2: #f3f6f9; --sunk: #dde4ea;
   --ink: #14202c; --ink-2: #3d4d5c; --muted: #64757f; --line: #ccd6df; --line-2: #b6c4cf;
@@ -61,8 +57,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* A later display rule on main or a section would otherwise beat the attribute
-   and show two views at once. */
+/* Otherwise a display rule can beat [hidden]. */
 [hidden] { display: none !important; }
 
 h1, h2, h3 { margin: 0; text-wrap: balance; }
@@ -124,8 +119,6 @@ button.danger.solid { background: var(--bad); color: var(--surface); }
 button[aria-pressed="true"] { background: var(--pick-bg); border-color: var(--pick); color: var(--pick); font-weight: 600; }
 button.sm, .row-actions button { padding: 3px 9px; min-height: 0; font-size: 12px; }
 
-/* Every field label reads as a small caps heading above its input; the input
-   itself is set back to body type. */
 label {
   display: inline-flex; flex-direction: column; gap: 5px;
   font-size: 10.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
@@ -139,7 +132,7 @@ input, select {
 }
 input[type="checkbox"], input[type="radio"] { height: auto; padding: 0; accent-color: var(--brass); margin: 0; }
 
-/* A tickable chip: night group, BUS pick, and the roster form's flags. */
+/* Tickable chips. */
 .pill {
   flex-direction: row; align-items: center; gap: 6px;
   font-size: 12.5px; font-weight: 500; letter-spacing: normal; text-transform: none; color: var(--ink);
@@ -182,9 +175,7 @@ input[type="checkbox"], input[type="radio"] { height: auto; padding: 0; accent-c
 }
 .actions { display: flex; gap: 6px; flex-wrap: wrap; }
 
-/* Lines and buttons that come and go keep their space, so nothing below them
-   moves. Measured: before this, entering edit mode pushed the grid down 41px,
-   and a swap pushed the toolbar and grid down 27px. */
+/* Reserve space so the grid doesn't jump. */
 .message, .hint { min-height: 1.4rem; margin: 6px 0; line-height: 1.4rem; font-size: 12.5px; }
 button.mode { min-width: 8.5rem; }
 button.mode.wide { min-width: 11rem; }
@@ -213,12 +204,7 @@ p.ticks {
 
 .grid { min-width: 860px; font-variant-numeric: tabular-nums; }
 
-/*
- * rem, not ch. The header row sets a smaller font-size, and a ch is relative to
- * the element's own font — so with ch the header's fixed columns came out
- * narrower than the body's and the hour labels sat half a column left of the
- * cells they name. rem is relative to the root and immune to that.
- */
+/* rem, not ch: the header has a smaller font, so ch columns misaligned. */
 .row { display: grid; grid-template-columns: 8.5rem repeat(24, minmax(0, 1fr)) 2.9rem 3.2rem; min-height: 27px; }
 .row + .row { border-top: 1px solid var(--grid); }
 
@@ -226,7 +212,7 @@ p.ticks {
   position: relative; text-align: center; min-width: 0;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-/* Not clipped: a stint's block reaches 1px back over the rule it covers. */
+/* Not clipped: blocks overlap the line by 1px. */
 .cell { overflow: visible; }
 .name {
   text-align: left; padding: 0 8px; font-weight: 500; font-size: 12.5px;
@@ -234,8 +220,6 @@ p.ticks {
 }
 .name .tag { font-size: 8.5px; }
 
-/* The day labels sit above the grid: the evening the sheet starts, the
-   morning after, and the totals. */
 .row.days { border: 0; min-height: 0; }
 .row.days > div {
   font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2);
@@ -254,7 +238,7 @@ p.ticks {
 .hour.cross { color: var(--brass); font-weight: 600; }
 
 .cell { border-left: 1px solid var(--grid); background: var(--surface); }
-/* Midnight, where the sheet's date changes, and the totals: heavier rules. */
+/* Heavier lines at midnight and before the totals. */
 .row > .mid { border-left: 1.5px solid var(--grid-strong); }
 .tally {
   font-family: var(--mono); font-size: 11.5px; color: var(--ink-2);
@@ -264,9 +248,7 @@ p.ticks {
 .row > .tally:nth-last-child(2) { border-left: 1.5px solid var(--grid-strong); }
 .row.head > .tally { display: block; }
 
-/* A stint is one block across its hours, rounded at either end, labelled once
-   where it starts. Inner cells drop their rule and the block covers it, so a
-   three-hour AP reads as one thing, not three. */
+/* One rounded block per stint. */
 .cell .blk {
   position: absolute; inset: 3px 0; display: flex; align-items: center; justify-content: center;
   font-family: var(--mono); font-size: 9.5px; font-weight: 600;
@@ -286,12 +268,10 @@ p.ticks {
   background: repeating-linear-gradient(135deg, var(--mp-bg) 0 4px, color-mix(in srgb, var(--mp-bg) 70%, var(--mp)) 4px 5px);
 }
 
-/* Hours a Trooper is on leave: hatched, so they read as unavailable rather
-   than as hours nobody posted. */
+/* Leave hours, hatched. */
 .cell.away { background: repeating-linear-gradient(135deg, transparent 0 3px, var(--line) 3px 4px); }
 
-/* Outlines drawn over the block, not under it: an inset shadow on the cell
-   would be hidden by the block it is meant to point at. */
+/* Over the block, or the block would hide it. */
 .cell.flag::after, .cell.away.on::after, .grid.editing .cell:hover::after {
   content: ""; position: absolute; inset: 1px; border-radius: 4px; pointer-events: none; z-index: 1;
 }
@@ -300,8 +280,7 @@ p.ticks {
 .grid.editing .cell { cursor: pointer; }
 .grid.editing .cell:hover::after { border: 2px solid var(--pick); }
 
-/* Away all sheet: one hatched band saying why, rather than twenty-four empty
-   cells that look like a Trooper nobody posted. */
+/* Away all sheet: one hatched band. */
 .row.out .name { color: var(--muted); }
 .row.out .tally { color: var(--muted); }
 .band {
@@ -333,8 +312,7 @@ p.ticks {
 .cell.cov.short { color: var(--warn); background: var(--warn-bg); }
 .cell.cov.over { color: var(--bad); background: var(--bad-bg); }
 
-/* Absolute in page coordinates: no ancestor of the menu is positioned, so it
-   is placed against the document and scrolls with the cell it belongs to. */
+/* Page coordinates, so it scrolls with its cell. */
 .cell-menu {
   position: absolute; z-index: 60; min-width: 8rem;
   background: var(--surface); border: 1px solid var(--line-2); border-radius: 6px;
@@ -431,7 +409,7 @@ td.row-actions > * + * { margin-left: 6px; }
 .leave-form .times { display: flex; align-items: center; gap: 6px; color: var(--muted); }
 .leave-form .preview { flex-basis: 100%; margin: 0; }
 
-/* Help: prose, kept to a readable measure inside each panel. */
+/* Help */
 .help-toc { display: flex; flex-wrap: wrap; gap: 6px; padding: 13px; }
 .help-body { padding: 4px 18px 12px; max-width: 76ch; font-size: 14px; line-height: 1.6; }
 .help-body p, .help-body ul, .help-body ol { margin: 10px 0; }
@@ -439,25 +417,20 @@ td.row-actions > * + * { margin-left: 6px; }
 .help-body ul, .help-body ol { padding-left: 22px; }
 .help article { scroll-margin-top: 12px; }
 
-/* A row of fields and a button in a panel: the team and invite forms. */
 .inline-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 11px; padding: 13px; }
 .inline-form .full { flex-basis: 100%; margin: 0; }
 
-/* A link just made: shown once, with its copy button beside it. */
 .invite-link { padding: 0 13px 13px; }
 .invite-link .note { margin: 0 0 8px; }
 .invite-link .row { display: flex; gap: 8px; }
 .invite-link input { flex: 1; min-width: 0; font-family: var(--mono); font-size: 12px; }
 
-/* The register's filter sits in its heading, so it reads across, not stacked. */
 .panel-hd .filter { flex-direction: row; align-items: center; gap: 8px; }
 .panel-hd .filter select { height: 28px; font-size: 12.5px; }
 .kind-table .panel-hd h2 { display: flex; align-items: center; gap: 8px; }
-/* Wide enough for its columns on a phone: the table scrolls, the page does not. */
+/* The table scrolls on a phone, not the page. */
 .table-scroll { overflow-x: auto; }
-/* Every column a share of the width, none fixed in pixels: a fixed actions
-   column left the note nothing at phone width, and it wrapped a letter a line.
-   Below the minimum the table scrolls rather than squeeze. */
+/* Percent widths; a fixed actions column squeezed the note on phones. */
 .table-scroll .register { min-width: 820px; }
 .kind-table .register { table-layout: fixed; }
 .kind-table .c-trooper { width: 14%; }
@@ -481,9 +454,8 @@ input.hours { width: 5.5rem; }
   .controls > label, .controls input, .controls select { width: 100%; }
 }
 
-/* The sheet header's buttons sit in a panel heading: kept compact. */
 .sheet-bar button { min-height: 28px; padding: 3px 11px; font-size: 12.5px; }
 .sheet-bar .actions { margin-left: auto; }
 
-/* Names stay put while the hours scroll under them on a narrow screen. */
+/* Sticky names on narrow screens. */
 .grid .name { position: sticky; left: 0; z-index: 2; }

@@ -25,9 +25,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/absences")
-// A team's own accounts only. The owner has no team, so would read nothing
-// here anyway; refusing them outright says so. Methods that write narrow this
-// to ADMIN with their own annotation, which takes precedence over this one.
+// Not the owner, who has no team. Write methods narrow this to ADMIN.
 @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
 public class AbsenceController {
 
@@ -63,13 +61,8 @@ public class AbsenceController {
     }
 
     /**
-     * What a booking would take, without making it. The form calls this as it is
-     * filled in, so the sheets a booking reaches are on screen before it is
-     * saved — the 2000 cut-off is a surprise a week later otherwise.
-     *
-     * <p>
-     * Saves nothing, so any signed-in user may ask. The Trooper is not looked
-     * up: who it is changes nothing about the interval.
+     * Which sheets a booking would reach, without saving it. The form calls
+     * this while it is filled in.
      */
     @PostMapping("/preview")
     public AbsenceReach preview(@Valid @RequestBody AbsenceRequest request) {

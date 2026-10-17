@@ -8,20 +8,9 @@ import org.springframework.test.context.TestContext;
 import org.springframework.test.context.TestExecutionListener;
 
 /**
- * Every Spring test method runs as one team, "Test team", opened before its
- * {@code @BeforeEach} and closed after it.
- *
- * <p>
- * The tests seed rosters straight through the repositories, with nobody
- * signed in, and most of them make requests as a {@code @WithMockUser}, whose
- * principal names no team. Both fall back to the thread's scope, so with this
- * they work as one team exactly as they did before there were teams. A test
- * about teams signs in with real accounts, whose own team takes precedence
- * over this scope — which is the property it is there to prove.
- *
- * <p>
- * Registered in {@code META-INF/spring.factories}, so it joins the default
- * listeners for every Spring test without each class asking for it.
+ * Runs every Spring test method in "Test team", so repository seeding and
+ * {@code @WithMockUser} requests share a team. Registered in
+ * {@code META-INF/spring.factories}.
  */
 public class TestTeamListener implements TestExecutionListener, Ordered {
 
@@ -50,7 +39,7 @@ public class TestTeamListener implements TestExecutionListener, Ordered {
 
     @Override
     public int getOrder() {
-        // Early, so the scope is open before anything that touches the database.
+
         return Ordered.HIGHEST_PRECEDENCE + 100;
     }
 }

@@ -25,13 +25,13 @@ class AvailabilityTest {
 
     @ParameterizedTest(name = "a free run of {0} hours holds {1} hours of duty")
     @CsvSource({ "0, 0", "1, 1", "2, 2", "3, 3", "4, 3", "5, 4", "7, 6", "8, 6", "24, 18" })
-    @DisplayName("three on, one off, so a run never holds as much as it looks like it should")
+    @DisplayName("3 on 1 off caps a run")
     void stintCapacityArithmetic(int free, int holds) {
         assertEquals(holds, DutyRules.stintCapacity(free));
     }
 
     @Test
-    @DisplayName("a stay-out has ten hours of a weekday sheet, 0800 to 1800")
+    @DisplayName("stay-out: 0800-1800 on weekdays")
     void stayOutWeekdayWindow() {
         boolean[] mask = Availability.mask(TROOPER_B, DutyDay.of(THURSDAY), List.of());
 
@@ -44,7 +44,7 @@ class AvailabilityTest {
     }
 
     @Test
-    @DisplayName("a stay-out has none of a weekend sheet at all")
+    @DisplayName("stay-out: nothing at the weekend")
     void stayOutHasNoWeekend() {
         assertEquals(0, Availability.freeHours(
                 Availability.mask(TROOPER_B, DutyDay.of(SATURDAY), List.of())));
@@ -54,7 +54,7 @@ class AvailabilityTest {
     }
 
     @Test
-    @DisplayName("an absence takes only the hours it actually overlaps")
+    @DisplayName("absence takes only overlapping hours")
     void absenceTakesOnlyItsOwnHours() {
         Absence ma = Absence.appointment(TROOPER_A, LocalDate.of(2026, 9, 11),
                 java.time.LocalTime.of(9, 30), java.time.LocalTime.of(11, 30));
@@ -65,7 +65,7 @@ class AvailabilityTest {
     }
 
     @Test
-    @DisplayName("somebody else's leave is not your problem")
+    @DisplayName("other people's leave doesn't matter")
     void absencesAreFilteredByTrooper() {
         Absence hisLeave = Absence.fullDays(TROOPER_B, AbsenceKind.MC, THURSDAY, THURSDAY);
 
@@ -74,7 +74,7 @@ class AvailabilityTest {
     }
 
     @Test
-    @DisplayName("night is the clock, not the post — the same eight slots on any sheet")
+    @DisplayName("silent hours are the same eight slots on any sheet")
     void nightIsDefinedByTheClock() {
         boolean[] weekday = Availability.silentSlots(DutyDay.of(THURSDAY));
         boolean[] weekend = Availability.silentSlots(DutyDay.of(SATURDAY));
@@ -89,7 +89,7 @@ class AvailabilityTest {
     }
 
     @Test
-    @DisplayName("the silent hours and the day hours partition the sheet")
+    @DisplayName("silent and day hours partition the sheet")
     void silentAndDayHoursAddUp() {
         DutyDay day = DutyDay.of(THURSDAY);
 
@@ -101,13 +101,9 @@ class AvailabilityTest {
         assertEquals(47, silent + daytime);
     }
 
-    /**
-     * The result this whole step exists to produce. Nobody decided three; it is
-     * what the stint rule does to the silent block, and it would move on its own
-     * if either number changed.
-     */
+    /** Follows from the stint rule, not a setting. */
     @Test
-    @DisplayName("three Troopers on night is arithmetic, not policy")
+    @DisplayName("silent hours need at least three")
     void minimumNightGroupIsDerived() {
         DutyDay day = DutyDay.of(THURSDAY);
         boolean[] silent = Availability.silentSlots(day);
@@ -116,12 +112,11 @@ class AvailabilityTest {
         assertEquals(6, Availability.capacity(silent), "and one Trooper can supply six of them");
         assertEquals(3, Availability.minimumNightGroup(day), "so the night group cannot be smaller than three");
 
-        // Same on a weekend sheet, because the silent block is the same eight hours.
         assertEquals(3, Availability.minimumNightGroup(DutyDay.of(SATURDAY)));
     }
 
     @Test
-    @DisplayName("capacity within a window is the intersection, not the whole mask")
+    @DisplayName("capacity within a window")
     void capacityWithinAWindow() {
         DutyDay day = DutyDay.of(THURSDAY);
         boolean[] stayOut = Availability.mask(TROOPER_B, day, List.of());

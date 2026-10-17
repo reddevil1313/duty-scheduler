@@ -35,11 +35,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * The owner, teams, invite links and members, the way people use them: every
- * account here signs in through the real login and works in its own session,
- * and every account but the owner's is made by accepting an invite.
- */
+/** Owner, teams, invites and members, through the real login and invite flow. */
 @SpringBootTest(properties = {
         "owner.bootstrap.username=root",
         "owner.bootstrap.password=root-password" })
@@ -67,7 +63,7 @@ class TeamsIT {
 
     @BeforeEach
     void onlyTheOwner() {
-        // Everything but the owner, so each test starts from a server with no teams.
+        // Keep only the owner.
         jdbc.execute("DELETE FROM invite");
         jdbc.execute("DELETE FROM app_user WHERE role <> 'OWNER'");
         jdbc.execute("TRUNCATE hour_credit, duty_assignment, duty_sheet, absence, trooper CASCADE");
@@ -94,7 +90,7 @@ class TeamsIT {
         return json.readValue(body, Map.class);
     }
 
-    /** As the owner: a team, and the token of the invite for its first admin. */
+    /** Makes a team as the owner and returns the first-admin invite token. */
     @SuppressWarnings("unchecked")
     private String newTeam(String name) throws Exception {
         Map<String, Object> created = read(in(signIn("root", "root-password"), post("/api/teams"))
@@ -110,7 +106,6 @@ class TeamsIT {
                 .andExpect(status().isCreated());
     }
 
-    /** A team with an admin signed in, ready to invite. */
     private MockHttpSession adminOf(String team, String username) throws Exception {
         accept(newTeam(team), username);
         return signIn(username, "long-enough-password");
@@ -124,7 +119,7 @@ class TeamsIT {
     // ---- the owner ----------------------------------------------------------
 
     @Test
-    @DisplayName("the owner is made from the environment once, and a restart leaves their password alone")
+    @DisplayName("owner is created once; a restart keeps the password")
     void ownerBootstrap() throws Exception {
         AppUserEntity owner = users.findByUsername("root").orElseThrow();
         assertThat(owner.getRole()).isEqualTo("OWNER");
@@ -137,7 +132,7 @@ class TeamsIT {
     }
 
     @Test
-    @DisplayName("the owner has no team: the session says so, and every team endpoint refuses them")
+    @DisplayName("the owner has no team and is refused by team endpoints")
     void ownerSeesNoTeamData() throws Exception {
         MockHttpSession owner = signIn("root", "root-password");
         mvc.perform(get("/api/session").session(owner))
@@ -153,7 +148,7 @@ class TeamsIT {
     }
 
     @Test
-    @DisplayName("the owner makes a team with a first-admin invite; names are unique ignoring case")
+    @DisplayName("owner makes a team with an invite; names are case-insensitive")
     void ownerMakesTeams() throws Exception {
         MockHttpSession owner = signIn("root", "root-password");
         Map<String, Object> created = read(in(owner, post("/api/teams")).content("{\"name\":\" Alpha \"}"), 201);
@@ -176,7 +171,7 @@ class TeamsIT {
     }
 
     @Test
-    @DisplayName("the owner can invite into an existing team, and a missing team is a 404")
+    @DisplayName("owner can invite into an existing team")
     void ownerInvitesIntoATeam() throws Exception {
         newTeam("Alpha");
         MockHttpSession owner = signIn("root", "root-password");
@@ -191,7 +186,7 @@ class TeamsIT {
     // ---- invite links -------------------------------------------------------
 
     @Test
-    @DisplayName("an invite link shows its team and role to anyone, and accepting it makes a signed-in member")
+    @DisplayName("accepting an invite makes a signed-in member")
     void acceptAnInvite() throws Exception {
         String token = newTeam("Alpha");
         mvc.perform(get("/api/invites/" + token))
@@ -204,12 +199,12 @@ class TeamsIT {
         mvc.perform(get("/api/session").session(session))
                 .andExpect(jsonPath("$.role").value("ADMIN"))
                 .andExpect(jsonPath("$.team").value("Alpha"));
-        // In the team, which starts with an empty roster.
+
         mvc.perform(get("/api/troopers").session(session)).andExpect(status().isOk()).andExpect(jsonPath("$", hasSize(0)));
     }
 
     @Test
-    @DisplayName("a link works once; used, unknown and expired links are the same 404")
+    @DisplayName("links work once; bad links are all 404")
     void linksDie() throws Exception {
         String token = newTeam("Alpha");
         accept(token, "alpha_admin");
@@ -226,7 +221,7 @@ class TeamsIT {
     }
 
     @Test
-    @DisplayName("a taken username is a 409 and leaves the invite usable; a bad username or short password is a 400")
+    @DisplayName("taken username is 409 and keeps the invite; bad input is 400")
     void acceptingRefusals() throws Exception {
         String token = newTeam("Alpha");
         accept(token, "alpha_admin");
@@ -241,17 +236,17 @@ class TeamsIT {
         mvc.perform(post("/api/invites/" + next + "/accept").with(csrf()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"username\":\"newcomer\",\"displayName\":\"X\",\"password\":\"short\"}"))
                 .andExpect(status().isBadRequest())
-                // The message written on the request type, as a problem document.
+
                 .andExpect(jsonPath("$.detail").value("A password is at least 10 characters."));
 
-        // Still open after all three.
+        // Still usable.
         mvc.perform(get("/api/invites/" + next)).andExpect(status().isOk()).andExpect(jsonPath("$.role").value("USER"));
         accept(next, "newcomer");
         assertThat(users.findByUsername("newcomer")).map(AppUserEntity::getRole).hasValue("USER");
     }
 
     @Test
-    @DisplayName("an admin sees the team's pending invites without their tokens, and can revoke one")
+    @DisplayName("admin lists and revokes invites")
     void pendingAndRevoke() throws Exception {
         MockHttpSession admin = adminOf("Alpha", "alpha_admin");
         String token = invite(admin, "USER");
@@ -285,7 +280,7 @@ class TeamsIT {
     // ---- members ------------------------------------------------------------
 
     @Test
-    @DisplayName("an admin lists the team's accounts, and only the team's")
+    @DisplayName("admin lists only the team's accounts")
     void members() throws Exception {
         MockHttpSession admin = adminOf("Alpha", "alpha_admin");
         accept(invite(admin, "USER"), "alpha_user");
@@ -298,7 +293,7 @@ class TeamsIT {
     }
 
     @Test
-    @DisplayName("a team keeps an admin: the last cannot be demoted, and nobody removes themselves")
+    @DisplayName("last admin can't be demoted; nobody removes themselves")
     void keepAnAdmin() throws Exception {
         MockHttpSession admin = adminOf("Alpha", "alpha_admin");
         long self = users.findByUsername("alpha_admin").orElseThrow().getId();
@@ -315,7 +310,7 @@ class TeamsIT {
     }
 
     @Test
-    @DisplayName("a removed account's session ends at its next request; a demoted admin's too")
+    @DisplayName("removed or demoted accounts are signed out")
     void sessionsFollowTheAccount() throws Exception {
         MockHttpSession admin = adminOf("Alpha", "alpha_admin");
         accept(invite(admin, "USER"), "alpha_user");
@@ -332,13 +327,13 @@ class TeamsIT {
         long secondId = users.findByUsername("alpha_second").orElseThrow().getId();
         mvc.perform(in(admin, put("/api/members/" + secondId)).content("{\"role\":\"USER\"}")).andExpect(status().isOk());
         mvc.perform(in(second, post("/api/invites")).content("{\"role\":\"USER\"}")).andExpect(status().isUnauthorized());
-        // Signing in again gives the new role.
+
         mvc.perform(get("/api/session").session(signIn("alpha_second", "long-enough-password")))
                 .andExpect(jsonPath("$.role").value("USER"));
     }
 
     @Test
-    @DisplayName("another team's member is a 404 to change or remove")
+    @DisplayName("another team's member is a 404")
     void othersMembers() throws Exception {
         MockHttpSession alpha = adminOf("Alpha", "alpha_admin");
         adminOf("Bravo", "bravo_admin");

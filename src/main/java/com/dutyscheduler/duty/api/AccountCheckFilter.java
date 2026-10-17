@@ -14,20 +14,10 @@ import java.io.IOException;
 import java.util.Objects;
 
 /**
- * Ends a session whose account has been removed, or whose role or team has
- * changed since it signed in.
- *
- * <p>
- * The session holds the account as it was at sign-in — the role every check
- * reads and the team every query is filtered by. Without this, someone an
- * admin removed would keep their access until the session timed out, and a
- * demoted admin would stay an admin until they signed out themselves.
- *
- * <p>
- * The request carries on as anonymous rather than failing here: the session
- * endpoint then answers "signed out" with a 200, which is what tells the
- * client to show the sign-in form, and anything that needs an account gets the
- * usual 401. One lookup by primary key per signed-in request.
+ * Ends the session if the account was removed or its role or team changed
+ * since sign-in; otherwise a removed user keeps access until the session
+ * expires. The request continues as anonymous, so the client sees
+ * "signed out" and other endpoints give their usual 401.
  */
 final class AccountCheckFilter extends OncePerRequestFilter {
 

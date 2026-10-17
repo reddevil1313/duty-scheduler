@@ -29,20 +29,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * What the roles actually do, tested through the HTTP layer.
- *
- * <p>
- * The UI will hide buttons a Trooper cannot use, and that is a courtesy, not a
- * control — anyone can open a terminal. These tests go straight at the
- * endpoints with a Trooper's credentials and insist on a 403, because that is
- * the only place the answer really lives.
- *
- * <p>
- * Note the {@code csrf()} post-processor on every write. Without it the writes
- * would fail with 403 too, and the test would pass for entirely the wrong
- * reason:
- * it would be proving CSRF is on rather than that roles are enforced. Passing a
- * valid token is what makes the Trooper's 403 mean what it claims to.
+ * Role checks at the HTTP layer. Writes send a CSRF token, so a 403 means the
+ * role was refused and not the token.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -104,11 +92,9 @@ class ApiSecurityIT {
     }
 
     @Test
-    @DisplayName("the session endpoint answers an anonymous caller, and hands out a token")
+    @DisplayName("session endpoint works anonymously and returns a token")
     void anonymousStillGetsACsrfToken() throws Exception {
-        // The one endpoint that must work signed out. The login POST is itself
-        // CSRF-protected, so a client with no token cannot sign in — and a 401
-        // here would leave it with no way to get one.
+        // The login POST needs this token.
         mvc.perform(get("/api/session"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.authenticated").value(false))
@@ -117,22 +103,20 @@ class ApiSecurityIT {
     }
 
     @Test
-    @DisplayName("the session endpoint names the signed-in user and their role")
+    @DisplayName("session endpoint shows user and role")
     void sessionNamesTheUser() throws Exception {
         mvc.perform(get("/api/session").with(user("admin").roles("ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.authenticated").value(true))
                 .andExpect(jsonPath("$.username").value("admin"))
-                // ADMIN, not ROLE_ADMIN. The prefix is Spring's business, not the client's.
+                // Without the ROLE_ prefix.
                 .andExpect(jsonPath("$.role").value("ADMIN"));
     }
 
     @Test
-    @DisplayName("a POST to the session endpoint is not permitted by the anonymous rule")
+    @DisplayName("POST to the session endpoint is not open")
     void onlyGetIsOpen() throws Exception {
-        // The permitAll rule names GET explicitly. If it were written as a bare
-        // path it would open every method on it, and this test is what would
-        // notice.
+        // permitAll is for GET only.
         mvc.perform(post("/api/session").with(csrf())).andExpect(status().isUnauthorized());
     }
 
@@ -154,7 +138,7 @@ class ApiSecurityIT {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
-    @DisplayName("an ADMIN adds a Trooper, and they join the end of the roster")
+    @DisplayName("admin adds a Trooper to the end of the roster")
     void adminAddsTrooper() throws Exception {
         mvc.perform(post("/api/troopers").with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
@@ -186,7 +170,7 @@ class ApiSecurityIT {
 
     @Test
     @WithMockUser(username = "trooper_d", roles = "USER")
-    @DisplayName("a Trooper cannot edit or remove anyone on the roster")
+    @DisplayName("a Trooper cannot edit or remove anyone")
     void trooperCannotEditOrRemove() throws Exception {
         long id = troopers.findByName("TROOPER_A").orElseThrow().getId();
 
@@ -204,7 +188,7 @@ class ApiSecurityIT {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
-    @DisplayName("a name already on the roster is a 409, not a second row")
+    @DisplayName("duplicate name is a 409")
     void duplicateNameConflicts() throws Exception {
         mvc.perform(post("/api/troopers").with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
@@ -217,7 +201,7 @@ class ApiSecurityIT {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
-    @DisplayName("a stay-out on the night group is a 422: well formed, but impossible")
+    @DisplayName("stay-out on night is a 422")
     void stayOutOnNightIsUnprocessable() throws Exception {
         mvc.perform(post("/api/troopers").with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
@@ -241,11 +225,9 @@ class ApiSecurityIT {
     }
 
     @Test
-    @DisplayName("a wrong password is a 401 with a problem body, not a redirect")
+    @DisplayName("wrong password is a 401, not a redirect")
     void badSignInIsUnauthorized() throws Exception {
-        // Left at its default, formLogin answers with a 302 to /login?error.
-        // fetch() follows redirects silently, so the browser would see a 200 and
-        // report a successful sign-in. This is the test that pins the status.
+        // The default is a 302, which fetch() would follow to a 200.
         mvc.perform(post("/api/session/login").with(csrf())
                 .param("username", "admin")
                 .param("password", "not-the-password"))
@@ -254,7 +236,7 @@ class ApiSecurityIT {
     }
 
     @Test
-    @DisplayName("health is open, because a load balancer has no account")
+    @DisplayName("health is open")
     void healthIsPublic() throws Exception {
         mvc.perform(get("/actuator/health")).andExpect(status().isOk());
     }
@@ -264,14 +246,13 @@ class ApiSecurityIT {
     @DisplayName("a trooper can read the board and the register")
     void stCanRead() throws Exception {
         mvc.perform(get("/api/absences")).andExpect(status().isOk());
-        // Nothing logged for that date yet, so 404 — but a 404 means they got past
-        // security, which is the thing under test.
+        // 404 means it got past security.
         mvc.perform(get("/api/schedules/2026-09-10")).andExpect(status().isNotFound());
     }
 
     @Test
     @WithMockUser(username = "trooper_d", roles = "USER")
-    @DisplayName("a trooper cannot generate, log or book — every write is refused")
+    @DisplayName("a trooper cannot generate, log or book")
     void stCannotWrite() throws Exception {
         mvc.perform(post("/api/schedules/generate").with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content(GENERATE_BODY))
@@ -305,7 +286,7 @@ class ApiSecurityIT {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
-    @DisplayName("a write without a CSRF token is refused even for an ADMIN")
+    @DisplayName("writes without a CSRF token are refused")
     void csrfIsEnforced() throws Exception {
         mvc.perform(post("/api/absences")
                 .contentType(MediaType.APPLICATION_JSON).content(ABSENCE_BODY))
@@ -314,9 +295,9 @@ class ApiSecurityIT {
 
     @Test
     @WithMockUser(username = "admin", roles = "ADMIN")
-    @DisplayName("a well-formed request the manpower cannot cover is 422, not 400")
+    @DisplayName("uncoverable request is 422")
     void unsolvableIsUnprocessable() throws Exception {
-        // Two Troopers on night cannot hold sixteen silent hours, whatever else is true.
+        // Two night Troopers can't cover 16 silent hours.
         String impossible = """
                 {"date":"2026-09-10","nightGroup":["TROOPER_A","TROOPER_B"]}
                 """;

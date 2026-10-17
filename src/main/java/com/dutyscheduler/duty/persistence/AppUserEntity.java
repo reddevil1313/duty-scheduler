@@ -3,12 +3,8 @@ package com.dutyscheduler.duty.persistence;
 import jakarta.persistence.*;
 
 /**
- * An account. The password column holds a bcrypt hash and nothing else.
- *
- * <p>
- * Not scoped by {@code @TenantId}: signing in has to find an account before
- * anyone knows its team, and the owner's has none. The team is a plain column,
- * and the code that lists a team's members filters on it by hand.
+ * An account; the password is a bcrypt hash. Not a {@code @TenantId} entity,
+ * since sign-in happens before the team is known. Filter by team by hand.
  */
 @Entity
 @Table(name = "app_user")

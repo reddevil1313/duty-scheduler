@@ -25,18 +25,14 @@ class ScheduleScoreTest {
 
     @ParameterizedTest(name = "{0} hours can be done in no less than {1}")
     @CsvSource({ "0, 0", "1, 1", "3, 3", "4, 5", "6, 7", "7, 9", "9, 11" })
-    @DisplayName("the break rule sets a floor on how tight a span can be")
+    @DisplayName("minimum span")
     void tightestSpanIsBoundedByTheBreakRule(int hours, int tightest) {
         assertEquals(tightest, DutyRules.tightestSpan(hours));
     }
 
-    /**
-     * The rule that makes an early-evening stint affordable. Without it, a Trooper who
-     * works 2000-2200 and comes back at 0800 looks like they have been on duty for
-     * fourteen hours, and the search will not give anyone an evening hour again.
-     */
+    /** Otherwise 2000-2200 plus 0800 would look like 14 hours on duty. */
     @Test
-    @DisplayName("a gap of ten hours or more is rest, and does not count as span")
+    @DisplayName("a gap of ten or more is rest")
     void aLongGapIsRestNotSpan() {
         Schedule.Row split = row(TROOPER_E, "AP AP . . . . . . . . . . PAC PAC PAC . . . . . . . . .");
 
@@ -46,7 +42,7 @@ class ScheduleScoreTest {
     }
 
     @Test
-    @DisplayName("a gap shorter than that is just waiting around, and counts")
+    @DisplayName("shorter gaps count as span")
     void aShortGapIsNotRest() {
         Schedule.Row waiting = row(TROOPER_E, ". . AP AP . . . . PAC PAC . . . . . . . . . . . . . .");
 
@@ -56,20 +52,19 @@ class ScheduleScoreTest {
     }
 
     @Test
-    @DisplayName("stay-outs are left out of the span score")
+    @DisplayName("stay-outs are excluded from span")
     void stayOutsAreExempt() {
         Schedule sprawling = Schedule.builder(DutyDay.of(THURSDAY))
                 .row(TROOPER_F, ". . . . . . . . . . . . PAC . . . . . . . PAC . . .")
                 .build();
 
-        // They are in 0800 to 1800 whatever they are doing, so spreading their two
-        // hours across it costs them nothing and the score should not pretend it does.
+        // They're in 0800-1800 anyway.
         assertEquals(0, ScheduleScore.of(sprawling).totalExcess());
         assertTrue(sprawling.rows().get(0).excessSpan() > 0, "the row itself still reports the span");
     }
 
     @Test
-    @DisplayName("hours come before span, and the worst-off Trooper before the total")
+    @DisplayName("hours before span, worst before total")
     void theOrderingIsLexicographic() {
         ScheduleScore evenHoursLooseSpans = new ScheduleScore(1, 6, 20, 0);
         ScheduleScore unevenHoursTightSpans = new ScheduleScore(3, 0, 0, 0);
@@ -86,7 +81,7 @@ class ScheduleScoreTest {
     }
 
     @Test
-    @DisplayName("post changes only break ties: fairness is never traded for fewer walks")
+    @DisplayName("walks only break ties")
     void postChangesComeLast() {
         assertTrue(new ScheduleScore(1, 3, 5, 9).isBetterThan(new ScheduleScore(1, 3, 6, 0)),
                 "an hour less wasted beats any number of walks saved");
@@ -97,7 +92,7 @@ class ScheduleScoreTest {
     }
 
     @Test
-    @DisplayName("walks between AP and GG are counted for everyone, stay-outs included")
+    @DisplayName("walks count for stay-outs too")
     void postChangesAreSummed() {
         Schedule sheet = Schedule.builder(DutyDay.of(THURSDAY))
                 .row(TROOPER_E, ". . GG GG GG . AP . GG GG GG . . . . . . . . . . . . .")

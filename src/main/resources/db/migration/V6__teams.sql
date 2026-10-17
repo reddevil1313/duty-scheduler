@@ -1,28 +1,13 @@
--- ---------------------------------------------------------------------------
--- V6 — teams.
---
--- One server, many teams, and no team sees another's roster, sheets, leave or
--- records. Every one of those rows now carries the team it belongs to, and
--- what was unique for the whole database is unique within a team: two teams
--- can each have a TROOPER_A, and each log a sheet for the same evening.
---
--- The application filters every read by the signed-in account's team. The
--- database holds the other half: the composite foreign keys below make it
--- impossible for a sheet, a leave booking or a credit to point at another
--- team's Trooper, whatever the application does. Each child table carries
--- team_id itself, rather than reaching it through its parent, so that the
--- key can be checked.
---
--- Existing data goes into one team, created only when there is data to put
--- in it, so a fresh database starts with no teams at all.
--- ---------------------------------------------------------------------------
+-- V6: teams. Team-owned rows get team_id, uniqueness becomes per team, and
+-- composite foreign keys stop rows pointing at another team's Trooper or
+-- sheet. Existing data goes into "First team" (only if there is any).
 
 CREATE TABLE team (
     id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     name        TEXT        NOT NULL,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
--- Case-insensitive, so the owner cannot end up with "Alpha" and "alpha".
+-- Case-insensitive.
 CREATE UNIQUE INDEX team_name_unique ON team (lower(name));
 
 INSERT INTO team (name)
@@ -32,8 +17,7 @@ SELECT 'First team'
     OR EXISTS (SELECT 1 FROM app_user);
 
 -- ---- accounts --------------------------------------------------------------
--- Every account but the owner's belongs to exactly one team. The owner runs
--- the server, creates the teams, and belongs to none of them.
+-- The owner has no team; everyone else has exactly one.
 ALTER TABLE app_user ADD COLUMN team_id BIGINT REFERENCES team (id);
 UPDATE app_user SET team_id = (SELECT min(id) FROM team);
 ALTER TABLE app_user DROP CONSTRAINT app_user_role_known;
@@ -91,6 +75,5 @@ ALTER TABLE hour_credit ADD CONSTRAINT hour_credit_trooper_same_team
     FOREIGN KEY (trooper_id, team_id) REFERENCES trooper (id, team_id);
 
 -- ---- a leftover ------------------------------------------------------------
--- V1's single-row team settings were never read by anything, and one row of
--- settings for the whole server says the opposite of what this migration does.
+-- V1's team_config was never used.
 DROP TABLE team_config;

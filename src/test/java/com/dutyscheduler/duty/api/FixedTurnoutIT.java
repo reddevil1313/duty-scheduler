@@ -25,7 +25,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** Fixed turnouts through the API: the sheet that comes back, and the two ways it is refused. */
+/** Fixed turnouts through the API. */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
@@ -69,7 +69,7 @@ class FixedTurnoutIT {
     }
 
     @Test
-    @DisplayName("at 5h each the sheet comes back with 46 of its 47 hours, one left for the MP team")
+    @DisplayName("5h each covers 46 of 47 hours")
     void fiveEach() throws Exception {
         mvc.perform(post("/api/schedules/generate").with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content(body(5)))
@@ -78,7 +78,7 @@ class FixedTurnoutIT {
     }
 
     @Test
-    @DisplayName("a turnout that makes more hours than the sheet needs is a 422 that suggests the free split")
+    @DisplayName("too many hours is a 422")
     void tooManyIs422() throws Exception {
         mvc.perform(post("/api/schedules/generate").with(csrf())
                 .contentType(MediaType.APPLICATION_JSON).content(body(7)))

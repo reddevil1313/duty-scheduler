@@ -31,7 +31,7 @@ public final class Availability {
                 .filter(absence -> absence.trooper().equals(trooper))
                 .filter(absence -> absence.touches(day))
                 .toList();
-        
+
         boolean[] mask = new boolean[DutyDay.SLOT_COUNT];
         for (int i = 0; i < DutyDay.SLOT_COUNT; i++) {
             Slot slot = day.slot(i);
@@ -75,9 +75,7 @@ public final class Availability {
      * Most duty hours that can actually be placed inside a mask, once 3-on/1-off
      * is applied to each unbroken run.
      *
-     * <p>This is an <em>upper bound</em>, and deliberately so. Used as a
-     * prune so that it can only ever over-estimate what is reachable, which
-     * means it never cuts off a schedule that exists.
+     * <p>An upper bound, so pruning with it never cuts off a real schedule.
      */
     public static int capacity(boolean[] mask) {
         int capacity = 0;
@@ -94,7 +92,7 @@ public final class Availability {
         return capacity + DutyRules.stintCapacity(run);
     }
 
-    /** The same, restricted to a window — pass the window as a second mask. */
+    /** The same, restricted to a window. */
     public static int capacityWithin(boolean[] mask, boolean[] window) {
         boolean[] combined = new boolean[DutyDay.SLOT_COUNT];
         for (int i = 0; i < DutyDay.SLOT_COUNT; i++) {

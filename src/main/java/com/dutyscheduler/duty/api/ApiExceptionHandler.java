@@ -40,16 +40,8 @@ public class ApiExceptionHandler {
     }
 
     /**
-     * A request body that fails its {@code @Valid} checks, with the messages
-     * written on the request types as the detail.
-     *
-     * <p>
-     * Left to Spring, this is answered from Boot's {@code /error} page: a body
-     * that is not a problem document and carries none of those messages, so
-     * the client could only say "Request failed (400)". And for a caller with
-     * no account — someone accepting an invite — reaching that page needed one,
-     * so a short password came back as a 401 that read "Your session has
-     * expired".
+     * {@code @Valid} failures, with the DTO messages as the detail. Boot's
+     * default goes through {@code /error} and loses the messages.
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ProblemDetail invalid(MethodArgumentNotValidException e) {
@@ -72,10 +64,5 @@ public class ApiExceptionHandler {
         return problem;
     }
 
-    /**
-     * No handler for authorization failures on purpose. Spring Security turns an
-     * {@code AccessDeniedException} into a 403 before the response ever reaches a
-     * controller advice, and catching it here would only risk turning a refusal
-     * into a 200 with an error body.
-     */
+    // No AccessDeniedException handler: Spring Security already answers 403.
 }

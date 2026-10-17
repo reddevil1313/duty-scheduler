@@ -11,17 +11,9 @@ import java.util.Map;
 /**
  * A request to the solver, containing all the information it needs to produce a schedule.
  *
- * @param bus      the Trooper chosen to take the BUS hours, or null to let the
- *                 solver choose. Pinned before the search starts, the way the
- *                 night group is: a human choice the search works around, not a
- *                 preference it may trade away.
- * @param turnout  null for the free split; otherwise everyone's hours, 5 to 7,
- *                 with what that leaves uncovered handed to the MP team. See
- *                 {@link ScheduleSolver} for the rules it keeps.
- * @param reusable logged sheets with the same posts, headcount and turnout,
- *                 latest first. The first that can be laid onto today's
- *                 Troopers is used as it is, instead of solving; see
- *                 {@link SheetReuse}.
+ * @param bus      BUS Trooper, pinned before the search; null lets the solver choose
+ * @param turnout  null for the free split, else 5 to 7 hours each
+ * @param reusable logged sheets to try first, latest first; see {@link SheetReuse}
  */
 public record SolveRequest(DutyDay day,
                            List<Trooper> roster,
@@ -34,7 +26,6 @@ public record SolveRequest(DutyDay day,
 
     public static final int MIN_TURNOUT = 5;
     public static final int MAX_TURNOUT = 7;
-
 
     public SolveRequest {
         roster = List.copyOf(roster);

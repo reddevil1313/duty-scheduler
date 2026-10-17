@@ -20,37 +20,37 @@ class DemandTest {
     // 2026-09-10 is a Thursday, so the 11th is a Friday, the 12th a Saturday,
     // the 13th a Sunday and the 14th a Monday.
     @Test
-    @DisplayName("the calendar this suite assumes")
+    @DisplayName("calendar check")
     void calendarSanity() {
         assertEquals("THURSDAY", LocalDate.of(2026, 9, 10).getDayOfWeek().name());
         assertEquals("SUNDAY", LocalDate.of(2026, 9, 13).getDayOfWeek().name());
     }
 
     @Test
-    @DisplayName("a weekday evening from 2000 to 2200 stands no posts")
+    @DisplayName("weekday 2000-2200 is empty")
     void weekdayEveningIsEmpty() {
         assertTrue(Demand.at(at(10, 20)).isEmpty());
         assertTrue(Demand.at(at(10, 21)).isEmpty());
     }
 
     @Test
-    @DisplayName("the silent hours 2200 to 0600 stand AP and GG")
+    @DisplayName("silent hours are AP and GG")
     void silentHoursStandApAndGg() {
         Map<Post, Integer> ten = Demand.at(at(10, 22));
 
         assertEquals(Map.of(Post.AP, 1, Post.GG, 1), ten);
         assertEquals(Map.of(Post.AP, 1, Post.GG, 1), Demand.at(at(11, 5)));
-        // 0600 is already the day shift.
+
         assertFalse(Demand.at(at(11, 6)).containsKey(Post.AP));
     }
 
     @Test
-    @DisplayName("0600 to 2000 stands two PAC, with BUS added from 0700 to 1000")
+    @DisplayName("day: two PAC, BUS 0700-1000")
     void dayHoursStandTwoPacAndTheBusRun() {
         assertEquals(Map.of(Post.PAC, 2), Demand.at(at(11, 6)));
         assertEquals(Map.of(Post.PAC, 2, Post.BUS, 1), Demand.at(at(11, 7)));
         assertEquals(Map.of(Post.PAC, 2, Post.BUS, 1), Demand.at(at(11, 9)));
-        // The bus run ends at 1000, so 1000 itself is PAC only.
+        // 1000 is PAC only.
         assertEquals(Map.of(Post.PAC, 2), Demand.at(at(11, 10)));
         assertEquals(Map.of(Post.PAC, 2), Demand.at(at(11, 19)));
     }
@@ -74,7 +74,7 @@ class DemandTest {
     }
 
     @Test
-    @DisplayName("inside the weekend block only AP and GG stand, all day and all night")
+    @DisplayName("weekend is AP and GG only")
     void weekendStandsApAndGgOnly() {
         Map<Post, Integer> saturdayNoon = Demand.at(at(12, 12));
 
@@ -84,7 +84,7 @@ class DemandTest {
     }
 
     @Test
-    @DisplayName("Monday morning comes back to the weekday shape at 0600")
+    @DisplayName("weekday shape from Monday 0600")
     void weekdayShapeResumesMondayMorning() {
         assertEquals(Map.of(Post.AP, 1, Post.GG, 1), Demand.at(at(14, 5)));
         assertEquals(Map.of(Post.PAC, 2), Demand.at(at(14, 6)));
@@ -92,7 +92,7 @@ class DemandTest {
     }
 
     @Test
-    @DisplayName("what comes back cannot be modified by the caller")
+    @DisplayName("result is unmodifiable")
     void demandIsImmutable() {
         Map<Post, Integer> m = Demand.at(at(11, 8));
         assertThrows(UnsupportedOperationException.class, () -> m.put(Post.AP, 1));

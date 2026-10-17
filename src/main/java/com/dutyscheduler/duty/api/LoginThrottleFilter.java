@@ -16,20 +16,14 @@ import java.time.Duration;
 import java.time.Instant;
 
 /**
- * Refuses a sign-in attempt from an address {@link LoginThrottle} has shut out,
- * before the password is checked: a refused address gets no answer about
- * whether its guess was right.
- *
- * <p>
- * A sign-in attempt is the login POST, or any request carrying HTTP Basic
- * credentials. Everything else passes, so an address that is shut out can
- * still reach the session endpoint and be told why.
+ * Answers 429 to sign-in attempts (login POST or HTTP Basic) from an address
+ * {@link LoginThrottle} has blocked, before the password is checked.
  */
 final class LoginThrottleFilter extends OncePerRequestFilter {
 
     private final LoginThrottle throttle;
     private final DutyMetrics metrics;
-    /** Matched as Spring Security matches it: the servlet path alone is empty under some mappings. */
+    /** The servlet path is empty under some mappings, so match like Spring Security does. */
     private final RequestMatcher login;
 
     LoginThrottleFilter(LoginThrottle throttle, DutyMetrics metrics, String loginPath) {

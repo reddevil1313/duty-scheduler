@@ -5,13 +5,8 @@ import type { Session } from '../api/types'
 import { SessionContext } from './session-context'
 
 /**
- * Holds the signed-in identity and the CSRF token for the whole app.
- *
- * <p>Every path through this component ends in `adopt`, which is the only place
- * `setCsrfToken` is called. That is deliberate: signing in and signing out both
- * rotate the token server-side, so any code path that changes the session and
- * forgets to store the new token leaves the app able to read but not write —
- * a failure that shows up much later, as a 403 on a button.
+ * The signed-in identity and CSRF token. Every path goes through `adopt`, the
+ * only caller of `setCsrfToken`, since the token rotates on sign-in and out.
  */
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
@@ -28,9 +23,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         if (!cancelled) adopt(next)
       })
       .catch(() => {
-        // The session endpoint is the one call that should never fail. If it
-        // does the server is down, and showing the sign-in form is the honest
-        // response — the user will find out when they try.
+        // Server is down: show the sign-in form.
         if (!cancelled) {
           adopt({ authenticated: false, username: null, displayName: null, role: null, team: null, csrfToken: '' })
         }

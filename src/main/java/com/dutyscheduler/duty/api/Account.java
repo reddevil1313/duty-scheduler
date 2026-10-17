@@ -11,17 +11,9 @@ import java.util.Collection;
 import java.util.List;
 
 /**
- * The signed-in account, as Spring Security holds it for the session.
- *
- * <p>
- * It carries the team, which is what every query is filtered by: the resolver
- * reads it from here on each request instead of looking the account up again.
- * The authority is {@code ROLE_ADMIN}, not {@code ADMIN}, because the role is
- * stored bare and checked with {@code hasRole}.
- *
- * <p>
- * The hash is needed once, to check the password, and dropped as soon as that
- * is done ({@link #eraseCredentials}), so it does not live in the session.
+ * The signed-in account held in the session. Carries the team id so the
+ * tenant resolver needn't look it up. Authorities are {@code ROLE_*} since
+ * checks use {@code hasRole}. The password hash is erased after sign-in.
  */
 public final class Account implements UserDetails, CredentialsContainer {
 
@@ -57,11 +49,7 @@ public final class Account implements UserDetails, CredentialsContainer {
         return teamId;
     }
 
-    /**
-     * The caller's team, for an endpoint that only makes sense inside one.
-     * Refused rather than defaulted: an endpoint reached by someone with no
-     * team — the owner, or a test's mock user — must not guess one.
-     */
+    /** Throws when there is no team (the owner, or a mock user). */
     static long teamOf(Account account) {
         if (account == null || account.teamId == null) {
             throw new AccessDeniedException("Only a team's own accounts can do this.");

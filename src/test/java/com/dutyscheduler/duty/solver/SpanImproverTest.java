@@ -12,21 +12,14 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * The improver is a hill-climber, so the tests assert its <em>guarantees</em> —
- * never worse, never illegal, hours untouched — rather than one exact outcome.
- * Pinning the outcome would make every future tweak to the move set look like a
- * regression.
- */
+/** Tests the guarantees, not an exact grid: never worse, still legal, same hours. */
 class SpanImproverTest {
 
     private static final Trooper A = Trooper.of("A");
     private static final Trooper B = Trooper.of("B");
     private static final List<Trooper> BOTH = List.of(A, B);
 
-    /**
-     * Everything allowed, so only the improver's own legality checks are in play.
-     */
+    /** Everything allowed. */
     private static final SpanImprover.Eligibility ANYWHERE = (trooper, slot) -> true;
 
     private static Post[] cells(int... slots) {
@@ -75,10 +68,9 @@ class SpanImproverTest {
     }
 
     @Test
-    @DisplayName("it tightens a sprawling pair without either of them working a different number of hours")
+    @DisplayName("tightens span without changing hours")
     void tightensWithoutChangingHourCounts() {
-        // A is strung out across the whole afternoon for two hours' work; B is
-        // compact. Trading one of A's hours for one of B's helps both.
+        // A is spread across the afternoon; B is compact.
         Post[][] before = { cells(10, 14), cells(11, 12) };
         int hoursA = hours(before[0]);
         int hoursB = hours(before[1]);
@@ -92,7 +84,7 @@ class SpanImproverTest {
     }
 
     @Test
-    @DisplayName("it leaves the input alone and hands back a copy")
+    @DisplayName("returns a copy")
     void doesNotMutateTheInput() {
         Post[][] before = { cells(10, 22), cells(12, 14) };
         Post[] originalRowA = before[0].clone();
@@ -103,7 +95,7 @@ class SpanImproverTest {
     }
 
     @Test
-    @DisplayName("it never produces a run longer than three, or an illegal post change")
+    @DisplayName("no run over three, no illegal change")
     void keepsEveryRowLegal() {
         Post[][] before = { cells(10, 11, 13, 14, 22), cells(12, 15, 16, 17, 20) };
 
@@ -126,10 +118,10 @@ class SpanImproverTest {
     }
 
     @Test
-    @DisplayName("it will not move a Trooper into an hour they are not eligible for")
+    @DisplayName("respects eligibility")
     void respectsEligibility() {
         Post[][] before = { cells(10, 22), cells(12, 14) };
-        // A may only ever be on at 10 and 22 — there is nowhere for them to move to.
+        // A can only be on at 10 and 22.
         SpanImprover.Eligibility pinned = (trooper, slot) -> trooper != 0 || slot == 10 || slot == 22;
 
         Post[][] after = new SpanImprover(BOTH, pinned).improve(before);
@@ -138,7 +130,7 @@ class SpanImproverTest {
     }
 
     @Test
-    @DisplayName("a sheet with nothing to gain comes back unchanged")
+    @DisplayName("nothing to gain: unchanged")
     void alreadyTightIsLeftAlone() {
         Post[][] before = { cells(10, 11, 12), cells(14, 15, 16) };
 

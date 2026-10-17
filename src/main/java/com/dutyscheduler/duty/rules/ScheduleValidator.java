@@ -8,7 +8,6 @@ import com.dutyscheduler.duty.domain.Post;
 import com.dutyscheduler.duty.domain.Schedule;
 import com.dutyscheduler.duty.domain.Slot;
 
-
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -130,8 +129,7 @@ public final class ScheduleValidator {
                                 + ", inside the weekend block"));
             } else if (t.getHour() < DutyRules.STAY_OUT_FROM || t.getHour() >= DutyRules.STAY_OUT_TO) {
                 violations.add(Violation.by(Rule.STAY_OUT_WINDOW, who, slot,
-                        // Padded, so 8 reads as 0800: the board writes every
-                        // hour as four digits, and "800" looks like a typo.
+                        // 0800, not 800, as on the board.
                         who + " is a stay-out and is posted at " + s.label() + ", outside "
                                 + "%02d00-%02d00".formatted(DutyRules.STAY_OUT_FROM, DutyRules.STAY_OUT_TO)));
             }
@@ -151,5 +149,4 @@ public final class ScheduleValidator {
                     row.trooper().name() + " is down for " + hours + " hours; the cap is " + DutyRules.HOUR_CAP));
         }
     }
-    
 }

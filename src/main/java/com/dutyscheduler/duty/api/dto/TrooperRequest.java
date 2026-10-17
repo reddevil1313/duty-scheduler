@@ -4,20 +4,10 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 /**
- * Add a Trooper to the roster.
+ * A Trooper to add or edit. The name is the short board name.
  *
- * <p>
- * The name is the identifier everything else refers to: the night group in a
- * generate request, the Trooper on an absence, the row on a logged sheet. It is
- * the short name written on the board, not a full name — the roster stores no
- * more about a person than the scheduling needs.
- *
- * @param onNight    whether the board should pre-tick this Trooper for the
- *                   night group. A default, not a constraint: the night group is
- *                   chosen per sheet.
- * @param defaultBus whether the board's BUS pick starts on this Trooper; at
- *                   most one does, so setting it moves it here. Null leaves it as
- *                   it is, so an edit that does not mention it does not clear it.
+ * @param onNight    pre-ticked for the night group on the board
+ * @param defaultBus the board's starting BUS pick; null leaves it unchanged
  */
 public record TrooperRequest(
         @NotBlank(message = "A name is required.")

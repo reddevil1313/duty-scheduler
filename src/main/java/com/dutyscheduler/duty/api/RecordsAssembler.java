@@ -22,14 +22,12 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Adds the records up from logged sheets, credits, opening hours and the leave
- * register. Everything is derived on each read rather than stored as totals,
- * so a re-logged day or a cancelled MC is reflected the moment it happens and
- * there is no running total to fall out of step.
+ * Totals from logged sheets, credits, opening hours and leave, computed on
+ * every read so nothing can go stale.
  */
 final class RecordsAssembler {
 
-    /** The silent hours as slots: 2200 to 0559 is always slots 2 to 9. */
+    /** Silent hours 2200-0559 as slots. */
     private static final int SILENT_FROM = 2;
     private static final int SILENT_TO = 9;
 
@@ -103,18 +101,14 @@ final class RecordsAssembler {
         }
 
         List<TrooperRecord> records = byName.values().stream()
-                // An archived Trooper is listed only while there is something to show for them.
+                // Archived Troopers only if they have something to show.
                 .filter(t -> t.entity.isActive() || t.hasHistory())
                 .map(Tally::toRecord)
                 .toList();
         return new RecordsResponse(records, List.copyOf(days));
     }
 
-    /**
-     * What the validator finds, less the MP team's share on a fixed-turnout
-     * sheet: an under-manned hour outside the silent block with someone still
-     * on is the MP team covering it, not a broken rule.
-     */
+    /** Violations, minus the gaps the MP team covers on a fixed-turnout sheet. */
     private static int issues(Schedule sheet, Integer turnout, ScheduleValidator validator) {
         List<Violation> found = validator.validate(sheet).violations();
         if (turnout == null) {

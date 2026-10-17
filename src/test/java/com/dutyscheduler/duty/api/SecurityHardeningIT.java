@@ -33,12 +33,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * The defences that sit around the endpoints rather than on them: the
- * sign-in throttle, the response headers, and who may read the actuator.
- *
- * <p>
- * Each throttle test uses its own client address, because the counts live in
- * one throttle for the whole application context.
+ * Sign-in throttle, headers and actuator access. Each throttle test uses its
+ * own address since the counts are shared across the context.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -92,7 +88,7 @@ class SecurityHardeningIT {
     }
 
     @Test
-    @DisplayName("ten wrong passwords from one address, and the right one is refused there with a 429")
+    @DisplayName("ten failures, then even the right password gets 429")
     void throttlesTheForm() throws Exception {
         double refusedBefore = registry.counter("duty.signin.refused").count();
         for (int i = 0; i < LoginThrottle.LIMIT; i++) {
@@ -104,12 +100,12 @@ class SecurityHardeningIT {
                 .andExpect(header().exists("Retry-After"))
                 .andExpect(jsonPath("$.detail").value(containsString("Try again in 15 minutes")));
         assertThat(registry.counter("duty.signin.refused").count()).isEqualTo(refusedBefore + 1);
-        // Another address is not held to it.
+
         signIn("192.0.2.11", PASSWORD, 204);
     }
 
     @Test
-    @DisplayName("a right password clears the count before it reaches the limit")
+    @DisplayName("success clears the count")
     void successClears() throws Exception {
         for (int i = 0; i < LoginThrottle.LIMIT - 1; i++) {
             signIn("192.0.2.20", "wrong", 401);
@@ -122,7 +118,7 @@ class SecurityHardeningIT {
     }
 
     @Test
-    @DisplayName("HTTP Basic guesses count too, and are refused the same way")
+    @DisplayName("HTTP Basic failures count too")
     void throttlesBasic() throws Exception {
         for (int i = 0; i < LoginThrottle.LIMIT; i++) {
             mvc.perform(get("/api/troopers").with(from("192.0.2.30")).header("Authorization", basic("wrong")))
@@ -130,12 +126,12 @@ class SecurityHardeningIT {
         }
         mvc.perform(get("/api/troopers").with(from("192.0.2.30")).header("Authorization", basic(PASSWORD)))
                 .andExpect(status().isTooManyRequests());
-        // Reading the session, which tries no password, still works from there.
+        // The session endpoint still works.
         mvc.perform(get("/api/session").with(from("192.0.2.30"))).andExpect(status().isOk());
     }
 
     @Test
-    @DisplayName("every response carries the content security policy and sends no Referer")
+    @DisplayName("CSP and no-referrer headers")
     void headers() throws Exception {
         mvc.perform(get("/api/session"))
                 .andExpect(header().string("Content-Security-Policy", containsString("default-src 'self'")))
@@ -145,7 +141,7 @@ class SecurityHardeningIT {
     }
 
     @Test
-    @DisplayName("health says up or down to anyone, and names nothing behind it")
+    @DisplayName("health shows no details to anyone")
     void healthForAnyone() throws Exception {
         mvc.perform(get("/actuator/health"))
                 .andExpect(status().isOk())
@@ -155,7 +151,7 @@ class SecurityHardeningIT {
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    @DisplayName("a team admin may not read the rest of the actuator")
+    @DisplayName("team admin can't read the actuator")
     void actuatorNotForAdmins() throws Exception {
         mvc.perform(get("/actuator/metrics")).andExpect(status().isForbidden());
         mvc.perform(get("/actuator/health")).andExpect(jsonPath("$.components").doesNotExist());
@@ -163,21 +159,20 @@ class SecurityHardeningIT {
 
     @Test
     @WithMockUser(roles = "OWNER")
-    @DisplayName("the owner reads the actuator, health details included")
+    @DisplayName("owner can read the actuator")
     void actuatorForTheOwner() throws Exception {
         mvc.perform(get("/actuator/metrics")).andExpect(status().isOk());
         mvc.perform(get("/actuator/health")).andExpect(jsonPath("$.components.db.status").value("UP"));
     }
 
     @Test
-    @DisplayName("the client's own files are open to anyone, since signing in happens inside them")
+    @DisplayName("client files are public")
     void clientIsOpen() throws Exception {
-        // No client is built into the test classpath, so these are 404s: what
-        // matters is that they are not 401s.
+        // No client in the test build, so 404, not 401.
         for (String path : new String[] { "/", "/index.html", "/favicon.svg", "/assets/index-abc.js" }) {
             mvc.perform(get(path)).andExpect(status().isNotFound());
         }
-        // And nothing else is, by being near them.
+
         mvc.perform(get("/api/troopers")).andExpect(status().isUnauthorized());
     }
 }

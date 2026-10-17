@@ -16,6 +16,6 @@ public interface DutyAssignmentRepository extends JpaRepository<DutyAssignmentEn
             """)
     long countForDate(@Param("date") LocalDate date);
 
-    /** Whether this Trooper stands on any logged sheet — which decides archive or delete. */
+    /** Decides archive vs delete. */
     boolean existsByTrooper_Id(Long trooperId);
 }

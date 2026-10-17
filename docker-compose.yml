@@ -1,22 +1,17 @@
-# Development: `docker compose up -d db` starts Postgres alone, for bootRun.
+# Dev: `docker compose up -d db`
 #
-# The whole stack, built from this repo and run as it would be deployed:
-#
+# Full stack:
 #   OWNER_USERNAME=... OWNER_PASSWORD=... DATABASE_PASSWORD=... \
 #     docker compose --profile app up -d --build
 #
-# then http://localhost:8080. The owner is made on first start from the two
-# OWNER_ variables. The session cookie is HTTPS-only: browsers allow that on
-# localhost, but anywhere else run it behind HTTPS, or set
-# SESSION_COOKIE_SECURE=false for a trial over plain HTTP. TZ is the zone the
-# sheet image prints its "logged at" time in, such as Etc/GMT-8 for UTC+8.
+# Run behind HTTPS, or set SESSION_COOKIE_SECURE=false to try it over HTTP.
+# TZ sets the time zone printed on sheet images, e.g. Etc/GMT-8.
 services:
   db:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: duty
-      # Read only when the volume is first made; changing it later does not
-      # change the database's password.
+      # Only used when the volume is created.
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-duty_local_dev}
       POSTGRES_DB: duty
     ports: ["${DB_PORT:-5432}:5432"]
@@ -27,7 +22,6 @@ services:
       retries: 10
 
   app:
-    # Only with --profile app, so `docker compose up -d db` stays the dev setup.
     profiles: [app]
     build: .
     image: duty-scheduler

@@ -14,8 +14,7 @@ const KINDS: [AbsenceKind, string][] = [
   ['MA', 'MA — appointment'],
 ]
 
-// No window here: a time window is what an appointment is, so MA always gets
-// one and nothing else is offered it.
+// MA is always a time window, so it isn't offered here.
 const SPANS: [AbsenceSpan, string][] = [
   ['FULL', 'Full days'],
   ['DAY_HALF', 'Half day — 0800 to 2000'],
@@ -25,21 +24,13 @@ const SPANS: [AbsenceSpan, string][] = [
 type Preview = { reach: AbsenceReach } | { problem: string } | null
 
 interface Props {
-  /** True while the tab is showing. The roster is re-read on each showing, so a Trooper added on the board is there to book. */
+  /** The roster is re-read each time the tab is shown. */
   active: boolean
-  /** Roster ticks: shown here so they are visible, and so it is plain they are not bookings. */
+  /** Roster ticks, shown as "not booked". */
   ticks: Ticks
 }
 
-/**
- * The leave register: MCs, overseas leave, annual leave and medical
- * appointments, a table each. Anyone signed in can read it; only an ADMIN can
- * book or cancel, and the server refuses anyone else regardless.
- *
- * One table per kind, because the kinds are asked about separately — who is
- * on MC, how much AL someone has had — and one list mixing all four, past and
- * to come, had to be read from end to end to answer either.
- */
+/** The leave register, a table per kind. Only an ADMIN can book or cancel. */
 export function LeaveRegister({ active, ticks }: Props) {
   const { session } = useSession()
   const isAdmin = session?.role === 'ADMIN'
@@ -54,8 +45,7 @@ export function LeaveRegister({ active, ticks }: Props) {
 
   useEffect(() => {
     if (!active) return
-    // Cancelled on the way out, so a quick switch away and back cannot let the
-    // older of two reads land last.
+    // Ignore a stale read that lands late.
     let cancelled = false
     Promise.all([api.troopers(), api.absences()])
       .then(([troopers, absences]) => {
@@ -69,7 +59,7 @@ export function LeaveRegister({ active, ticks }: Props) {
 
   const booked = (absence: Absence) => {
     setRegister((current) => [absence, ...current])
-    // A booking for someone the filter hides would seem not to have happened.
+    // Otherwise the new booking could be hidden by the filter.
     setOnly((current) => (current === null || current === absence.trooper ? current : null))
     setError(null)
     setNote(`${absence.trooper} booked ${absence.kind}.`)
@@ -81,13 +71,10 @@ export function LeaveRegister({ active, ticks }: Props) {
     setNote(`${absence.trooper}'s ${absence.kind} cancelled.`)
   }
 
-  // Names from the register rather than the roster, so leave taken by someone
-  // since archived can still be picked out. A filter on a name no longer
-  // there (their last entry cancelled) falls back to everyone.
+  // From the register, so archived Troopers can still be filtered on.
   const names = [...new Set(register.map((a) => a.trooper))].sort()
   const trooper = only !== null && names.includes(only) ? only : null
-  // Read on each render rather than held, so an entry that ends while the tab
-  // is open moves to the past at the next change, with no timer to keep.
+
   const now = nowMinute()
   const groups = byKind(register, now, trooper)
   const current = groups.reduce((n, g) => n + g.current.length, 0)
@@ -140,8 +127,7 @@ export function LeaveRegister({ active, ticks }: Props) {
 
       {groups.map((group) => (
         <KindTable
-          // Keyed on the filter too, so a table opened to its past closes
-          // again when the view changes to someone else.
+          // Keyed on the filter so the past section closes when it changes.
           key={`${group.kind}:${trooper ?? ''}`}
           group={group}
           now={now}
@@ -162,16 +148,12 @@ interface TableProps {
   onError: (e: unknown) => Promise<void>
 }
 
-/**
- * One kind's entries: what is running or to come, and the past folded away
- * below it. The past is what the records count, so it stays one click off
- * rather than gone, but it no longer stands between the reader and next week.
- */
+/** One kind's entries: current and upcoming, with the past folded away. */
 function KindTable({ group, now, canCancel, onCancelled, onError }: TableProps) {
   const [showPast, setShowPast] = useState(false)
   const { kind, current, past } = group
   const label = KIND_TABLES.find(([k]) => k === kind)?.[1] ?? kind
-  // An appointment is hours on one day; a count of days says nothing about it.
+
   const withDays = kind !== 'MA'
   const rows = showPast ? [...current, ...past] : current
 
@@ -197,8 +179,7 @@ function KindTable({ group, now, canCancel, onCancelled, onError }: TableProps) 
           <table className="register">
             <thead>
               <tr>
-                {/* Fixed widths, the same in every table, so the four line up
-                    down the page; When takes the room of Dates and Days. */}
+                {/* Fixed widths so the tables line up. */}
                 <th className="c-trooper">Trooper</th>
                 <th className={withDays ? 'c-dates' : 'c-when'}>{withDays ? 'Dates' : 'When'}</th>
                 {withDays && <th className="n c-days">Days</th>}
@@ -214,8 +195,7 @@ function KindTable({ group, now, canCancel, onCancelled, onError }: TableProps) 
                   absence={absence}
                   now={now}
                   withDays={withDays}
-                  // The first past row carries a rule above it, where the
-                  // current entries end.
+
                   firstPast={showPast && i === current.length && current.length > 0}
                   canCancel={canCancel}
                   onCancelled={onCancelled}
@@ -250,28 +230,21 @@ function BookingForm({ roster, onBooked, onError }: FormProps) {
   const [preview, setPreview] = useState<Preview>(null)
   const [busy, setBusy] = useState(false)
 
-  // Default to the first Trooper once the roster arrives, and move off one who
-  // has since been removed from it.
   const trooper = roster.some((t) => t.name === draft.trooper) ? draft.trooper : (roster[0]?.name ?? '')
 
   const change = (patch: Partial<LeaveDraft>) => {
     setDraft((current) => {
       const next = { ...current, ...patch }
-      // An appointment is always a window on one day; anything else is full
-      // days or a half. Kept in step here so the form never offers a shape the
-      // kind cannot have.
+      // MA is always a window; other kinds never are.
       if (next.kind === 'MA') next.span = 'WINDOW'
       else if (next.span === 'WINDOW') next.span = 'FULL'
-      // Moving the start past the end carries the end along, rather than
-      // flagging an error about a field nobody touched.
+      // Push the end along with the start.
       if (next.to < next.from) next.to = next.from
       return next
     })
   }
 
-  // Ask the server what this booking would reach, a moment after typing stops.
-  // The server owns the 2000 rule; re-deriving it here would be a second copy
-  // free to drift from the first.
+  // Ask the server which sheets this reaches, after typing stops.
   useEffect(() => {
     if (!trooper || !draft.from) return
     let stale = false
@@ -371,11 +344,7 @@ function BookingForm({ roster, onBooked, onError }: FormProps) {
   )
 }
 
-/**
- * The sheets named outright. A sheet is named by the evening it starts, so
- * leave on the 11th mostly lands on the 10th's sheet — saying so at the moment
- * of booking is what stops that being a surprise a week later.
- */
+/** Leave on the 11th mostly lands on the 10th's sheet, so spell it out. */
 function describe(reach: AbsenceReach): string {
   const sheets = reach.sheets.length === 0
     ? 'reaches no sheet'
@@ -415,15 +384,14 @@ function RegisterRow({ absence, now, withDays, firstPast, canCancel, onCancelled
     : sheets.length > 3
       ? `${sheets.length} sheets, ${shortDate(sheets[0])} to ${shortDate(sheets[sheets.length - 1])}`
       : sheets.map(shortDate).join(', ')
-  // Dimmed once it is over, so the eye lands on what still matters.
+
   const past = isOver(absence, now)
   const days = daysOf(absence)
 
   return (
     <tr className={[past && 'past', firstPast && 'first-past'].filter(Boolean).join(' ') || undefined}>
       <td>{absence.trooper}</td>
-      {/* As booked, with the interval the 2000 rule resolves it to on hover:
-          the sheets column already says what that interval reaches. */}
+      {/* Resolved interval on hover. */}
       <td title={`${shortInstant(absence.covers)} → ${shortInstant(absence.until)}`}>
         {bookedAs(absence)}
         {isRunning(absence, now) && <span className="tag now">now</span>}

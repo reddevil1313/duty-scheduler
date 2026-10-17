@@ -8,7 +8,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class DutyRulesTest {
 
-    /** "GG . AP" — one token per slot from slot 0, the rest of the sheet off. */
+    /** "GG . AP": one token per slot from slot 0, rest off. */
     private static Post[] row(String spec) {
         Post[] cells = new Post[DutyDay.SLOT_COUNT];
         String[] tokens = spec.trim().split("\\s+");
@@ -23,41 +23,41 @@ class DutyRulesTest {
     class PostChanges {
 
         @Test
-        @DisplayName("3h GG, 1h AP, 3h GG is two walks: there and back")
+        @DisplayName("GG, AP, GG is two walks")
         void theWalkThePlanIsAbout() {
             assertEquals(2, DutyRules.postChanges(row("GG GG GG . AP . GG GG GG")));
         }
 
         @Test
-        @DisplayName("staying on one post, breaks and all, is no walk")
+        @DisplayName("one post is no walk")
         void samePostIsFree() {
             assertEquals(0, DutyRules.postChanges(row("GG GG GG . GG GG . GG")));
         }
 
         @Test
-        @DisplayName("AP to PAC is the 0600 handover, not a walk")
+        @DisplayName("AP to PAC is not a walk")
         void apToPacIsNotCounted() {
             assertEquals(0, DutyRules.postChanges(row("AP AP PAC PAC . PAC")));
         }
 
         @Test
-        @DisplayName("a change across a rest gap is a new turnout, not a walk")
+        @DisplayName("no walk across a rest gap")
         void restResets() {
-            // AP at slot 0, GG at slot 11: ten hours off between, so home in between.
+            // Ten hours off.
             assertEquals(0, DutyRules.postChanges(row("AP . . . . . . . . . . GG")));
-            // Nine hours off is not rest, so it still counts.
+            // Nine is not enough.
             assertEquals(1, DutyRules.postChanges(row("AP . . . . . . . . . GG")));
         }
 
         @Test
-        @DisplayName("an empty row walks nowhere")
+        @DisplayName("empty row")
         void emptyRow() {
             assertEquals(0, DutyRules.postChanges(new Post[DutyDay.SLOT_COUNT]));
         }
     }
 
     @Test
-    @DisplayName("only the same post, or AP and PAC either way round, follow with no break")
+    @DisplayName("only same post or AP/PAC need no break")
     void followsWithoutBreak() {
         assertTrue(DutyRules.followsWithoutBreak(Post.GG, Post.GG));
         assertTrue(DutyRules.followsWithoutBreak(Post.AP, Post.PAC));

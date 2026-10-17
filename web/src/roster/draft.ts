@@ -1,12 +1,6 @@
 import type { Trooper, TrooperParticulars } from '../api/types'
 
-/**
- * What the Trooper inputs hold while someone is typing. Rank is a string here,
- * null on the wire.
- *
- * <p>In its own file rather than beside TrooperFields: Vite's fast refresh only
- * hot-swaps a module that exports nothing but components.
- */
+// Separate from TrooperFields: fast refresh needs component-only modules.
 export interface Draft {
   name: string
   rank: string

@@ -29,11 +29,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * Roster ticks: a Trooper taken out of the sheet being worked on, without a
- * leave booking. The point of every test here is the "without": a tick shapes
- * the sheet it is sent with and leaves nothing behind.
- */
+/** Roster ticks affect one request and save nothing. */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
@@ -93,7 +89,7 @@ class QuickLeaveIT {
     }
 
     @Test
-    @DisplayName("a ticked Trooper does no hours, the sheet is still covered, and nothing is booked")
+    @DisplayName("ticked Trooper does no hours and nothing is booked")
     void tickedOutDoesNothing() throws Exception {
         String sheet = generate("\"TROOPER_A\",\"TROOPER_B\",\"TROOPER_C\"",
                 "{\"trooper\":\"TROOPER_D\",\"kind\":\"MC\"}");
@@ -104,7 +100,7 @@ class QuickLeaveIT {
     }
 
     @Test
-    @DisplayName("someone out the whole sheet is listed last, everyone else in roster order")
+    @DisplayName("someone out all sheet is listed last")
     @SuppressWarnings("unchecked")
     void unavailableRowsGoLast() throws Exception {
         String sheet = generate("\"TROOPER_A\",\"TROOPER_B\",\"TROOPER_C\"",
@@ -117,7 +113,7 @@ class QuickLeaveIT {
     }
 
     @Test
-    @DisplayName("a tick lasts one request: the next generate without it puts the Trooper back")
+    @DisplayName("a tick lasts one request")
     void tickIsForgotten() throws Exception {
         generate("\"TROOPER_A\",\"TROOPER_B\",\"TROOPER_C\"", "{\"trooper\":\"TROOPER_D\",\"kind\":\"OL\"}");
 
@@ -126,7 +122,7 @@ class QuickLeaveIT {
     }
 
     @Test
-    @DisplayName("someone ticked out is dropped from the night group rather than left holding it")
+    @DisplayName("ticked out is dropped from the night group")
     void tickedOutLeavesTheNightGroup() throws Exception {
         String sheet = generate("\"TROOPER_A\",\"TROOPER_B\",\"TROOPER_C\",\"TROOPER_D\"",
                 "{\"trooper\":\"TROOPER_A\",\"kind\":\"AL\"}");
@@ -136,7 +132,7 @@ class QuickLeaveIT {
     }
 
     @Test
-    @DisplayName("a tick is MC, OL or AL; an appointment, or someone not on the roster, is a 400")
+    @DisplayName("MA or an unknown name is a 400")
     void badTicks() throws Exception {
         for (String out : new String[] {
                 "{\"trooper\":\"TROOPER_D\",\"kind\":\"MA\"}",
@@ -151,7 +147,7 @@ class QuickLeaveIT {
     }
 
     @Test
-    @DisplayName("a check with the same tick greys the Trooper out, and flags them if posted anyway")
+    @DisplayName("check marks the ticked Trooper away and flags duty")
     void checkSeesTheTick() throws Exception {
         String sheet = generate("\"TROOPER_A\",\"TROOPER_B\",\"TROOPER_C\"", "");
         assertThat(hoursOf(sheet, "TROOPER_D")).as("on duty without the tick").isPositive();
@@ -166,7 +162,7 @@ class QuickLeaveIT {
     }
 
     @Test
-    @DisplayName("a malformed tick on a check is a 400 that shows the expected shape")
+    @DisplayName("malformed tick is a 400")
     void malformedCheckTick() throws Exception {
         String sheet = generate("\"TROOPER_A\",\"TROOPER_B\",\"TROOPER_C\"", "");
         mvc.perform(post("/api/schedules/" + DATE + "/check").param("out", "TROOPER_D").with(csrf())

@@ -9,24 +9,14 @@ import org.springframework.stereotype.Component;
 import java.util.function.Supplier;
 
 /**
- * The few numbers about this app worth watching, beside the JVM and HTTP ones
- * Boot already records:
- *
+ * App metrics on top of Boot's JVM and HTTP ones:
  * <ul>
- * <li>{@code duty.sheet.generate}: how long making a sheet takes, by how it
- * ended (solved, reused from a logged sheet, or not coverable) and with which
- * turnout. The solver is a search; this is where a slow one shows.</li>
- * <li>{@code duty.sheet.logged}: sheets logged, by whether from the board or by
- * saving the image.</li>
- * <li>{@code duty.signin.refused}: sign-ins the throttle turned away. Anything
- * above zero means someone was guessing.</li>
+ * <li>{@code duty.sheet.generate}: timer by outcome (solved, reused,
+ * unsolvable) and turnout</li>
+ * <li>{@code duty.sheet.logged}: by board or image</li>
+ * <li>{@code duty.signin.refused}: throttled sign-ins</li>
  * </ul>
- *
- * <p>
- * Recorded here, in {@code api/}, and not in the solver, which stays free of
- * Spring and of Micrometer. No tag carries a team, a Trooper or a date: the
- * metrics are for watching the server, and are read by the owner, who sees no
- * team's data.
+ * Tags never include a team, Trooper or date.
  */
 @Component
 public class DutyMetrics {
@@ -41,7 +31,7 @@ public class DutyMetrics {
                 .register(registry);
     }
 
-    /** Make a sheet, timing it and tagging how it ended. */
+    /** Times a generate and tags its outcome. */
     SolveResult generate(Integer turnout, Supplier<SolveResult> solve) {
         Timer.Sample sample = Timer.start(registry);
         SolveResult result = solve.get();

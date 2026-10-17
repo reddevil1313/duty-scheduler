@@ -20,11 +20,8 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Fixed-length turnouts. The same solver and the same validator: the only
- * thing a fixed turnout changes is that post-hours the turnouts do not reach go
- * to the MP team, so the validator's under-manning is expected — and the tests
- * check it is the only thing it finds, and that the MP team never gets more
- * than the rules allow.
+ * Fixed turnouts. The validator will report the MP team's hours as
+ * under-manned; that must be the only thing it finds.
  */
 class FixedTurnoutTest {
 
@@ -61,9 +58,7 @@ class FixedTurnoutTest {
     /** The guarantees every fixed-turnout sheet keeps, whatever the roster. */
     private void assertKeepsTheRules(Schedule sheet, int turnout) {
         DutyDay day = sheet.day();
-        // The validator is unchanged, and the only thing it may find is the MP
-        // team's share: under-manned hours. No stint, post change, stay-out or
-        // hour-cap breach.
+        // Only UNDER_MANNED is allowed.
         ValidationResult check = validator.validate(sheet);
         assertTrue(check.violations().stream().allMatch(v -> v.rule() == Rule.UNDER_MANNED), check::describe);
 
@@ -79,10 +74,7 @@ class FixedTurnoutTest {
                 assertTrue(on >= 1, day.slot(slot).label() + " keeps at least one Trooper on");
             }
         }
-        // Everyone does the turnout; the night group may do one more to hold
-        // the silent hours.
-        // Nobody here is short of room for 7h, so anyone who works at all does
-        // exactly the turnout — a stay-out at the weekend does nothing at all.
+        // Everyone does N; night Troopers may do N + 1.
         for (Schedule.Row row : sheet.rows()) {
             if (row.hours() == 0) {
                 continue;
@@ -111,7 +103,7 @@ class FixedTurnoutTest {
     }
 
     @Test
-    @DisplayName("at 5h each the nine cover 46 of a weekday's 47 hours, and the MP team has the one left")
+    @DisplayName("5h each: 46 of 47 weekday hours, MP takes 1")
     void mpGetsTheRemainder() {
         Schedule sheet = solve(THURSDAY, NINE, 5).schedule();
 
@@ -120,17 +112,16 @@ class FixedTurnoutTest {
     }
 
     @Test
-    @DisplayName("a night group short of the silent hours at N each goes one over, no more than it needs")
+    @DisplayName("night group goes to N + 1 only as needed")
     void nightGoesOneOver() {
-        // Three on night at 5h is 15, and the silent hours need 16: one of them
-        // does 6, the rest 5.
+        // 3 x 5 = 15 but silent hours need 16.
         Schedule sheet = solve(THURSDAY, NINE, 5).schedule();
         List<Integer> night = NIGHT.stream().map(sheet::hours).sorted().toList();
         assertEquals(List.of(5, 5, 6), night);
     }
 
     @Test
-    @DisplayName("a turnout that makes more hours than the sheet needs is refused before any search")
+    @DisplayName("refuses a turnout with more hours than needed")
     void tooManyIsRefused() {
         List<Trooper> eleven = new java.util.ArrayList<>(NINE);
         eleven.add(Trooper.of("TROOPER_J"));
@@ -144,7 +135,7 @@ class FixedTurnoutTest {
     }
 
     @Test
-    @DisplayName("too few hours to keep the silent block and one post an hour is refused, and says what is short")
+    @DisplayName("refuses too few hours for the silent block plus one an hour")
     void tooFewIsRefused() {
         SolveResult result = solve(DutyDay.of(LocalDate.of(2026, 9, 12)), SIX, 5);
 
@@ -154,7 +145,7 @@ class FixedTurnoutTest {
     }
 
     @Test
-    @DisplayName("a night group that cannot hold the silent hours even one over is refused")
+    @DisplayName("refuses when N + 1 still can't cover silent hours")
     void nightTooSmall() {
         SolveResult result = solver.solve(SolveRequest.of(THURSDAY, NINE, List.of(TROOPER_A, TROOPER_B)).withTurnout(5));
 
@@ -164,10 +155,9 @@ class FixedTurnoutTest {
     }
 
     @Test
-    @DisplayName("when the turnouts fit the sheet exactly, nothing goes to the MP team and the sheet is clean")
+    @DisplayName("exact fit leaves nothing for MP")
     void exactFit() {
-        // Eleven at 6h on a Saturday is 66 hours, but the stay-outs are out all
-        // weekend: eight living in at 6h make exactly the 48 the sheet needs.
+        // Stay-outs are away, so 8 x 6 = 48, exactly Saturday's demand.
         List<Trooper> eleven = new java.util.ArrayList<>(NINE);
         eleven.add(Trooper.of("TROOPER_J"));
         eleven.add(Trooper.stayOut("TROOPER_K"));
@@ -178,7 +168,7 @@ class FixedTurnoutTest {
     }
 
     @Test
-    @DisplayName("a fixed turnout and a BUS choice work together")
+    @DisplayName("fixed turnout with a BUS pick")
     void withBus() {
         SolveResult result = solver.solve(SolveRequest.of(THURSDAY, NINE, NIGHT).withTurnout(5).withBus(TROOPER_D));
 

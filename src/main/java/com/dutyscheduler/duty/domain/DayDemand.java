@@ -5,14 +5,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * {@link Demand} resolved across one whole sheet: what each of the twenty-four
- * slots needs, and what that adds up to.
- *
- * <p>
- * {@link #postHours()} is the number of Trooper-hours the sheet has to absorb,
- * and
- * it is the first number worth knowing about any day — 47 on a weekday, 44 on a
- * Friday, 48 on a Saturday, 51 on a Sunday.
+ * {@link Demand} for each of a sheet's 24 slots. {@link #postHours()} is 47 on
+ * a weekday, 44 on Friday, 48 on Saturday and 51 on Sunday.
  */
 public record DayDemand(DutyDay day, List<Map<Post, Integer>> byHour) {
 
@@ -58,7 +52,7 @@ public record DayDemand(DutyDay day, List<Map<Post, Integer>> byHour) {
         return day.slots().stream().anyMatch(s -> Demand.isWeekend(s.start()));
     }
 
-    /** True if any hour of this sheet stands a day post — PAC or BUS. */
+    /** True if any hour of this sheet has PAC or BUS. */
     public boolean hasDayPosts() {
         return byHour.stream().anyMatch(m -> m.containsKey(Post.PAC) || m.containsKey(Post.BUS));
     }

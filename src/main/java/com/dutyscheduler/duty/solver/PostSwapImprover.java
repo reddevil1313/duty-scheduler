@@ -5,27 +5,20 @@ import com.dutyscheduler.duty.domain.DutyRules;
 import com.dutyscheduler.duty.domain.Post;
 
 /**
- * Local search for one cost only: walks between AP and GG.
+ * Cuts AP/GG walks. Two Troopers on duty through the same hours trade posts
+ * for those hours, so hours, span and manning can't change. That's why it is
+ * safe to run after {@link SpanImprover}.
  *
  * <p>
- * The move: two Troopers both on duty through the same hours trade posts for
- * those hours. Nobody's hours move, so hours, span and every Trooper's on/off
- * pattern are exactly what they were, and each hour still has the same posts
- * manned. That is what lets it run after {@link SpanImprover} without risk to
- * anything ranked above post changes — it cannot touch them, by construction,
- * rather than by being careful.
- *
- * <p>
- * The only rule a trade can break is a post change with no break between, so
- * that is all it re-checks. A trade is taken only when it strictly reduces the
- * two Troopers' walks between them, so the search always ends.
+ * Only the post-change rule needs re-checking. A trade must strictly reduce
+ * walks, so it always terminates.
  */
 final class PostSwapImprover {
 
-    /** Each pass takes one trade; a sheet has far fewer walks than this to remove. */
+    /** One trade per pass. */
     private static final int MAX_PASSES = 200;
 
-    /** [trooper][slot]: cells a human chose, such as the BUS hours. Never traded. */
+    /** [trooper][slot]: pinned cells, never traded. */
     private final boolean[][] pinned;
 
     PostSwapImprover() {
@@ -49,7 +42,7 @@ final class PostSwapImprover {
         return grid;
     }
 
-    /** Takes the first trade that helps, scanning in a fixed order so the result is repeatable. */
+    /** First trade that helps, in a fixed order so results are repeatable. */
     private boolean onePass(Post[][] grid) {
         for (int a = 0; a < grid.length; a++) {
             for (int b = a + 1; b < grid.length; b++) {
@@ -72,7 +65,7 @@ final class PostSwapImprover {
     private boolean tryTrade(Post[][] grid, int a, int b, int from, int length, int before) {
         boolean differs = false;
         for (int slot = from; slot < from + length; slot++) {
-            // Both on duty for every hour traded; otherwise the trade would move hours.
+            // Both must be on for every traded hour.
             if (grid[a][slot] == null || grid[b][slot] == null) {
                 return false;
             }

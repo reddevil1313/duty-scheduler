@@ -11,10 +11,8 @@ import java.util.Set;
 /**
  * A sheet, flattened for the wire.
  *
- * @param turnout    the fixed turnout it was made with, or null for the free
- *                   split. Sent back when logging, so the logged sheet records it.
- * @param reusedFrom on a generated sheet, the date of the logged sheet it reuses;
- *                   null when it was solved, and on anything else
+ * @param turnout    null for the free split; sent back when logging
+ * @param reusedFrom date of the logged sheet reused, if any
  */
 public record ScheduleResponse(LocalDate date, List<Row> rows, int totalHours, Integer turnout,
         LocalDate reusedFrom) {
@@ -40,12 +38,9 @@ public record ScheduleResponse(LocalDate date, List<Row> rows, int totalHours, I
     }
 
     /**
-     * The same sheet with its rows in board order: the night group, then day
-     * duty, then stay-outs, then anyone away the whole sheet, in roster order
-     * within each. Night is anyone with a silent hour on this sheet, so the
-     * order follows the sheet itself and reads the same for a logged one. The
-     * board sorts the same way (web/src/board/edit.ts), so a generated sheet
-     * does not move when its check arrives.
+     * Rows in board order: night (anyone with a silent hour), day, stay-outs,
+     * then anyone away all sheet; roster order within each. Must match
+     * {@code boardOrder} in web/src/board/edit.ts.
      *
      * @param silent which slots are the silent hours
      * @param away   who cannot stand any hour of this sheet

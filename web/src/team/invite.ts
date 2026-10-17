@@ -1,15 +1,12 @@
-/**
- * Invite links are `…/#invite=TOKEN`. In the fragment, which the browser
- * never sends to a server: the token stays out of access logs, proxies and
- * Referer headers, and only this page's script ever reads it.
- */
+// `/#invite=TOKEN`: the fragment is never sent to a server, so the token
+// stays out of logs and Referer headers.
 const PATTERN = /^#invite=([A-Za-z0-9_-]+)$/
 
 export function inviteToken(): string | null {
   return PATTERN.exec(window.location.hash)?.[1] ?? null
 }
 
-/** Drop the token from the address bar, so a reload or a shared screen does not carry it. */
+/** Remove the token from the address bar. */
 export function clearInvite() {
   window.history.replaceState(null, '', window.location.pathname + window.location.search)
 }

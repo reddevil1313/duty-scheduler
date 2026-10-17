@@ -49,9 +49,6 @@ export function LoginPage() {
             required
           />
         </label>
-        {/* One message for a wrong username and a wrong password alike — the
-            server sends the same text for both, so the form cannot be used to
-            find out which accounts exist. */}
         {error && <p className="error" role="alert">{error}</p>}
         <button type="submit" className="primary" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
       </form>

@@ -24,23 +24,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Against a real Postgres, in a container, with the real migrations applied.
- *
- * <p>
- * The obvious alternative is H2 in Postgres-compatibility mode, and it is a
- * trap. H2 does not have Postgres's type system, its CHECK constraints behave
- * differently, and half the SQL in V1 either fails or quietly means something
- * else. You end up with a green suite that tests a database you do not deploy —
- * and the first thing you find out in production is which of your constraints
- * were imaginary. A container costs a few seconds on the first run and tests
- * the
- * thing itself.
- *
- * <p>
- * Named {@code *IT} rather than {@code *Test} so it can be split off from the
- * fast unit suite later without renaming anything.
- */
+/** Real Postgres in a container with the real migrations (H2 behaves differently). */
 @SpringBootTest
 @Testcontainers
 class DutySheetStoreIT {
@@ -103,7 +87,7 @@ class DutySheetStoreIT {
     }
 
     @Test
-    @DisplayName("a solved sheet goes in and comes back out identical")
+    @DisplayName("a solved sheet round-trips")
     void scheduleRoundTrips() {
         DutyDay day = DutyDay.of(LocalDate.of(2026, 9, 10));
         SolveResult solved = new ScheduleSolver().solve(SolveRequest.of(day, roster(), nightGroup()));
@@ -115,7 +99,7 @@ class DutySheetStoreIT {
         assertEquals(day.date(), reloaded.day().date());
         for (Schedule.Row original : solved.schedule().rows()) {
             if (original.hours() == 0) {
-                continue; // a Trooper with nothing on has no rows to store
+                continue; // no rows stored
             }
             Schedule.Row back = reloaded.row(original.trooper()).orElseThrow(
                     () -> new AssertionError(original.trooper().name() + " did not come back"));
@@ -127,7 +111,7 @@ class DutySheetStoreIT {
     }
 
     @Test
-    @DisplayName("logging the same day twice replaces it rather than doubling it")
+    @DisplayName("logging a day again replaces it")
     void savingIsAnUpsert() {
         DutyDay day = DutyDay.of(LocalDate.of(2026, 9, 10));
         Schedule first = new ScheduleSolver()
@@ -144,7 +128,7 @@ class DutySheetStoreIT {
     }
 
     @Test
-    @DisplayName("cumulative hours come back as a group-by, not a loop in Java")
+    @DisplayName("hours per Trooper")
     void hoursAggregateOverARange() {
         List<Trooper> roster = roster();
         List<Trooper> night = nightGroup();
@@ -161,20 +145,20 @@ class DutySheetStoreIT {
 
         // Three weekday sheets at 47 post-hours each.
         assertEquals(47 * 3, hours.values().stream().mapToInt(Integer::intValue).sum());
-        // The silent block is 16 Trooper-hours a night, and only the night group works it.
+        // 16 silent hours a night, all on the night group.
         assertEquals(16 * 3, silent.values().stream().mapToInt(Integer::intValue).sum());
         assertTrue(NIGHT.containsAll(silent.keySet()), "only the night group did silent hours: " + silent);
     }
 
     @Test
-    @DisplayName("leave round-trips and the 2000 rule survives the database")
+    @DisplayName("leave round-trips with the 2000 cut-off")
     void absenceRoundTrips() {
         TrooperEntity trooper_f = troopers.findByName("TROOPER_F").orElseThrow();
         Absence mc = Absence.fullDays(trooper_f.toDomain(), AbsenceKind.MC,
                 LocalDate.of(2026, 9, 10), LocalDate.of(2026, 9, 12));
         absences.save(new AbsenceEntity(trooper_f, mc, "admin"));
 
-        // The 11th's sheet is taken whole; the 12th's is not touched at all.
+        // All of the 11th's sheet, none of the 12th's.
         assertEquals(1, store.absencesTouching(DutyDay.of(LocalDate.of(2026, 9, 11))).size());
         assertEquals(0, store.absencesTouching(DutyDay.of(LocalDate.of(2026, 9, 12))).size());
 
@@ -184,7 +168,7 @@ class DutySheetStoreIT {
     }
 
     @Test
-    @DisplayName("the database refuses a Trooper on two posts at the same hour")
+    @DisplayName("the database rejects two posts in one hour")
     void theDatabaseEnforcesOnePostPerHour() {
         DutyDay day = DutyDay.of(LocalDate.of(2026, 9, 10));
         TrooperEntity trooper_a = troopers.findByName("TROOPER_A").orElseThrow();

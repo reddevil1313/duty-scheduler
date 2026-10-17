@@ -18,11 +18,7 @@ public interface DutySheetRepository extends JpaRepository<DutySheetEntity, Long
 
   boolean existsByDutyDate(LocalDate dutyDate);
 
-  /**
-   * Every logged sheet with its grid, latest first, in one query. The records
-   * read them all; loading each sheet's assignments lazily would be one query
-   * per day logged.
-   */
+  /** All logged sheets with their grids in one query, latest first. */
   @Query("""
       SELECT DISTINCT s FROM DutySheetEntity s
         LEFT JOIN FETCH s.assignments a
@@ -31,10 +27,7 @@ public interface DutySheetRepository extends JpaRepository<DutySheetEntity, Long
       """)
   List<DutySheetEntity> findAllWithAssignments();
 
-  /**
-   * Cumulative hours per Trooper over a date range — what long-run fairness is
-   * decided from.
-   */
+  /** Hours per Trooper over a date range. */
   @Query("""
       SELECT a.trooper.name, COUNT(a)
         FROM DutyAssignmentEntity a
@@ -43,9 +36,7 @@ public interface DutySheetRepository extends JpaRepository<DutySheetEntity, Long
       """)
   List<Object[]> hoursPerTrooper(@Param("from") LocalDate from, @Param("to") LocalDate to);
 
-  /**
-   * The same, restricted to the silent hours, for "who has done the most nights".
-   */
+  /** Silent hours per Trooper over a date range. */
   @Query("""
       SELECT a.trooper.name, COUNT(a)
         FROM DutyAssignmentEntity a

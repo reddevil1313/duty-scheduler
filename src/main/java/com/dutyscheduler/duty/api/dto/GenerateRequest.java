@@ -12,18 +12,11 @@ import java.util.List;
 /**
  * Ask for a sheet.
  *
- * @param out Troopers ticked out on the roster for this sheet only; see
- *            {@link QuickLeave}. Optional.
- * @param bus     who takes the BUS run, by name; optional, and the solver
- *                chooses when it is left out. Refused with a 422 when they
- *                cannot stand it.
- * @param busDefault whether {@code bus} is the roster's default BUS Trooper
- *                rather than a pick for this sheet. A default gives way: when the
- *                sheet cannot be made with them on BUS, the solver chooses
- *                instead of the request being refused. Optional; left out, a pick.
- * @param turnout everyone's hours, 5 to 7, with the rest of the sheet left to
- *                the MP team; optional, and the free split when left out.
- *                Refused with a 422 when it makes more hours than the sheet needs.
+ * @param out        roster ticks for this sheet only; optional
+ * @param bus        BUS Trooper by name; optional
+ * @param busDefault true if {@code bus} is just the roster default, which the
+ *                   solver may drop if it can't work
+ * @param turnout    5 to 7, or null for the free split
  */
 public record GenerateRequest(
         @NotNull(message = "A duty date is required.") LocalDate date,

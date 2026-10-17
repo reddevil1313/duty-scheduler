@@ -11,20 +11,10 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 /**
- * The owner, made at startup from {@code OWNER_USERNAME} and
- * {@code OWNER_PASSWORD} — in every environment, because without an owner
- * nobody can make a team and so nobody can ever sign in.
- *
- * <p>
- * From the environment rather than a migration, for the reason the dev seeder
- * gives: a migration would put a password hash in a public repo. And not
- * "whoever signs in first on an empty database", which hands a fresh deploy to
- * whoever reaches it first.
- *
- * <p>
- * Insert-only, like the dev seeder: once there is an owner this does nothing,
- * so the variables can be left set without resetting a changed password at
- * every restart, or removed once the account exists.
+ * Creates the owner at startup from {@code OWNER_USERNAME} and
+ * {@code OWNER_PASSWORD}. Without an owner nobody can make a team.
+ * Insert-only: once an owner exists this does nothing, so a changed password
+ * is never reset.
  */
 @Configuration
 public class OwnerBootstrap {

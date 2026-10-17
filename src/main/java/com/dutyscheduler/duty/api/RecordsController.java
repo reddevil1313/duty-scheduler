@@ -23,9 +23,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/records")
-// A team's own accounts only. The owner has no team, so would read nothing
-// here anyway; refusing them outright says so. Methods that write narrow this
-// to ADMIN with their own annotation, which takes precedence over this one.
+// Not the owner, who has no team. Write methods narrow this to ADMIN.
 @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
 public class RecordsController {
 
@@ -46,12 +44,8 @@ public class RecordsController {
     }
 
     /**
-     * Set opening hours, by name. Troopers left out keep what they had, so the
-     * form can send only what changed.
-     *
-     * <p>
-     * All or nothing: one bad entry and none are saved, rather than half a
-     * form's worth landing silently.
+     * Sets opening hours by name; anyone left out keeps theirs. All or
+     * nothing.
      */
     @PutMapping("/opening")
     @PreAuthorize("hasRole('ADMIN')")

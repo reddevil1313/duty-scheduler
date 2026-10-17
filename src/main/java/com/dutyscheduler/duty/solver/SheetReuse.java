@@ -17,26 +17,16 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Lays a logged sheet onto today's Troopers, so a day that has been worked
- * before is worked the same way again instead of solved afresh.
- *
- * <p>
- * Its rows are the old sheet's turnouts, kept exactly; only who stands each
- * one changes. The same people are not required — the same headcount is — so
- * each row goes to anyone today who can stand it:
+ * Reuses a logged sheet for today: the old rows stay exactly as they were,
+ * only who stands each one changes. A row can go to anyone who:
  * <ul>
- * <li>available for every hour of it, which rules out leave, a roster tick and
- * a stay-out's hours outside their window;
- * <li>on night if it has silent hours, and if on night, holding nothing beyond
- * the silent hours and the morning crossover;
- * <li>the chosen BUS Trooper, if there is one, takes the row with the BUS run.
+ * <li>is available for all of its hours;
+ * <li>is on night if it has silent hours, and if on night, has nothing past
+ * the crossover window;
+ * <li>is the chosen BUS Trooper, for the row with the BUS run.
  * </ul>
- * Where rows differ in length, the longer ones go to whoever has done fewest
- * hours so far, the same tie-break the solver's hour targets use.
- *
- * <p>
- * The result is then put to the validator like any sheet. Anything it cannot
- * lay, or that comes out breaking a rule, is not reused: the caller solves.
+ * Longer rows go to whoever has done the fewest hours. The result must pass
+ * the validator, otherwise the caller solves from scratch.
  */
 final class SheetReuse {
 
@@ -129,7 +119,7 @@ final class SheetReuse {
         return true;
     }
 
-    /** With a BUS Trooper chosen, the BUS run is theirs: no BUS for anyone else, and theirs must have it. */
+    /** The chosen BUS Trooper's row has the BUS run, and nobody else's does. */
     private static boolean busAllows(Trooper bus, Trooper trooper, List<Post> row) {
         if (bus == null) {
             return true;
@@ -139,9 +129,8 @@ final class SheetReuse {
     }
 
     /**
-     * The validator's verdict, as the turnout reads it: a free-split sheet must
-     * be clean; a fixed-turnout sheet may only be short where the MP team is
-     * allowed to be — never a silent hour, never an hour with nobody on.
+     * Free split: no violations. Fixed turnout: only gaps the MP team may take
+     * (not silent, someone still on).
      */
     private static boolean keepsTheRules(Schedule sheet, boolean fixed) {
         ValidationResult result = new ScheduleValidator().validate(sheet);
