@@ -1,4 +1,15 @@
 # Local development only. bootRun activates this profile; nothing else should.
+spring:
+  datasource:
+    password: ${DATABASE_PASSWORD:duty_local_dev}   # docker-compose.yml's
+
+# Plain http://localhost, so a secure-only cookie would never be sent back.
+server:
+  servlet:
+    session:
+      cookie:
+        secure: false
+
 # These passwords are public — they are in a public repo — which is fine only
 # because the accounts they open exist nowhere but a developer's own database.
 dev:

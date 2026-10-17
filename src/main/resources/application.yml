@@ -4,7 +4,9 @@ spring:
   datasource:
     url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/duty}
     username: ${DATABASE_USER:duty}
-    password: ${DATABASE_PASSWORD:duty_local_dev}
+    # No default outside the dev profile: a deploy that forgets to set it fails
+    # to connect at startup, rather than running on the password in this repo.
+    password: ${DATABASE_PASSWORD:}
   jpa:
     hibernate:
       ddl-auto: validate
@@ -19,6 +21,19 @@ owner:
     username: ${OWNER_USERNAME:}
     password: ${OWNER_PASSWORD:}
 
+server:
+  # Client addresses from X-Forwarded-For, trusted only from internal proxy
+  # addresses, so the sign-in throttle counts the caller and not the proxy —
+  # and someone outside cannot pick their own address with the header.
+  forward-headers-strategy: native
+  servlet:
+    session:
+      cookie:
+        # HTTPS only, and not sent with requests from other sites. The dev
+        # profile turns secure off for plain http://localhost.
+        secure: ${SESSION_COOKIE_SECURE:true}
+        same-site: lax
+
 management:
   endpoints:
     web:
@@ -26,4 +41,7 @@ management:
         include: health,info,metrics
   endpoint:
     health:
-      show-details: always
+      # Up or down for anyone; which database and how much disk only for the
+      # owner, who is the only one let at the rest of the actuator.
+      show-details: when-authorized
+      roles: OWNER

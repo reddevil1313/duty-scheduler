@@ -14,6 +14,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 
@@ -48,11 +50,32 @@ public class SecurityConfig {
             {"type":"about:blank","title":"Sign-in failed",\
             "status":401,"detail":"That username and password did not match."}""";
 
+    /**
+     * What the page may load and run. Everything from this origin and nothing
+     * else; inline style attributes only, because React sets some, and no
+     * inline script at all. Framing is refused, so the board cannot be laid
+     * under another site's clicks.
+     */
+    private static final String CONTENT_SECURITY_POLICY = String.join("; ",
+            "default-src 'self'",
+            "script-src 'self'",
+            "style-src 'self' 'unsafe-inline'",
+            "img-src 'self' data: blob:",
+            "font-src 'self'",
+            "connect-src 'self'",
+            "object-src 'none'",
+            "base-uri 'none'",
+            "form-action 'self'",
+            "frame-ancestors 'none'");
+
+    private static final String LOGIN = "/api/session/login";
+
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http, AppUserRepository users) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http, AppUserRepository users, LoginThrottle throttle)
+            throws Exception {
         http
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/api/session/login", "/actuator/health").permitAll()
+                        .requestMatchers(LOGIN, "/actuator/health").permitAll()
                         // Boot's error page, which a failure Spring answers itself
                         // forwards to. Closed, it turned every such failure for a caller
                         // with no account — someone accepting an invite — into a 401.
@@ -70,6 +93,11 @@ public class SecurityConfig {
                         // account. The token is the guard; InviteController says more.
                         .requestMatchers(HttpMethod.GET, "/api/invites/*").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/invites/*/accept").permitAll()
+                        // The rest of the actuator says how the server is doing —
+                        // memory, requests, timings — which is the owner's business,
+                        // not every team member's. There is no method to annotate here,
+                        // so this is the one rule that has to be a URL rule.
+                        .requestMatchers("/actuator/**").hasRole("OWNER")
                         // Everything else needs an account. Note what this does NOT do:
                         // it does not distinguish reading from writing. Doing that here
                         // would mean every new endpoint needs a URL rule adding, and the
@@ -86,6 +114,15 @@ public class SecurityConfig {
                 // Before the anonymous filter, so a session it ends carries on as
                 // anonymous for the rest of this request.
                 .addFilterBefore(new AccountCheckFilter(users), AnonymousAuthenticationFilter.class)
+                // Before either way of signing in, so a refused address is answered
+                // before its password is checked.
+                .addFilterBefore(new LoginThrottleFilter(throttle, LOGIN), UsernamePasswordAuthenticationFilter.class)
+
+                // Spring's defaults stay (nosniff, frame denial, no caching of
+                // responses); the policy above is added, and no Referer is sent on.
+                .headers(headers -> headers
+                        .contentSecurityPolicy(csp -> csp.policyDirectives(CONTENT_SECURITY_POLICY))
+                        .referrerPolicy(referrer -> referrer.policy(ReferrerPolicy.NO_REFERRER)))
 
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
@@ -103,7 +140,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.csrfTokenRepository(new CookieCsrfTokenRepository()))
 
                 .formLogin(form -> form
-                        .loginProcessingUrl("/api/session/login")
+                        .loginProcessingUrl(LOGIN)
                         // 204 and nothing else. The client's next move is to re-read
                         // /api/session anyway — it has to, because signing in rotates
                         // the CSRF token — so putting the identity in this response
@@ -122,9 +159,9 @@ public class SecurityConfig {
                         .logoutSuccessHandler((request, response, authentication) -> response
                                 .setStatus(HttpStatus.NO_CONTENT.value())))
 
-                // Kept for curl and for the integration tests. With the entry point
-                // above it prompts nobody; it only accepts a header that is already
-                // there.
+                // Kept for curl. With the entry point above it prompts nobody; it
+                // only accepts a header that is already there, and its failures
+                // count toward the sign-in throttle like the form's.
                 .httpBasic(Customizer.withDefaults());
 
         return http.build();
