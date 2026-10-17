@@ -25,7 +25,7 @@ CREATE TABLE duty_sheet (
     created_by  TEXT
 );
 
--- One row per man per hour.
+-- One row per Trooper per hour.
 CREATE TABLE duty_assignment (
     id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     sheet_id    BIGINT      NOT NULL REFERENCES duty_sheet(id) ON DELETE CASCADE,
@@ -34,7 +34,7 @@ CREATE TABLE duty_assignment (
     post        TEXT        NOT NULL,
     CONSTRAINT duty_assignment_slot_range CHECK (slot BETWEEN 0 AND 23),
     CONSTRAINT duty_assignment_post_known CHECK (post IN ('AP', 'GG', 'PAC', 'BUS')),
-    -- A man stands one post at a time.
+    -- A Trooper stands one post at a time.
     CONSTRAINT duty_assignment_one_post_per_hour UNIQUE (sheet_id, trooper_id, slot)
 );
 
@@ -95,8 +95,8 @@ CREATE TABLE team_config (
     cycle_start   DATE,
     cycle_in      SMALLINT    NOT NULL DEFAULT 3,
     cycle_length  SMALLINT    NOT NULL DEFAULT 6,
-    stay_in_note  TEXT        NOT NULL DEFAULT 'Ex. Stay in',
-    weekend_note  TEXT        NOT NULL DEFAULT 'Weekend Dismount',
+    stay_in_note  TEXT        NOT NULL DEFAULT '',
+    weekend_note  TEXT        NOT NULL DEFAULT '',
     template      TEXT        NOT NULL DEFAULT '',
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT team_config_single_row CHECK (id = 1)

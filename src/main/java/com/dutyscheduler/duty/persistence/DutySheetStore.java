@@ -181,7 +181,7 @@ public class DutySheetStore {
         return true;
     }
 
-    /** Cumulative hours per man, which is what the fairness tiebreak reads. */
+    /** Cumulative hours per Trooper, which is what the fairness tiebreak reads. */
     @Transactional(readOnly = true)
     public Map<String, Integer> hoursSince(LocalDate from, LocalDate to) {
         return toCounts(sheets.hoursPerTrooper(from, to));
@@ -202,7 +202,7 @@ public class DutySheetStore {
     }
 
     /**
-     * How many hours each man has done recently, keyed by the domain object the
+     * How many hours each Trooper has done recently, keyed by the domain object the
      * solver uses.
      */
     public static final int HISTORY_DAYS = 90;

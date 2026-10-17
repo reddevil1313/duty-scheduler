@@ -53,7 +53,7 @@ class HourTargetsTest {
     }
 
     /**
-     * The trade-off worth being honest about. Sixteen silent hours over three men
+     * The trade-off worth being honest about. Sixteen silent hours over three Troopers
      * is five or six each; thirty-one day hours over eight is three or four. Both
      * halves are even, and the sheet as a whole is not — and no choice of group
      * size fixes it, because it is just the arithmetic. What fixes it is the week:

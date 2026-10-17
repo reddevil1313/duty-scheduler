@@ -5,7 +5,7 @@ import jakarta.persistence.*;
 import org.hibernate.annotations.TenantId;
 
 /**
- * One man, one hour, one post.
+ * One Trooper, one hour, one post.
  *
  */
 @Entity

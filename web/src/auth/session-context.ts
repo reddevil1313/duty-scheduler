@@ -9,7 +9,7 @@ export interface SessionState {
   /**
    * Re-read the session after a call came back 401.
    *
-   * <p>A session can end while the tab is still open — it times out, or an IC
+   * <p>A session can end while the tab is still open — it times out, or someone
    * signs out in another tab. Without this the board would keep showing a
    * signed-in shell over an API that refuses everything.
    */

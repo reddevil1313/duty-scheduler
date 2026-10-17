@@ -394,7 +394,7 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
               {mpHours > 0 && ` ${mpHours} post-hour${mpHours === 1 ? '' : 's'} to the MP team.`}
               {edited && ' Edited by hand.'}
               {' '}
-              {current?.sheet.totalHours ?? schedule.totalHours} man-hours over {schedule.rows.length} men.
+              {current?.sheet.totalHours ?? schedule.totalHours} hours over {schedule.rows.length} Troopers.
             </p>
             {!isAdmin && source === 'logged' && (
               <div className="actions">

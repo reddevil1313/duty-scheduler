@@ -264,7 +264,7 @@ class ApiSecurityIT {
     @DisplayName("a trooper can read the board and the register")
     void stCanRead() throws Exception {
         mvc.perform(get("/api/absences")).andExpect(status().isOk());
-        // Nothing logged for that date yet, so 404 — but a 404 means he got past
+        // Nothing logged for that date yet, so 404 — but a 404 means they got past
         // security, which is the thing under test.
         mvc.perform(get("/api/schedules/2026-09-10")).andExpect(status().isNotFound());
     }
@@ -316,7 +316,7 @@ class ApiSecurityIT {
     @WithMockUser(username = "admin", roles = "ADMIN")
     @DisplayName("a well-formed request the manpower cannot cover is 422, not 400")
     void unsolvableIsUnprocessable() throws Exception {
-        // Two men on night cannot hold sixteen silent hours, whatever else is true.
+        // Two Troopers on night cannot hold sixteen silent hours, whatever else is true.
         String impossible = """
                 {"date":"2026-09-10","nightGroup":["TROOPER_A","TROOPER_B"]}
                 """;

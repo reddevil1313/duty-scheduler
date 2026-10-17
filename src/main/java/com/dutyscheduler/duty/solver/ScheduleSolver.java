@@ -33,17 +33,17 @@ import java.util.Map;
  * pruning techniques:
  *
  * <ul>
- * <li><b>Hour targets as a budget.</b> Each man arrives with an exact number of
+ * <li><b>Hour targets as a budget.</b> Each Trooper arrives with an exact number of
  * hours to do. A position can only go to someone with hours left, so the
- * search cannot wander into schedules where one man does everything.
+ * search cannot wander into schedules where one Trooper does everything.
  * <li><b>The night/day partition.</b> The night group takes the silent hours
  * and nobody else can; everyone else takes the rest. This halves the
- * branching and, more importantly, is what stops a man being given 2200 and
+ * branching and, more importantly, is what stops a Trooper being given 2200 and
  * 1800 on the same sheet.
  * <li><b>Symmetry breaking on PAC.</b> The two PAC positions at an hour are
  * interchangeable, so putting A on the first and B on the second is the
  * same schedule as the reverse. Only the ordered pair is explored.
- * <li><b>A capacity prune.</b> Before recursing, every man who still owes hours
+ * <li><b>A capacity prune.</b> Before recursing, every Trooper who still owes hours
  * must have somewhere left to do them. If not, the branch is abandoned.
  * </ul>
  */
@@ -271,7 +271,7 @@ public final class ScheduleSolver {
         private final boolean[][] available; // [trooper][slot]
         private final boolean[] onNight; // [trooper]
         private final Post[][] grid; // [trooper][slot], null = off
-        private final int[] owed; // hours each man still has to do
+        private final int[] owed; // hours each Trooper still has to do
         private final List<Position> positions;
         private final int[] filledBy; // [position] -> trooper index, -1 unset
         // Cells placed by a human choice before the search, which neither the
@@ -470,8 +470,8 @@ public final class ScheduleSolver {
         }
 
         /**
-         * Night men take the silent hours, day men take the rest — except that a
-         * night man may also be given one of the first few day hours, which is
+         * The night group takes the silent hours, the day group the rest — except that a
+         * night Trooper may also be given one of the first few day hours, which is
          * what "crossover" buys.
          */
         private boolean rightGroup(int trooper, int slot) {
@@ -600,7 +600,7 @@ public final class ScheduleSolver {
         }
 
         /**
-         * Who could take this position, most-committed first. Trying the man with
+         * Who could take this position, most-committed first. Trying the Trooper with
          * the most hours still owed puts the tightest constraint at the top of the
          * tree, where failing is cheap.
          * 
@@ -667,7 +667,7 @@ public final class ScheduleSolver {
         }
 
         /**
-         * Upper bound on the hours a man can still take from {@code frontier} on.
+         * Upper bound on the hours a Trooper can still take from {@code frontier} on.
          * Over-estimating only costs a branch that turns out to be a dead end;
          * under-estimating would cut off a schedule that exists.
          */

@@ -17,7 +17,7 @@ import java.util.Map;
  * post.
  *
  * <p>
- * With a target per man, placing someone is a
+ * With a target per Trooper, placing someone is a
  * decision that can be checked against a budget instead of a choice whose
  * consequences only show up twenty decisions later.
  */
@@ -140,7 +140,7 @@ public record HourTargets(Map<Trooper, Integer> hours, int nightDemand, int dayD
     }
 
     /**
-     * An even share, except that nobody is given more hours than he has room for.
+     * An even share, except that nobody is given more hours than they have room for.
      *
      */
     private static Map<Trooper, Integer> share(int total,
@@ -163,7 +163,7 @@ public record HourTargets(Map<Trooper, Integer> hours, int nightDemand, int dayD
         int left = total;
         while (!pool.isEmpty()) {
             Map<Trooper, Integer> proposed = distribute(left, pool, history);
-            // If any trooper is proposed more than he has room for, give him his max and
+            // If any trooper is proposed more than they have room for, give them their max and
             // redistribute the rest.
             List<Trooper> overflowing = pool.stream()
                     .filter(t -> proposed.get(t) > room.get(t))

@@ -2,7 +2,7 @@
 
 export function today(): string {
   // Local, not toISOString(). A sheet is named by the evening it starts, and at
-  // 2100 in Singapore toISOString() already says tomorrow.
+  // 2100 at UTC+8 toISOString() already says tomorrow.
   const now = new Date()
   const offset = now.getTimezoneOffset() * 60_000
   return new Date(now.getTime() - offset).toISOString().slice(0, 10)

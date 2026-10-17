@@ -113,7 +113,7 @@ class AvailabilityTest {
         boolean[] silent = Availability.silentSlots(day);
 
         assertEquals(16, Availability.demandWithin(day, silent), "sixteen Trooper-hours to place");
-        assertEquals(6, Availability.capacity(silent), "and one man can supply six of them");
+        assertEquals(6, Availability.capacity(silent), "and one Trooper can supply six of them");
         assertEquals(3, Availability.minimumNightGroup(day), "so the night group cannot be smaller than three");
 
         // Same on a weekend sheet, because the silent block is the same eight hours.

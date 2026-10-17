@@ -126,15 +126,15 @@ class SpanImproverTest {
     }
 
     @Test
-    @DisplayName("it will not move a man into an hour he is not eligible for")
+    @DisplayName("it will not move a Trooper into an hour they are not eligible for")
     void respectsEligibility() {
         Post[][] before = { cells(10, 22), cells(12, 14) };
-        // A may only ever be on at 10 and 22 — there is nowhere for him to move to.
+        // A may only ever be on at 10 and 22 — there is nowhere for them to move to.
         SpanImprover.Eligibility pinned = (trooper, slot) -> trooper != 0 || slot == 10 || slot == 22;
 
         Post[][] after = new SpanImprover(BOTH, pinned).improve(before);
 
-        assertArrayEquals(before[0], after[0], "A could not legally be moved, so he was not");
+        assertArrayEquals(before[0], after[0], "A could not legally be moved, so they were not");
     }
 
     @Test

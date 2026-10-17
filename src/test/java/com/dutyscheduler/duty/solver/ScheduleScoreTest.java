@@ -31,8 +31,8 @@ class ScheduleScoreTest {
     }
 
     /**
-     * The rule that makes an early-evening stint affordable. Without it, a man who
-     * works 2000-2200 and comes back at 0800 looks like he has been on duty for
+     * The rule that makes an early-evening stint affordable. Without it, a Trooper who
+     * works 2000-2200 and comes back at 0800 looks like they have been on duty for
      * fourteen hours, and the search will not give anyone an evening hour again.
      */
     @Test
@@ -62,14 +62,14 @@ class ScheduleScoreTest {
                 .row(TROOPER_F, ". . . . . . . . . . . . PAC . . . . . . . PAC . . .")
                 .build();
 
-        // He is on camp 0800 to 1800 whatever he is doing, so spreading his two
-        // hours across it costs him nothing and the score should not pretend it does.
+        // They are in 0800 to 1800 whatever they are doing, so spreading their two
+        // hours across it costs them nothing and the score should not pretend it does.
         assertEquals(0, ScheduleScore.of(sprawling).totalExcess());
         assertTrue(sprawling.rows().get(0).excessSpan() > 0, "the row itself still reports the span");
     }
 
     @Test
-    @DisplayName("hours come before span, and the worst man before the total")
+    @DisplayName("hours come before span, and the worst-off Trooper before the total")
     void theOrderingIsLexicographic() {
         ScheduleScore evenHoursLooseSpans = new ScheduleScore(1, 6, 20, 0);
         ScheduleScore unevenHoursTightSpans = new ScheduleScore(3, 0, 0, 0);
@@ -79,7 +79,7 @@ class ScheduleScoreTest {
         assertTrue(evenHoursLooseSpans.isBetterThan(unevenHoursTightSpans),
                 "an hour of unfairness is worse than several hours of hanging about");
         assertTrue(spreadAround.isBetterThan(oneManRuined),
-                "three men mildly inconvenienced beats one man's day wrecked, even at a higher total");
+                "three Troopers mildly inconvenienced beats one Trooper's day wrecked, even at a higher total");
         assertTrue(new ScheduleScore(1, 3, 5, 0).isBetterThan(new ScheduleScore(1, 3, 6, 0)),
                 "the total only breaks ties");
         assertTrue(new ScheduleScore(0, 0, 0, 0).isBetterThan(null), "anything beats nothing");

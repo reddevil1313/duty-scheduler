@@ -66,7 +66,7 @@ class ScheduleValidatorTest {
     }
 
     @Test
-    @DisplayName("the fixture really is the 47-hour day, spread over eleven men")
+    @DisplayName("the fixture really is the 47-hour day, spread over eleven Troopers")
     void fixtureMatchesTheDaysDemand() {
         Schedule s = validThursday();
         int total = s.rows().stream().mapToInt(Schedule.Row::hours).sum();
@@ -82,7 +82,7 @@ class ScheduleValidatorTest {
     class Coverage {
 
         @Test
-        @DisplayName("taking a man off a manned post reports the hour as under-manned")
+        @DisplayName("taking a Trooper off a manned post reports the hour as under-manned")
         void missingManIsCaught() {
             Schedule broken = validThursday().with(TROOPER_A, 5, null);   // 0100, was AP
 
@@ -109,7 +109,7 @@ class ScheduleValidatorTest {
         }
 
         @Test
-        @DisplayName("a third man on the two PAC positions is over-manned")
+        @DisplayName("a third Trooper on the two PAC positions is over-manned")
         void doublingUpOnAPostIsCaught() {
             Schedule broken = validThursday().with(TROOPER_F, 10, Post.PAC);   // 0600 already has two
 
@@ -144,7 +144,7 @@ class ScheduleValidatorTest {
         @Test
         @DisplayName("four consecutive hours is one hour too many")
         void fourInARowIsCaught() {
-            // TROOPER_E has AP at 0100-0300. Give him 0400 as well and the run is four.
+            // TROOPER_E has AP at 0100-0300. Give them 0400 as well and the run is four.
             Schedule broken = validThursday().with(TROOPER_A, 8, Post.AP);
 
             ValidationResult result = validator.validate(broken);
@@ -164,7 +164,7 @@ class ScheduleValidatorTest {
         @Test
         @DisplayName("AP straight onto PAC needs no break")
         void apToPacIsLegal() {
-            // A clean two-man sheet: this is about the transition rule alone, so
+            // A clean two-Trooper sheet: this is about the transition rule alone, so
             // coverage violations are expected and ignored.
             Schedule s = Schedule.builder(DutyDay.of(THURSDAY))
                     .row(TROOPER_A, ". . . . . . . . . AP PAC . . . . . . . . . . . . .")
@@ -255,7 +255,7 @@ class ScheduleValidatorTest {
         }
 
         @Test
-        @DisplayName("the same hours on a man who is not a stay-out are fine")
+        @DisplayName("the same hours on a Trooper who is not a stay-out are fine")
         void onlyAppliesToStayOuts() {
             Schedule s = Schedule.builder(DutyDay.of(THURSDAY))
                     .row(TROOPER_A, ". . AP . . . . . . . . . . . . . . . . . . . . .")   // 2200
@@ -305,7 +305,7 @@ class ScheduleValidatorTest {
         ValidationResult result = validator.validate(broken);
 
         assertTrue(result.has(Rule.STINT_TOO_LONG));
-        assertTrue(result.has(Rule.OVER_MANNED), "0400 now has a third man on AP");
+        assertTrue(result.has(Rule.OVER_MANNED), "0400 now has a third Trooper on AP");
         assertFalse(result.has(Rule.UNDER_MANNED));
         assertFalse(result.has(Rule.STAY_OUT_WINDOW));
         assertFalse(result.has(Rule.HOUR_CAP_EXCEEDED));

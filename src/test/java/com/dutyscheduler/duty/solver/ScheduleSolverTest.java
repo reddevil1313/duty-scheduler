@@ -98,19 +98,19 @@ class ScheduleSolverTest {
     }
 
     @Test
-    @DisplayName("everybody does exactly the hours he was allocated, to the hour")
+    @DisplayName("everybody does exactly the hours they were allocated, to the hour")
     void hoursMatchTheTargetsExactly() {
         SolveResult result = solve(LocalDate.of(2026, 9, 10));
 
         for (Trooper trooper : ROSTER) {
             assertEquals(result.targets().forTrooper(trooper), result.schedule().hours(trooper),
-                    trooper.name() + " did not do his allocated hours");
+                    trooper.name() + " did not do their allocated hours");
         }
     }
 
     /**
      * Step 5 held a hard partition here. Step 6 relaxes it by exactly one thing:
-     * a night man may pick up the first few day hours coming off the silent block,
+     * a night Trooper may pick up the first few day hours coming off the silent block,
      * because AP straight onto the 0600 PAC needs no break and costs almost no
      * span. Everything else about the split is unchanged — and on a full weekday
      * the crossover earns nothing, so the hard partition is what actually comes
@@ -160,7 +160,7 @@ class ScheduleSolverTest {
     }
 
     /**
-     * The case crossover exists for. Three men on the silent hours can only reach
+     * The case crossover exists for. Three Troopers on the silent hours can only reach
      * five each while the four left on days sit near eight — and no choice of
      * group size fixes that, because both groups are already as small as they can
      * be. Letting the night group take a few early day hours does.
@@ -191,7 +191,7 @@ class ScheduleSolverTest {
         assertTrue(validator.validate(friday.schedule()).ok());
         // A Friday sheet is the silent hours and then a Saturday, and the stay-outs
         // are gone for the whole weekend block — so 16 silent hours fall on three
-        // men and 28 daylight hours on five. One hour of spread is the floor, and
+        // Troopers and 28 daylight hours on five. One hour of spread is the floor, and
         // the search is expected to reach it rather than settle above it.
         assertTrue(ScheduleScore.of(friday.schedule()).hourSpread() <= 1,
                 ScheduleScore.of(friday.schedule()).toString());
@@ -225,13 +225,13 @@ class ScheduleSolverTest {
 
         assertTrue(result.isSolved(), () -> "did not solve: " + result.reason());
         assertTrue(validator.validate(result.schedule()).ok());
-        assertEquals(0, result.schedule().hours(TROOPER_K), "a man on MC does nothing");
+        assertEquals(0, result.schedule().hours(TROOPER_K), "a Trooper on MC does nothing");
 
         Schedule.Row trooperB = result.schedule().row(TROOPER_B).orElseThrow();
-        assertNull(trooperB.at(13), "0900 — he is at his appointment");
+        assertNull(trooperB.at(13), "0900 — they are at their appointment");
         assertNull(trooperB.at(14), "1000");
         assertNull(trooperB.at(15), "1100");
-        assertTrue(trooperB.hours() > 0, "but he still works the rest of the sheet");
+        assertTrue(trooperB.hours() > 0, "but they still work the rest of the sheet");
 
         // The sheet still gets covered; the hours just land on other people.
         assertEquals(47, totalHours(result.schedule()));
@@ -311,7 +311,7 @@ class ScheduleSolverTest {
     }
 
     @Test
-    @DisplayName("too few men is refused with the arithmetic, not a shrug")
+    @DisplayName("too few Troopers is refused with the arithmetic, not a shrug")
     void thinRosterIsRefused() {
         SolveResult result = solver.solve(SolveRequest.of(
                 DutyDay.of(LocalDate.of(2026, 9, 10)),

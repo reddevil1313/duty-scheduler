@@ -9,7 +9,7 @@ import com.dutyscheduler.duty.domain.Post;
  *
  * <p>
  * The move: two Troopers both on duty through the same hours trade posts for
- * those hours. Nobody's hours move, so hours, span and every man's on/off
+ * those hours. Nobody's hours move, so hours, span and every Trooper's on/off
  * pattern are exactly what they were, and each hour still has the same posts
  * manned. That is what lets it run after {@link SpanImprover} without risk to
  * anything ranked above post changes — it cannot touch them, by construction,

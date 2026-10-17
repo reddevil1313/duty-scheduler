@@ -115,7 +115,7 @@ class DutySheetStoreIT {
         assertEquals(day.date(), reloaded.day().date());
         for (Schedule.Row original : solved.schedule().rows()) {
             if (original.hours() == 0) {
-                continue; // a man with nothing on has no rows to store
+                continue; // a Trooper with nothing on has no rows to store
             }
             Schedule.Row back = reloaded.row(original.trooper()).orElseThrow(
                     () -> new AssertionError(original.trooper().name() + " did not come back"));
@@ -184,7 +184,7 @@ class DutySheetStoreIT {
     }
 
     @Test
-    @DisplayName("the database refuses a man on two posts at the same hour")
+    @DisplayName("the database refuses a Trooper on two posts at the same hour")
     void theDatabaseEnforcesOnePostPerHour() {
         DutyDay day = DutyDay.of(LocalDate.of(2026, 9, 10));
         TrooperEntity trooper_a = troopers.findByName("TROOPER_A").orElseThrow();

@@ -62,7 +62,7 @@ class PostSwapImproverTest {
     }
 
     @Test
-    @DisplayName("a one-hour hop to AP is traded away when the other man can take it")
+    @DisplayName("a one-hour hop to AP is traded away when the other Trooper can take it")
     void removesAHop() {
         // A walks GG, AP, GG. B is on GG at that same hour, with a break either
         // side, so the two can trade it cleanly.

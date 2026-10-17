@@ -23,7 +23,7 @@ public final class Availability {
     /**
      * A mask of the twenty-four hours that are open to a trooper on a given sheet.
      * 
-     * <p>Hours are open if the trooper is not absent, and if he is a stay-out trooper
+     * <p>Hours are open if the trooper is not absent, and if they are a stay-out trooper
      * then only the hours between 0800 and 1800 on weekdays are open.
      */
     public static boolean[] mask(Trooper trooper, DutyDay day, List<Absence> absences) {
@@ -60,7 +60,7 @@ public final class Availability {
         return t.getHour() < DutyRules.STAY_OUT_FROM || t.getHour() >= DutyRules.STAY_OUT_TO;
     }
 
-    /** How many of the twenty-four hours are open to him at all. */
+    /** How many of the twenty-four hours are open to them at all. */
     public static int freeHours(boolean[] mask) {
         int free = 0;
         for (boolean open: mask) {

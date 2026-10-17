@@ -9,7 +9,7 @@ import java.util.Comparator;
 /**
  * How good a legal schedule is.
  *
- * The comparison is lexicographic, worst man first.
+ * The comparison is lexicographic, worst-off Trooper first.
  *
  * @param postChanges walks between AP and GG within a turnout, summed over
  *                    everyone; see {@link DutyRules#postChanges}
@@ -43,7 +43,7 @@ public record ScheduleScore(int hourSpread, int worstExcess, int totalExcess, in
         int changes = 0;
         for (Schedule.Row row : schedule.rows()) {
             // Counted for stay-outs too: they are spared the span score because
-            // they are on camp all day regardless, but they still walk.
+            // they are in all day regardless, but they still walk.
             changes += DutyRules.postChanges(row.posts().toArray(new Post[0]));
             if (row.hours() > 0) {
                 fewest = Math.min(fewest, row.hours());

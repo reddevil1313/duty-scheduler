@@ -32,7 +32,7 @@ public interface DutySheetRepository extends JpaRepository<DutySheetEntity, Long
   List<DutySheetEntity> findAllWithAssignments();
 
   /**
-   * Cumulative hours per man over a date range — what long-run fairness is
+   * Cumulative hours per Trooper over a date range — what long-run fairness is
    * decided from.
    */
   @Query("""

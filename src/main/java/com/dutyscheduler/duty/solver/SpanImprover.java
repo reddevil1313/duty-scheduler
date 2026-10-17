@@ -14,7 +14,7 @@ import java.util.List;
  * It takes the finished sheet and hill-climbs on it.
  *
  * <p>
- * The move is a swap of two equal-length segments between two men.
+ * The move is a swap of two equal-length segments between two Troopers.
  * Every candidate swap is re-checked for stint length, legal transitions,
  * availability and group before it is taken, and it is only taken if
  * the score strictly improves — so the sheet that comes out is still legal
@@ -23,7 +23,7 @@ import java.util.List;
 final class SpanImprover {
 
     /**
-     * Whether a man may stand a post at an hour at all — availability and group.
+     * Whether a Trooper may stand a post at an hour at all — availability and group.
      */
     interface Eligibility {
         boolean allows(int trooper, int slot);
@@ -109,7 +109,7 @@ final class SpanImprover {
         int worstBefore = Math.max(cost(a.trooper, grid[a.trooper]), cost(b.trooper, grid[b.trooper]));
         int worstAfter = Math.max(cost(a.trooper, rowA), cost(b.trooper, rowB));
 
-        // Same rule as the score: never flatten one man's day by wrecking another's.
+        // Same rule as the score: never flatten one Trooper's day by wrecking another's.
         if (worstAfter > worstBefore || after >= before) {
             return false;
         }
