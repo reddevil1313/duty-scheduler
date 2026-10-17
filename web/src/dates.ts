@@ -8,6 +8,13 @@ export function today(): string {
   return new Date(now.getTime() - offset).toISOString().slice(0, 10)
 }
 
+/** Local now as `YYYY-MM-DDTHH:MM`, the shape the API's instants take to the minute. */
+export function nowMinute(): string {
+  const now = new Date()
+  const offset = now.getTimezoneOffset() * 60_000
+  return new Date(now.getTime() - offset).toISOString().slice(0, 16)
+}
+
 /**
  * The day after, `YYYY-MM-DD`. Built from local parts: going through
  * toISOString() would read local midnight as UTC, and east of Greenwich hand

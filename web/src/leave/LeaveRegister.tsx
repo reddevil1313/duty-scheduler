@@ -3,8 +3,9 @@ import { ApiError, api } from '../api/client'
 import type { Absence, AbsenceKind, AbsenceReach, AbsenceSpan, Ticks, Trooper } from '../api/types'
 import { useReport } from '../api/useReport'
 import { useSession } from '../auth/session-context'
-import { shortDate, shortInstant, today } from '../dates'
+import { nowMinute, shortDate, shortInstant, today } from '../dates'
 import { requestOf, type LeaveDraft } from './draft'
+import { KIND_TABLES, bookedAs, byKind, daysLabel, daysOf, isOver, isRunning, type KindGroup } from './groups'
 
 const KINDS: [AbsenceKind, string][] = [
   ['MC', 'MC'],
@@ -31,9 +32,13 @@ interface Props {
 }
 
 /**
- * The leave register: MCs, off-in-lieu, annual leave and medical
- * appointments. Anyone signed in can read it; only an ADMIN can book or
- * cancel, and the server refuses anyone else regardless.
+ * The leave register: MCs, overseas leave, annual leave and medical
+ * appointments, a table each. Anyone signed in can read it; only an ADMIN can
+ * book or cancel, and the server refuses anyone else regardless.
+ *
+ * One table per kind, because the kinds are asked about separately — who is
+ * on MC, how much AL someone has had — and one list mixing all four, past and
+ * to come, had to be read from end to end to answer either.
  */
 export function LeaveRegister({ active, ticks }: Props) {
   const { session } = useSession()
@@ -43,6 +48,8 @@ export function LeaveRegister({ active, ticks }: Props) {
   const [register, setRegister] = useState<Absence[]>([])
   const [error, setError] = useState<string | null>(null)
   const [note, setNote] = useState<string | null>(null)
+  // One Trooper's leave across every table, or null for everyone.
+  const [only, setOnly] = useState<string | null>(null)
   const report = useReport(setError)
 
   useEffect(() => {
@@ -61,7 +68,9 @@ export function LeaveRegister({ active, ticks }: Props) {
   }, [active, report])
 
   const booked = (absence: Absence) => {
-    setRegister((current) => [absence, ...current].sort(latestFirst))
+    setRegister((current) => [absence, ...current])
+    // A booking for someone the filter hides would seem not to have happened.
+    setOnly((current) => (current === null || current === absence.trooper ? current : null))
     setError(null)
     setNote(`${absence.trooper} booked ${absence.kind}.`)
   }
@@ -72,68 +81,153 @@ export function LeaveRegister({ active, ticks }: Props) {
     setNote(`${absence.trooper}'s ${absence.kind} cancelled.`)
   }
 
+  // Names from the register rather than the roster, so leave taken by someone
+  // since archived can still be picked out. A filter on a name no longer
+  // there (their last entry cancelled) falls back to everyone.
+  const names = [...new Set(register.map((a) => a.trooper))].sort()
+  const trooper = only !== null && names.includes(only) ? only : null
+  // Read on each render rather than held, so an entry that ends while the tab
+  // is open moves to the past at the next change, with no timer to keep.
+  const now = nowMinute()
+  const groups = byKind(register, now, trooper)
+  const current = groups.reduce((n, g) => n + g.current.length, 0)
+
   return (
-    <section className="panel leave" aria-label="Leave register">
-      <div className="panel-hd">
-        <h2>Leave register</h2>
-        {register.length > 0 && (
-          <span className="meta">{register.length} {register.length === 1 ? 'entry' : 'entries'}</span>
+    <section className="leave" aria-label="Leave register">
+      <div className="panel">
+        <div className="panel-hd">
+          <h2>Leave register</h2>
+          <span className="meta">
+            {register.length === 0
+              ? 'nothing booked'
+              : `${current} current or to come · ${register.length - current} past`}
+          </span>
+          {names.length > 1 && (
+            <label className="filter">
+              Show
+              <select value={trooper ?? ''} onChange={(e) => setOnly(e.target.value || null)}>
+                <option value="">Everyone</option>
+                {names.map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </label>
+          )}
+        </div>
+
+        {isAdmin ? (
+          <BookingForm roster={roster} onBooked={booked} onError={report} />
+        ) : (
+          <p className="empty">You have view-only access. Ask an ADMIN to record leave.</p>
+        )}
+
+        {Object.keys(ticks).length > 0 && (
+          <p className="ticks note">
+            Ticked out on the Roster tab, for generating only — not booked, and not counted in the records:{' '}
+            {Object.entries(ticks).map(([name, kind]) => `${name} (${kind})`).join(', ')}.
+            {isAdmin && ' To make one stick, book it here.'}
+          </p>
+        )}
+
+        {(error || note) && (
+          <p className={`message${error ? ' error' : ' note'}`} role={error ? 'alert' : 'status'}>{error ?? note}</p>
+        )}
+
+        {register.length === 0 && (
+          <p className="empty">
+            Nothing booked yet. Anything recorded here is taken into account when that day's sheet is generated.
+          </p>
         )}
       </div>
 
-      {isAdmin ? (
-        <BookingForm roster={roster} onBooked={booked} onError={report} />
-      ) : (
-        <p className="empty">You have view-only access. Ask an ADMIN to record leave.</p>
-      )}
-
-      {Object.keys(ticks).length > 0 && (
-        <p className="ticks note">
-          Ticked out on the Roster tab, for generating only — not booked, and not counted in the records:{' '}
-          {Object.entries(ticks).map(([name, kind]) => `${name} (${kind})`).join(', ')}.
-          {isAdmin && ' To make one stick, book it here.'}
-        </p>
-      )}
-
-      {(error || note) && (
-        <p className={`message${error ? ' error' : ' note'}`} role={error ? 'alert' : 'status'}>{error ?? note}</p>
-      )}
-
-      {register.length === 0 ? (
-        <p className="empty">
-          Nothing booked yet. Anything recorded here is taken into account when that day's sheet is generated.
-        </p>
-      ) : (
-        <table className="register">
-          <thead>
-            <tr>
-              <th>Trooper</th>
-              <th>Type</th>
-              <th>Covers</th>
-              <th>Sheets affected</th>
-              <th>Note</th>
-              {isAdmin && <th aria-label="Actions" />}
-            </tr>
-          </thead>
-          <tbody>
-            {register.map((absence) => (
-              <RegisterRow
-                key={absence.id}
-                absence={absence}
-                canCancel={isAdmin}
-                onCancelled={cancelled}
-                onError={report}
-              />
-            ))}
-          </tbody>
-        </table>
-      )}
+      {groups.map((group) => (
+        <KindTable
+          // Keyed on the filter too, so a table opened to its past closes
+          // again when the view changes to someone else.
+          key={`${group.kind}:${trooper ?? ''}`}
+          group={group}
+          now={now}
+          canCancel={isAdmin}
+          onCancelled={cancelled}
+          onError={report}
+        />
+      ))}
     </section>
   )
 }
 
-function latestFirst(a: Absence, b: Absence): number {
-  return b.from.localeCompare(a.from) || b.id - a.id
+interface TableProps {
+  group: KindGroup
+  now: string
+  canCancel: boolean
+  onCancelled: (absence: Absence) => void
+  onError: (e: unknown) => Promise<void>
+}
+
+/**
+ * One kind's entries: what is running or to come, and the past folded away
+ * below it. The past is what the records count, so it stays one click off
+ * rather than gone, but it no longer stands between the reader and next week.
+ */
+function KindTable({ group, now, canCancel, onCancelled, onError }: TableProps) {
+  const [showPast, setShowPast] = useState(false)
+  const { kind, current, past } = group
+  const label = KIND_TABLES.find(([k]) => k === kind)?.[1] ?? kind
+  // An appointment is hours on one day; a count of days says nothing about it.
+  const withDays = kind !== 'MA'
+  const rows = showPast ? [...current, ...past] : current
+
+  return (
+    <div className="panel kind-table" aria-label={label}>
+      <div className="panel-hd">
+        <h2><span className={`kind ${kind}`}>{kind}</span> {label}</h2>
+        <span className="meta">
+          {current.length === 0 && past.length === 0
+            ? 'none'
+            : `${current.length} current or to come${past.length > 0 ? ` · ${past.length} past` : ''}`}
+        </span>
+        {past.length > 0 && (
+          <button type="button" className="sm" aria-expanded={showPast} onClick={() => setShowPast((v) => !v)}>
+            {showPast ? 'Hide past' : `Show ${past.length} past`}
+          </button>
+        )}
+      </div>
+      {rows.length === 0 ? (
+        <p className="empty">{past.length > 0 ? 'Nothing current or to come.' : `No ${kind} booked.`}</p>
+      ) : (
+        <div className="table-scroll">
+          <table className="register">
+            <thead>
+              <tr>
+                {/* Fixed widths, the same in every table, so the four line up
+                    down the page; When takes the room of Dates and Days. */}
+                <th className="c-trooper">Trooper</th>
+                <th className={withDays ? 'c-dates' : 'c-when'}>{withDays ? 'Dates' : 'When'}</th>
+                {withDays && <th className="n c-days">Days</th>}
+                <th className="c-sheets">Sheets affected</th>
+                <th>Note</th>
+                {canCancel && <th className="c-act" aria-label="Actions" />}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((absence, i) => (
+                <RegisterRow
+                  key={absence.id}
+                  absence={absence}
+                  now={now}
+                  withDays={withDays}
+                  // The first past row carries a rule above it, where the
+                  // current entries end.
+                  firstPast={showPast && i === current.length && current.length > 0}
+                  canCancel={canCancel}
+                  onCancelled={onCancelled}
+                  onError={onError}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
 }
 
 interface FormProps {
@@ -292,12 +386,15 @@ function describe(reach: AbsenceReach): string {
 
 interface RowProps {
   absence: Absence
+  now: string
+  withDays: boolean
+  firstPast: boolean
   canCancel: boolean
   onCancelled: (absence: Absence) => void
   onError: (e: unknown) => Promise<void>
 }
 
-function RegisterRow({ absence, canCancel, onCancelled, onError }: RowProps) {
+function RegisterRow({ absence, now, withDays, firstPast, canCancel, onCancelled, onError }: RowProps) {
   const [confirming, setConfirming] = useState(false)
   const [busy, setBusy] = useState(false)
 
@@ -319,13 +416,19 @@ function RegisterRow({ absence, canCancel, onCancelled, onError }: RowProps) {
       ? `${sheets.length} sheets, ${shortDate(sheets[0])} to ${shortDate(sheets[sheets.length - 1])}`
       : sheets.map(shortDate).join(', ')
   // Dimmed once it is over, so the eye lands on what still matters.
-  const past = absence.until.slice(0, 10) < today()
+  const past = isOver(absence, now)
+  const days = daysOf(absence)
 
   return (
-    <tr className={past ? 'past' : undefined}>
+    <tr className={[past && 'past', firstPast && 'first-past'].filter(Boolean).join(' ') || undefined}>
       <td>{absence.trooper}</td>
-      <td><span className={`kind ${absence.kind}`}>{absence.kind}</span></td>
-      <td>{shortInstant(absence.covers)} → {shortInstant(absence.until)}</td>
+      {/* As booked, with the interval the 2000 rule resolves it to on hover:
+          the sheets column already says what that interval reaches. */}
+      <td title={`${shortInstant(absence.covers)} → ${shortInstant(absence.until)}`}>
+        {bookedAs(absence)}
+        {isRunning(absence, now) && <span className="tag now">now</span>}
+      </td>
+      {withDays && <td className="n">{days === null ? '' : daysLabel(days)}</td>}
       <td title={sheets.join(', ')}>{affected}</td>
       <td>{absence.note ?? ''}</td>
       {canCancel && (

@@ -424,6 +424,28 @@ td.row-actions > * + * { margin-left: 6px; }
 .leave-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 11px; padding: 13px; border-bottom: 1px solid var(--line); }
 .leave-form .times { display: flex; align-items: center; gap: 6px; color: var(--muted); }
 .leave-form .preview { flex-basis: 100%; margin: 0; }
+
+/* The register's filter sits in its heading, so it reads across, not stacked. */
+.panel-hd .filter { flex-direction: row; align-items: center; gap: 8px; }
+.panel-hd .filter select { height: 28px; font-size: 12.5px; }
+.kind-table .panel-hd h2 { display: flex; align-items: center; gap: 8px; }
+/* Wide enough for its columns on a phone: the table scrolls, the page does not. */
+.table-scroll { overflow-x: auto; }
+/* Every column a share of the width, none fixed in pixels: a fixed actions
+   column left the note nothing at phone width, and it wrapped a letter a line.
+   Below the minimum the table scrolls rather than squeeze. */
+.table-scroll .register { min-width: 820px; }
+.kind-table .register { table-layout: fixed; }
+.kind-table .c-trooper { width: 14%; }
+.kind-table .c-dates { width: 23%; }
+.kind-table .c-days { width: 6%; }
+.kind-table .c-when { width: 29%; }
+.kind-table .c-sheets { width: 25%; }
+.kind-table .c-act { width: 12%; }
+.kind-table td { overflow-wrap: break-word; }
+.kind-table td:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.register tr.first-past td { border-top: 2px solid var(--line-2); }
+.tag.now { border-color: var(--brass); color: var(--brass); }
 input.hours { width: 5.5rem; }
 
 .empty { padding: 15px 13px; color: var(--muted); font-size: 12.5px; margin: 0; }

@@ -6,7 +6,7 @@ public enum AbsenceKind {
     /** Medical certificate. */
     MC,
 
-    /** Off in lieu. */
+    /** Overseas leave. */
     OL,
 
     /** Annual leave. */

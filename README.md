@@ -45,10 +45,12 @@ Both ship together as a single image.
   someone who stood a logged sheet archives them, so past sheets stay intact.
   MC, OL and AL tickboxes take someone out of the sheets you generate without
   booking anything, for trying out a sheet before the leave is confirmed.
-- **Leave register** for MCs, off-in-lieu, annual leave and medical
+- **Leave register** for MCs, overseas leave, annual leave and medical
   appointments: full days, half days or a time window. Each entry shows the
   duty sheets it affects, before and after booking, and is taken into account
-  automatically when sheets are generated.
+  automatically when sheets are generated. Each kind has its own table, with
+  what is running or to come first and past leave folded away beneath it, and
+  the register can be narrowed to one Trooper.
 - **Light and dark themes**, following the system or set from the masthead.
 - **Two roles**: `ADMIN` manages the roster and leave, and generates and logs
   sheets. `USER` has read-only access.
