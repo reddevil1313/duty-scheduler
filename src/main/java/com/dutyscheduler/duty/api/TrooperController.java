@@ -11,6 +11,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -69,6 +70,7 @@ public class TrooperController {
      */
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
+    @Transactional
     public ResponseEntity<TrooperResponse> add(@Valid @RequestBody TrooperRequest request) {
         String name = nameOf(request);
         checkConsistent(request);
@@ -80,6 +82,7 @@ public class TrooperController {
         if (entity == null) {
             entity = new TrooperEntity(name, request.stayOut());
         }
+        takeDefaultBus(entity.getId(), request);
         entity.setActive(true);
         apply(entity, name, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(TrooperResponse.from(save(entity, name)));
@@ -88,6 +91,7 @@ public class TrooperController {
     /** Replace a Trooper's particulars, name included. */
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
+    @Transactional
     public TrooperResponse update(@PathVariable Long id, @Valid @RequestBody TrooperRequest request) {
         TrooperEntity entity = onRoster(id);
         String name = nameOf(request);
@@ -102,6 +106,7 @@ public class TrooperController {
                                     + " belongs to an archived Trooper. Add them back instead.");
                 });
 
+        takeDefaultBus(id, request);
         apply(entity, name, request);
         return TrooperResponse.from(save(entity, name));
     }
@@ -131,8 +136,10 @@ public class TrooperController {
 
     private void archive(TrooperEntity entity) {
         entity.setActive(false);
-        // Not a default night-group member any more, should they be added back.
+        // Not a default night-group member, nor the default BUS Trooper, any
+        // more, should they be added back.
         entity.setOnNight(false);
+        entity.setDefaultBus(false);
         troopers.save(entity);
     }
 
@@ -141,6 +148,22 @@ public class TrooperController {
         // is a request about nobody the client can see.
         return troopers.findByIdAndActiveTrue(id).orElseThrow(() -> new RosterException(
                 HttpStatus.NOT_FOUND, "No Trooper " + id + " on the roster."));
+    }
+
+    /**
+     * One default BUS Trooper at most: whoever had it gives it up first, or the
+     * partial unique index refuses the write. Called before the entity is
+     * changed: it is managed in this transaction, so the bulk update flushes it
+     * first, and flushed already holding the flag it would meet the old holder
+     * in the index. In the same transaction as the save, so a save refused
+     * later puts the old default back rather than leaving nobody holding it.
+     * A new Trooper has no id yet, and "id <> null" matches nobody in SQL, so
+     * -1 stands in for it.
+     */
+    private void takeDefaultBus(Long id, TrooperRequest request) {
+        if (Boolean.TRUE.equals(request.defaultBus())) {
+            troopers.clearDefaultBusExcept(id == null ? -1L : id);
+        }
     }
 
     private TrooperEntity save(TrooperEntity entity, String name) {
@@ -167,6 +190,11 @@ public class TrooperController {
             throw new RosterException(HttpStatus.UNPROCESSABLE_CONTENT,
                     "A stay-out cannot be in the night group.");
         }
+        // Not in until 0800, so never able to take the 0700 run.
+        if (request.stayOut() && Boolean.TRUE.equals(request.defaultBus())) {
+            throw new RosterException(HttpStatus.UNPROCESSABLE_CONTENT,
+                    "A stay-out cannot be the default BUS Trooper: they are not in until 0800.");
+        }
     }
 
     private static void apply(TrooperEntity entity, String name, TrooperRequest request) {
@@ -174,6 +202,15 @@ public class TrooperController {
         entity.setRank(request.rank() == null || request.rank().isBlank() ? null : request.rank().trim());
         entity.setStayOut(request.stayOut());
         entity.setOnNight(request.onNight());
+        // Left alone when the request does not say, so an edit of the name does
+        // not quietly clear it; given up when they become a stay-out, who could
+        // never take the run.
+        if (request.defaultBus() != null) {
+            entity.setDefaultBus(request.defaultBus());
+        }
+        if (request.stayOut()) {
+            entity.setDefaultBus(false);
+        }
     }
 
     private static RosterException duplicate(String name) {

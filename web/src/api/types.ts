@@ -102,6 +102,8 @@ export interface GenerateOptions {
   ticks?: Ticks
   /** Who takes the BUS run; left out, the solver chooses. */
   bus?: string | null
+  /** True when `bus` is the roster's default rather than a pick: it then gives way instead of being refused. */
+  busDefault?: boolean
   /** Everyone's hours, 5 to 7, the rest to the MP team; left out, the free split. */
   turnout?: number | null
 }
@@ -175,6 +177,8 @@ export interface Trooper {
   stayOut: boolean
   permPac: boolean
   onNight: boolean
+  /** Who the board's BUS pick starts on. At most one Trooper, never a stay-out. */
+  defaultBus: boolean
 }
 
 /**
@@ -186,4 +190,6 @@ export interface TrooperParticulars {
   rank: string | null
   stayOut: boolean
   onNight: boolean
+  /** Left out, the server keeps whatever it was; true moves the default here. */
+  defaultBus?: boolean
 }

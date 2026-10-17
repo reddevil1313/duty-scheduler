@@ -80,9 +80,18 @@ public class ScheduleController {
         // A BUS choice the chosen Trooper cannot stand comes back unsolved, with
         // the reason, before any search — and leaves as a 422 like any sheet
         // that cannot be covered.
+        List<Schedule> reusable = reusable(day, roster, absences, request.turnout());
         SolveResult result = solver.solve(
                 new SolveRequest(day, roster, night, absences, store.history(day.date()), bus, request.turnout(),
-                        reusable(day, roster, absences, request.turnout())));
+                        reusable));
+        // The roster's default is a starting point, not a choice made for this
+        // sheet: on leave, or unable to stand BUS today, they give way and the
+        // solver chooses. Only a pick made for this sheet is refused.
+        if (!result.isSolved() && bus != null && Boolean.TRUE.equals(request.busDefault())) {
+            result = solver.solve(
+                    new SolveRequest(day, roster, night, absences, store.history(day.date()), null,
+                            request.turnout(), reusable));
+        }
 
         if (!result.isSolved()) {
             throw new UnsolvableException(result.reason());

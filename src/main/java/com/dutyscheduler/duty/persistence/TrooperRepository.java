@@ -1,7 +1,11 @@
 package com.dutyscheduler.duty.persistence;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -28,4 +32,14 @@ public interface TrooperRepository extends JpaRepository<TrooperEntity, Long> {
     Optional<TrooperEntity> findByNameAndActiveTrue(String name);
 
     List<TrooperEntity> findByOnNightTrue();
+
+    /**
+     * Clear the default BUS flag from everyone else, before setting it on one.
+     * Flushed straight away: the partial unique index allows only one, so the
+     * old one has to be gone before the new one is written.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = false)
+    @Transactional
+    @Query("UPDATE TrooperEntity t SET t.defaultBus = false WHERE t.defaultBus = true AND t.id <> :keep")
+    int clearDefaultBusExcept(@Param("keep") Long keep);
 }

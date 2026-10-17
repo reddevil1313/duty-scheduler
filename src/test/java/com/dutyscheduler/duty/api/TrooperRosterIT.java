@@ -21,6 +21,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -242,6 +243,78 @@ class TrooperRosterIT {
                 .andExpect(jsonPath("$.onNight").value(true));
 
         assertThat(troopers.findById(id)).map(TrooperEntity::isActive).hasValue(true);
+    }
+
+    private void setDefaultBus(String name, boolean on) throws Exception {
+        TrooperEntity t = troopers.findByName(name).orElseThrow();
+        mvc.perform(put("/api/troopers/" + t.getId()).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"name":"%s","stayOut":%s,"onNight":%s,"defaultBus":%s}
+                        """.formatted(name, t.isStayOut(), t.isOnNight(), on)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("a default BUS Trooper can be set, and there is only ever one")
+    void oneDefaultBus() throws Exception {
+        setDefaultBus("TROOPER_D", true);
+        mvc.perform(get("/api/troopers"))
+                .andExpect(jsonPath("$[?(@.defaultBus == true)].name", contains("TROOPER_D")));
+
+        setDefaultBus("TROOPER_E", true);
+        mvc.perform(get("/api/troopers"))
+                .andExpect(jsonPath("$[?(@.defaultBus == true)].name", contains("TROOPER_E")));
+
+        setDefaultBus("TROOPER_E", false);
+        mvc.perform(get("/api/troopers"))
+                .andExpect(jsonPath("$[?(@.defaultBus == true)]").isEmpty());
+    }
+
+    @Test
+    @DisplayName("an edit that does not mention the default BUS leaves it alone")
+    void editKeepsDefaultBus() throws Exception {
+        setDefaultBus("TROOPER_D", true);
+        mvc.perform(put("/api/troopers/" + idOf("TROOPER_D")).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content(body("TROOPER_D", false, false)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.defaultBus").value(true));
+    }
+
+    @Test
+    @DisplayName("a stay-out cannot be the default BUS (422); becoming one, or being archived, gives it up")
+    void stayOutAndArchiveClearIt() throws Exception {
+        mvc.perform(put("/api/troopers/" + idOf("TROOPER_I")).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"name":"TROOPER_I","stayOut":true,"onNight":false,"defaultBus":true}
+                        """))
+                .andExpect(status().isUnprocessableContent());
+
+        setDefaultBus("TROOPER_D", true);
+        mvc.perform(put("/api/troopers/" + idOf("TROOPER_D")).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content(body("TROOPER_D", true, false)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.defaultBus").value(false));
+
+        setDefaultBus("TROOPER_E", true);
+        logASheet();
+        mvc.perform(delete("/api/troopers/" + idOf("TROOPER_E")).with(csrf())).andExpect(status().isNoContent());
+        assertThat(troopers.findByName("TROOPER_E")).map(TrooperEntity::isDefaultBus).hasValue(false);
+    }
+
+    @Test
+    @DisplayName("a new Trooper can be added as the default BUS, taking it from whoever had it")
+    void addAsDefaultBus() throws Exception {
+        setDefaultBus("TROOPER_D", true);
+        mvc.perform(post("/api/troopers").with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"name":"TROOPER_L","stayOut":false,"onNight":false,"defaultBus":true}
+                        """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.defaultBus").value(true));
+        assertThat(troopers.findByName("TROOPER_D")).map(TrooperEntity::isDefaultBus).hasValue(false);
     }
 
     @Test

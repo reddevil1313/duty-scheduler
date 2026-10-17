@@ -38,10 +38,14 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   // Who takes the BUS run, chosen like the night group; null lets the solver
-  // choose. Read through busPick, so a Trooper since removed, renamed or ticked
-  // out falls back to the solver's choice instead of a request that fails.
-  const [bus, setBus] = useState<string | null>(null)
-  const busPick = bus !== null && roster.some((t) => t.name === bus) && !(bus in ticks) ? bus : null
+  // choose, and undefined means nobody has picked yet, so the roster's default
+  // BUS Trooper stands. Read through busPick, so a Trooper since removed,
+  // renamed or ticked out falls back to the solver's choice instead of a
+  // request that fails.
+  const [bus, setBus] = useState<string | null | undefined>(undefined)
+  const defaultBus = roster.find((t) => t.defaultBus)?.name ?? null
+  const wanted = bus === undefined ? defaultBus : bus
+  const busPick = wanted !== null && roster.some((t) => t.name === wanted) && !(wanted in ticks) ? wanted : null
   // The turnout to generate with (null for the free split), and the one the
   // sheet on the board was made with — generated now, or logged with it. The
   // MP hours themselves are never stored; the turnout is, and it is what tells
@@ -124,12 +128,18 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
         nightGroup: nightGroup.filter((n) => !(n in ticks)),
         ticks,
         bus: busPick,
+        busDefault: bus === undefined && busPick !== null,
         turnout,
       })
       show(sheet, 'generated', turnout)
-      if (sheet.reusedFrom) {
-        setNote(`Reused the sheet logged for ${shortDate(sheet.reusedFrom)}: the same posts, headcount and turnout.`)
-      }
+      // The default gave way when the sheet came back with BUS on someone else.
+      const gaveWay = bus === undefined && busPick !== null && sheet.rows.some((r) =>
+        r.trooper !== busPick && r.posts.includes('BUS'))
+      const notes = [
+        gaveWay && `${busPick}, the default BUS Trooper, could not take BUS on this sheet, so the solver chose.`,
+        sheet.reusedFrom && `Reused the sheet logged for ${shortDate(sheet.reusedFrom)}: the same posts, headcount and turnout.`,
+      ].filter(Boolean)
+      if (notes.length > 0) setNote(notes.join(' '))
     } catch (e) {
       await report(e)
     } finally {
@@ -286,6 +296,7 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
                   onChange={() => setBus(t.name)}
                 />
                 {t.name}
+                {t.name === defaultBus && <span className="tag">default</span>}
               </label>
             ))}
           </fieldset>

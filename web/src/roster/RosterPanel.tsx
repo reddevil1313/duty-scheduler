@@ -34,6 +34,7 @@ export function RosterPanel({ roster, canEdit, ticks, onTick, onAdded, onUpdated
             <th>Rank</th>
             <th>Stay-out</th>
             <th>Night</th>
+            {canEdit && <th className="tick" title="Who the board's BUS pick starts on">Default BUS</th>}
             {canEdit && TICK_KINDS.map((k) => <th key={k} className="tick">{k}</th>)}
             {canEdit && <th aria-label="Actions" />}
           </tr>
@@ -73,6 +74,9 @@ interface RowProps {
 function RosterRow({ trooper, canEdit, tick, onTick, onUpdated, onRemoved, onError }: RowProps) {
   const [mode, setMode] = useState<Mode>({ kind: 'view' })
   const [busy, setBusy] = useState(false)
+  // Shown while the default BUS change saves, so the box flips on the click
+  // rather than a round trip later.
+  const [pendingBus, setPendingBus] = useState<boolean | null>(null)
 
   const save = async (e: FormEvent, draft: Draft) => {
     e.preventDefault()
@@ -84,6 +88,20 @@ function RosterRow({ trooper, canEdit, tick, onTick, onUpdated, onRemoved, onErr
       await onError(err)
     } finally {
       setBusy(false)
+    }
+  }
+
+  /** The default BUS Trooper is a stored particular, saved as soon as it is ticked. */
+  const setDefaultBus = async (on: boolean) => {
+    setBusy(true)
+    setPendingBus(on)
+    try {
+      onUpdated(trooper, await api.updateTrooper(trooper.id, { ...particularsOf(draftOf(trooper)), defaultBus: on }))
+    } catch (err) {
+      await onError(err)
+    } finally {
+      setBusy(false)
+      setPendingBus(null)
     }
   }
 
@@ -103,7 +121,7 @@ function RosterRow({ trooper, canEdit, tick, onTick, onUpdated, onRemoved, onErr
     const { draft } = mode
     return (
       <tr className="editing">
-        <td colSpan={8}>
+        <td colSpan={9}>
           <form onSubmit={(e) => void save(e, draft)}>
             <TrooperFields draft={draft} onChange={(next) => setMode({ kind: 'edit', draft: next })} />
             <button type="submit" disabled={busy || draft.name.trim() === ''}>
@@ -124,6 +142,18 @@ function RosterRow({ trooper, canEdit, tick, onTick, onUpdated, onRemoved, onErr
       <td>{trooper.rank ?? ''}</td>
       <td>{trooper.stayOut ? 'Yes' : ''}</td>
       <td>{trooper.onNight ? 'Yes' : ''}</td>
+      {canEdit && (
+        <td className="tick">
+          <input
+            type="checkbox"
+            aria-label={`${trooper.name} default BUS`}
+            checked={pendingBus ?? trooper.defaultBus}
+            // A stay-out is not in until 0800; the server refuses them too.
+            disabled={trooper.stayOut || busy}
+            onChange={(e) => void setDefaultBus(e.target.checked)}
+          />
+        </td>
+      )}
       {canEdit && TICK_KINDS.map((kind) => (
         <td key={kind} className="tick">
           <input

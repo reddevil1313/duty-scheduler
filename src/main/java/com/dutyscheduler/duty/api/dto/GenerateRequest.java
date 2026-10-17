@@ -17,6 +17,10 @@ import java.util.List;
  * @param bus     who takes the BUS run, by name; optional, and the solver
  *                chooses when it is left out. Refused with a 422 when they
  *                cannot stand it.
+ * @param busDefault whether {@code bus} is the roster's default BUS Trooper
+ *                rather than a pick for this sheet. A default gives way: when the
+ *                sheet cannot be made with them on BUS, the solver chooses
+ *                instead of the request being refused. Optional; left out, a pick.
  * @param turnout everyone's hours, 5 to 7, with the rest of the sheet left to
  *                the MP team; optional, and the free split when left out.
  *                Refused with a 422 when it makes more hours than the sheet needs.
@@ -29,6 +33,8 @@ public record GenerateRequest(
         List<@Valid QuickLeave> out,
 
         String bus,
+
+        Boolean busDefault,
 
         @Min(value = 5, message = "A fixed turnout is 5 to 7 hours.")
         @Max(value = 7, message = "A fixed turnout is 5 to 7 hours.") Integer turnout) {

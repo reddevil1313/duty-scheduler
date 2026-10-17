@@ -37,6 +37,10 @@ public class TrooperEntity {
     @Column(nullable = false)
     private boolean active = true;
 
+    /** Who the board's BUS pick starts on. At most one Trooper, and never a stay-out. */
+    @Column(name = "default_bus", nullable = false)
+    private boolean defaultBus;
+
     /** Hours done before this tracker existed; the starting point of their total. */
     @Column(name = "opening_hours", nullable = false)
     private int openingHours;
@@ -88,6 +92,14 @@ public class TrooperEntity {
 
     public boolean isActive() {
         return active;
+    }
+
+    public boolean isDefaultBus() {
+        return defaultBus;
+    }
+
+    public void setDefaultBus(boolean defaultBus) {
+        this.defaultBus = defaultBus;
     }
 
     public int getOpeningHours() {

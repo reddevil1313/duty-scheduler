@@ -29,12 +29,18 @@ export function useRoster(report: (e: unknown) => Promise<void>) {
   }, [report])
 
   const added = (trooper: Trooper) => {
-    setRoster((current) => [...current, trooper])
+    setRoster((current) => [
+      ...current.map((t) => (trooper.defaultBus ? { ...t, defaultBus: false } : t)),
+      trooper,
+    ])
     if (trooper.onNight) setNightGroup((current) => [...current, trooper.name])
   }
 
   const updated = (before: Trooper, after: Trooper) => {
-    setRoster((current) => current.map((t) => (t.id === after.id ? after : t)))
+    // The server keeps one default BUS Trooper; when this one takes it, the
+    // others have given it up there, so they do here too.
+    setRoster((current) => current.map((t) =>
+      t.id === after.id ? after : after.defaultBus ? { ...t, defaultBus: false } : t))
     // Night group and ticks are held by name, so a rename carries them across,
     // and someone who has become a stay-out can no longer hold the night.
     setNightGroup((current) => {

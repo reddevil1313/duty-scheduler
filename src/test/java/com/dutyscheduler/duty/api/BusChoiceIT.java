@@ -104,6 +104,18 @@ class BusChoiceIT {
     }
 
     @Test
+    @DisplayName("the roster's default BUS Trooper, out today, gives way: the solver chooses and the sheet comes back")
+    void defaultGivesWay() throws Exception {
+        mvc.perform(post("/api/schedules/generate").with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body("TROOPER_D", "{\"trooper\":\"TROOPER_D\",\"kind\":\"MC\"}")
+                        .replace("\"bus\":", "\"busDefault\":true,\"bus\":")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rows[?(@.trooper == 'TROOPER_D')].hours", everyItem(is(0))))
+                .andExpect(jsonPath("$.rows[?(@.posts[11] == 'BUS')].trooper", hasSize(1)));
+    }
+
+    @Test
     @DisplayName("a BUS name not on the roster is a 400")
     void unknownIs400() throws Exception {
         mvc.perform(post("/api/schedules/generate").with(csrf())

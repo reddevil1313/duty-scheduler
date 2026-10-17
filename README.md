@@ -16,8 +16,8 @@ Both ship together as a single image.
 - **Generate a sheet** for any date from the roster, the leave register and the
   night group. The solver balances hours across the team within the rules.
   Who takes the BUS run (0700–1000) can be chosen the same way as the night
-  group; a choice that cannot stand, such as a stay-out, is refused with the
-  reason.
+  group, starting from the roster's default BUS Trooper; a choice that cannot
+  stand, such as a stay-out, is refused with the reason.
 - **Fixed turnouts** for a short-handed day: everyone does 5, 6 or 7 hours and
   the MP team covers what is left, shown in its own row on the board. The
   silent hours are always fully manned, and every other hour keeps at least one
@@ -40,7 +40,7 @@ Both ship together as a single image.
   BUS runs and leave taken, with opening hours from before the tracker; and a
   line per day logged, where hours can be credited for a day not stood.
 - **Roster** tab: Troopers, each marked as living in or staying out, with a
-  default night group. Troopers can be added, edited and removed. Removing
+  default night group and a default BUS Trooper. Troopers can be added, edited and removed. Removing
   someone who stood a logged sheet archives them, so past sheets stay intact.
   MC, OL and AL tickboxes take someone out of the sheets you generate without
   booking anything, for trying out a sheet before the leave is confirmed.

@@ -12,9 +12,12 @@ import jakarta.validation.constraints.Size;
  * the short name written on the board, not a full name — the roster stores no
  * more about a person than the scheduling needs.
  *
- * @param onNight whether the board should pre-tick this Trooper for the night
- *                group. A default, not a constraint: the night group is chosen
- *                per sheet.
+ * @param onNight    whether the board should pre-tick this Trooper for the
+ *                   night group. A default, not a constraint: the night group is
+ *                   chosen per sheet.
+ * @param defaultBus whether the board's BUS pick starts on this Trooper; at
+ *                   most one does, so setting it moves it here. Null leaves it as
+ *                   it is, so an edit that does not mention it does not clear it.
  */
 public record TrooperRequest(
         @NotBlank(message = "A name is required.")
@@ -23,5 +26,7 @@ public record TrooperRequest(
         @Size(max = 20, message = "Keep the rank to 20 characters.") String rank,
 
         boolean stayOut,
-        boolean onNight) {
+        boolean onNight,
+
+        Boolean defaultBus) {
 }

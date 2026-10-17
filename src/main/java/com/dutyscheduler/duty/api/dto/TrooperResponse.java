@@ -9,10 +9,10 @@ import com.dutyscheduler.duty.persistence.TrooperEntity;
  *           otherwise change the address of the thing being renamed.
  */
 public record TrooperResponse(long id, String name, String rank, boolean stayOut,
-        boolean permPac, boolean onNight) {
+        boolean permPac, boolean onNight, boolean defaultBus) {
 
     public static TrooperResponse from(TrooperEntity entity) {
         return new TrooperResponse(entity.getId(), entity.getName(), entity.getRank(),
-                entity.isStayOut(), entity.isPermPac(), entity.isOnNight());
+                entity.isStayOut(), entity.isPermPac(), entity.isOnNight(), entity.isDefaultBus());
     }
 }
