@@ -1,0 +1,13 @@
+# An allowlist: only what the image is built from. Everything else — the
+# build output, node_modules, local notes, editor files — never enters the
+# build, so nothing kept out of git can end up in an image by accident.
+*
+!gradlew
+!gradle/
+!settings.gradle
+!build.gradle
+!src/
+!web/
+web/node_modules
+web/dist
+**/.DS_Store

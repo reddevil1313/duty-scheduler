@@ -1,11 +1,15 @@
 # Duty Scheduler
 
+[![CI](https://github.com/reddevil1313/duty-scheduler/actions/workflows/ci.yml/badge.svg)](https://github.com/reddevil1313/duty-scheduler/actions/workflows/ci.yml)
+
 Generates guard duty schedules under hard constraints, keeps a record of the
 sheet that was actually used, and serves both to a browser client. One server
 hosts many teams, and no team sees another's data.
 
 - **API**: Spring Boot 4 on Java 21, with PostgreSQL 16 and Flyway
 - **Client**: React 19 + TypeScript, built with Vite, in [`web/`](web/)
+- **Shipped** as one image: the API serves the built client from the same
+  origin
 
 ![The board: a generated Thursday sheet, one Trooper on MC listed at the bottom](docs/board.png)
 
@@ -31,6 +35,26 @@ hosts many teams, and no team sees another's data.
 | --- | --- |
 | ![A hand-edited sheet, one silent hour short and flagged](docs/editing.png) | ![The image of a logged sheet](docs/sheet-image.png) |
 | ![The leave register, a table per kind](docs/leave.png) | ![Records: totals per Trooper and the days logged](docs/records.png) |
+
+## Architecture
+
+```mermaid
+flowchart LR
+  browser["Browser<br/>React client"] -- "page and /api, one origin" --> api
+  subgraph app["Spring Boot app"]
+    api["api/<br/>controllers, security"]
+    api --> solver["solver/<br/>ScheduleSolver"]
+    api --> rules["rules/<br/>ScheduleValidator"]
+    api --> store["persistence/<br/>DutySheetStore"]
+    api --> export["export/<br/>SheetImage"]
+  end
+  store --> db[("PostgreSQL<br/>Flyway")]
+  prometheus["Prometheus"] -. "/actuator/prometheus" .-> api
+```
+
+The solver and the validator share no code, so the validator is an
+independent check on every sheet the solver makes. Every team's data is
+filtered by team in the persistence layer.
 
 ## How scheduling works
 
@@ -61,8 +85,17 @@ nine Troopers and these accounts:
 | `admin` | `admin` | `ADMIN` |
 | `trooper_d` | `trooper_d` | `USER` |
 
-Elsewhere, the owner is made once at startup from `OWNER_USERNAME` and
-`OWNER_PASSWORD`.
+## Deploying
+
+```sh
+OWNER_USERNAME=... OWNER_PASSWORD=... DATABASE_PASSWORD=... \
+  docker compose --profile app up -d --build
+```
+
+This builds the image and starts it with Postgres on http://localhost:8080.
+The owner is made on first start from the `OWNER_` variables. Run it behind
+HTTPS: the session cookie is HTTPS-only. Metrics are at
+`/actuator/prometheus`, for the owner.
 
 ## Tests
 
@@ -70,6 +103,8 @@ Elsewhere, the owner is made once at startup from `OWNER_USERNAME` and
 ./gradlew test                                          # needs Docker
 cd web && npm run typecheck && npm run lint && npm run build
 ```
+
+CI runs both on every push, then builds the image and starts the whole stack.
 
 ## API
 
@@ -120,4 +155,6 @@ src/main/java/com/dutyscheduler/duty/
   export/        the sheet image (Java2D)
 src/main/resources/db/migration/   Flyway migrations
 web/                               React client
+Dockerfile, docker-compose.yml     the image, and the stack around it
+.github/workflows/ci.yml           tests, client checks, image and stack
 ```
