@@ -28,3 +28,10 @@ and SameSite over a problem that does not exist in production behind one host.
     src/api/        types.ts mirrors the Java DTOs; client.ts is the only file that calls fetch
     src/auth/       session context and provider — holds identity and the CSRF token
     src/board/      the duty board, and slots.ts for the 2000-start clock
+    src/roster/     the roster tab, and the MC/OL/AL ticks held for generating
+    src/leave/      the leave register, a table per kind
+    src/records/    totals per Trooper and the days logged
+    src/team/       the owner's teams, invite links and the Team tab
+    src/help/       the Help tab, written per role
+    src/dates.ts    dates as the API sends them, and as the board writes them
+    src/theme.ts    light, dark or the system's, remembered in the browser

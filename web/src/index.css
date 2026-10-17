@@ -431,6 +431,14 @@ td.row-actions > * + * { margin-left: 6px; }
 .leave-form .times { display: flex; align-items: center; gap: 6px; color: var(--muted); }
 .leave-form .preview { flex-basis: 100%; margin: 0; }
 
+/* Help: prose, kept to a readable measure inside each panel. */
+.help-toc { display: flex; flex-wrap: wrap; gap: 6px; padding: 13px; }
+.help-body { padding: 4px 18px 12px; max-width: 76ch; font-size: 14px; line-height: 1.6; }
+.help-body p, .help-body ul, .help-body ol { margin: 10px 0; }
+.help-body li + li { margin-top: 6px; }
+.help-body ul, .help-body ol { padding-left: 22px; }
+.help article { scroll-margin-top: 12px; }
+
 /* A row of fields and a button in a panel: the team and invite forms. */
 .inline-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 11px; padding: 13px; }
 .inline-form .full { flex-basis: 100%; margin: 0; }

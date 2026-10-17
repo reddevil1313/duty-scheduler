@@ -1,128 +1,59 @@
 # Duty Scheduler
 
-Generates guard duty schedules for teams under hard constraints, keeps a
-record of the sheet that was actually used, and serves both to a browser
-client. One server hosts many teams, and no team sees another's data.
+Generates guard duty schedules under hard constraints, keeps a record of the
+sheet that was actually used, and serves both to a browser client. One server
+hosts many teams, and no team sees another's data.
 
 - **API**: Spring Boot 4 on Java 21, with PostgreSQL 16 and Flyway
 - **Client**: React 19 + TypeScript, built with Vite, in [`web/`](web/)
 
-Both ship together as a single image.
-
-![The duty board: a generated Thursday sheet, with the roster above it](docs/screenshot.png)
+![The board: a generated Thursday sheet, one Trooper on MC listed at the bottom](docs/board.png)
 
 ## Features
 
-- **Generate a sheet** for any date from the roster, the leave register and the
-  night group. The solver balances hours across the team within the rules.
-  Anyone away for the whole sheet is listed at the bottom.
-  Who takes the BUS run (0700–1000) can be chosen the same way as the night
-  group, starting from the roster's default BUS Trooper; a choice that cannot
-  stand, such as a stay-out, is refused with the reason.
-- **Fixed turnouts** for a short-handed day: everyone does 5, 6 or 7 hours and
-  the MP team covers what is left, shown in its own row on the board. The
-  silent hours are always fully manned, and every other hour keeps at least one
-  Trooper on. A turnout that makes more hours than the sheet needs is refused.
-- **Reuse of past sheets**: when a logged sheet has the same posts and hours
-  (any Monday to Thursday matches any other), the same headcount and the same
-  turnout, a new sheet reuses it rather than being solved afresh. Its turnouts
-  go to whoever is available today, the longest to whoever has done fewest
-  hours, and only if the result breaks no rule.
-- **Edit a sheet by hand**: click an hour to change its post, or swap two
-  Troopers' whole days. Every edit is checked against the rules as you make it,
-  with an hour-by-hour coverage row and a list of what the sheet breaks,
-  including anyone put on duty during their own leave.
-- **Save the sheet as an image** for sending on. Saving the image logs the
-  sheet in the same step, so what was sent is always what was recorded.
-- **Log the sheet actually used**, edits included. A sheet that breaks a rule
-  can still be logged, after a warning, because the log records what was used.
-  Past sheets can be looked up by date.
-- **Records**: per Trooper, hours worked, credited and in total, duties, nights,
-  BUS runs and leave taken, with opening hours from before the tracker; and a
-  line per day logged, where hours can be credited for a day not stood.
-- **Roster** tab: Troopers, each marked as living in or staying out, with a
-  default night group and a default BUS Trooper. Troopers can be added, edited and removed. Removing
-  someone who stood a logged sheet archives them, so past sheets stay intact.
-  MC, OL and AL tickboxes take someone out of the sheets you generate without
-  booking anything, for trying out a sheet before the leave is confirmed.
-- **Leave register** for MCs, overseas leave, annual leave and medical
-  appointments: full days, half days or a time window. Each entry shows the
-  duty sheets it affects, before and after booking, and is taken into account
-  automatically when sheets are generated. Each kind has its own table, with
-  what is running or to come first and past leave folded away beneath it, and
-  the register can be narrowed to one Trooper.
-- **Light and dark themes**, following the system or set from the masthead.
-- **Teams**: every roster, sheet, leave entry and record belongs to one team.
-  Two teams can have Troopers of the same name and log sheets for the same
-  evening without meeting.
-- **Invite links**: an admin makes a one-time link for a new `ADMIN` or `USER`
-  and sends it by chat. Whoever opens it chooses their own username and
-  password and joins the team. Links expire after seven days and can be
-  revoked; admins also change roles and remove accounts from the **Team** tab.
-- **Three roles**: the `OWNER` runs the server, creates teams and makes the
-  link for each team's first admin, and sees no team's data. `ADMIN` manages
-  the team's roster, leave and accounts, and generates and logs sheets.
-  `USER` has read-only access.
+- **Generate a sheet** for any date. The solver shares the hours out evenly
+  within the rules, with a chosen night group and BUS Trooper, and reuses a
+  logged sheet of the same shape and headcount when one fits.
+- **Fixed turnouts** of 5, 6 or 7 hours for a short-handed day, with the rest
+  left to the MP team.
+- **Edit by hand**, checked against the rules as you go. A sheet that breaks
+  one can still be logged, after a warning: the log records what was used.
+- **Save the sheet as an image**, which logs it in the same step.
+- **Leave register** with a table per kind (MC, OL, AL, MA), showing the
+  sheets each booking reaches. Roster tickboxes take someone out of a sheet
+  without booking anything.
+- **Records** of hours, nights, BUS runs and leave per Trooper.
+- **Teams and invite links.** The owner makes teams; admins invite members by a
+  one-time link and manage the roster and leave; users read.
+- **Light and dark themes**, and a **Help** tab written for each role.
+
+| | |
+| --- | --- |
+| ![A hand-edited sheet, one silent hour short and flagged](docs/editing.png) | ![The image of a logged sheet](docs/sheet-image.png) |
+| ![The leave register, a table per kind](docs/leave.png) | ![Records: totals per Trooper and the days logged](docs/records.png) |
 
 ## How scheduling works
 
-- A **sheet** is named by the evening it starts. It runs 24 hourly slots from
-  2000 to 1959 the next morning. Silent hours are 2200–0559.
-- Four **posts** are manned: `AP`, `GG`, `PAC`, `BUS`.
-- **Hard rules**: at most 3 consecutive hours, at least a 1-hour break, at most
-  9 hours per sheet, and stay-outs available 0800–1800 on weekdays.
-- **Span is rest-aware.** Duty either side of a gap of 10 hours or more counts
-  as two turnouts, not one long one.
-- **Crossover is solved.** When manpower is thin, the night group may take
-  early day hours. Each possible amount is solved and scored, and the best is
-  kept.
-- Sheets are **scored** lexicographically: hour spread first, then worst
-  excess, then total excess, then walks between AP and GG. Walks come last, so
-  they only ever decide between sheets that are equally fair. Two Troopers on
-  duty in the same hours may trade posts to save a walk, which moves nobody's
-  hours.
-- **Leave** covers whole sheets. An absence "until the 12th" removes the 11th's
-  sheet entirely and none of the 12th's.
+- A **sheet** is named by the evening it starts and runs 24 hours, 2000 to
+  1959. Silent hours are 2200–0559. Posts are `AP`, `GG`, `PAC` and `BUS`.
+- **Hard rules**: at most 3 hours in a row, a break of at least 1 hour, at
+  most 9 hours a sheet, and stay-outs only 0800–1800 on weekdays.
+- Sheets are **scored** on hour spread first, then excess hours, then walks
+  between AP and GG, so fewer walks never cost fairness.
 - An independent **validator** checks every rule against the solver's output.
-
-## Prerequisites
-
-| | Version |
-| --- | --- |
-| Java | 21 |
-| Docker | any recent version |
-| Node.js | 20.19+ or 22.12+ |
 
 ## Running it locally
 
-Use three terminals, starting from the repo root:
+Needs Java 21, Docker, and Node.js 20.19+ or 22.12+.
 
 ```sh
-# 1. Database: Postgres 16 on port 5432
-docker compose up -d db
-
-# 2. API on http://localhost:8080
-./gradlew bootRun
-
-# 3. Client on http://localhost:5173
-cd web
-npm install
-npm run dev
+docker compose up -d db                  # Postgres 16 on 5432
+./gradlew bootRun                        # API on 8080
+cd web && npm install && npm run dev     # client on http://localhost:5173
 ```
 
-Open **http://localhost:5173**. The dev server proxies `/api` and `/actuator`
-to the API.
-
-### The owner
-
-The server makes the owner account at startup from `OWNER_USERNAME` and
-`OWNER_PASSWORD`, once; after that the variables can be removed. The owner
-signs in, makes a team, and sends its first admin the link it gives.
-
-### Development data
-
-`bootRun` uses the `dev` profile, which creates an owner and a team called
-"Dev team" with two accounts:
+`bootRun` uses the `dev` profile, which creates a team called "Dev team" with
+nine Troopers and these accounts:
 
 | Username | Password | Role |
 | --- | --- | --- |
@@ -130,80 +61,56 @@ signs in, makes a team, and sends its first admin the link it gives.
 | `admin` | `admin` | `ADMIN` |
 | `trooper_d` | `trooper_d` | `USER` |
 
-To use different passwords, set `OWNER_PASSWORD`, `DEV_ADMIN_PASSWORD` and
-`DEV_TROOPER_PASSWORD`.
-
-It also gives Dev team a roster of nine Troopers when its roster is empty:
-`TROOPER_A` to `TROOPER_G` live in, with A, B and C as the default night group,
-and `TROOPER_H` and `TROOPER_I` stay out.
+Elsewhere, the owner is made once at startup from `OWNER_USERNAME` and
+`OWNER_PASSWORD`.
 
 ## Tests
 
 ```sh
-./gradlew test
-```
-
-This runs the unit tests and the integration tests. The integration tests need
-Docker running, because they start their own Postgres containers.
-
-Client checks:
-
-```sh
-cd web
-npm run typecheck
-npm run lint
-npm run build      # production bundle in web/dist
+./gradlew test                                          # needs Docker
+cd web && npm run typecheck && npm run lint && npm run build
 ```
 
 ## API
 
-All endpoints are under `/api`. Errors are
-[RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem documents. A request
-that is well formed but cannot be fulfilled returns `422`.
+Endpoints are under `/api`. Errors are
+[RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem documents, and a
+request that is well formed but cannot be fulfilled returns `422`. Writes send
+the CSRF token from `GET /api/session` in an `X-XSRF-TOKEN` header.
+
+<details>
+<summary>Endpoints</summary>
 
 | Method | Path | Access | |
 | --- | --- | --- | --- |
 | `GET` | `/session` | anyone | Identity and CSRF token |
-| `POST` | `/session/login` | anyone | Form-encoded; returns 204 or 401 |
-| `POST` | `/session/logout` | signed in | Returns 204 |
-| `GET` | `/troopers` | team member | The roster |
-| `POST` | `/troopers` | `ADMIN` | Add a Trooper; 409 when the name is taken |
-| `PUT` | `/troopers/{id}` | `ADMIN` | Edit a Trooper's particulars |
-| `DELETE` | `/troopers/{id}` | `ADMIN` | Remove a Trooper; archived if they stood a logged sheet |
-| `POST` | `/schedules/generate` | `ADMIN` | Generate a sheet, optionally with roster ticks; 422 when it cannot be covered |
-| `GET` | `/schedules/{date}` | team member | The logged sheet; 404 when none |
-| `POST` | `/schedules/{date}/check` | team member | What a sheet breaks, and each hour's demand; saves nothing |
+| `POST` | `/session/login` | anyone | Form-encoded; 204 or 401 |
+| `POST` | `/session/logout` | signed in | 204 |
+| `GET` | `/troopers` | team | The roster |
+| `POST` `PUT` `DELETE` | `/troopers[/{id}]` | `ADMIN` | Add, edit, remove (archived if on a logged sheet) |
+| `POST` | `/schedules/generate` | `ADMIN` | Generate a sheet; 422 when it cannot be covered |
+| `GET` | `/schedules/{date}` | team | The logged sheet |
+| `POST` | `/schedules/{date}/check` | team | What a sheet breaks; saves nothing |
 | `PUT` | `/schedules/{date}` | `ADMIN` | Log the sheet actually used |
-| `PUT` | `/schedules/{date}/credits` | `ADMIN` | Set a logged day's credited hours |
-| `POST` | `/schedules/{date}/image` | `ADMIN` | Log the sheet and return it as a PNG |
-| `GET` | `/schedules/{date}/image` | team member | The logged sheet as a PNG; 404 when none |
-| `GET` | `/absences` | team member | The leave register |
-| `POST` | `/absences` | `ADMIN` | Record leave |
-| `POST` | `/absences/preview` | team member | The interval and sheets a booking would affect; saves nothing |
-| `DELETE` | `/absences/{id}` | `ADMIN` | Remove leave |
-| `GET` | `/records` | team member | Totals per Trooper, and the days logged |
-| `PUT` | `/records/opening` | `ADMIN` | Set opening hours |
-| `GET` | `/teams` | `OWNER` | Every team, with its account counts |
-| `POST` | `/teams` | `OWNER` | Make a team and the invite for its first admin |
+| `PUT` | `/schedules/{date}/credits` | `ADMIN` | A logged day's credited hours |
+| `POST` `GET` | `/schedules/{date}/image` | `ADMIN` / team | Log and draw, or draw the logged sheet, as PNG |
+| `GET` `POST` `DELETE` | `/absences[/{id}]` | team / `ADMIN` | The leave register |
+| `POST` | `/absences/preview` | team | The sheets a booking would reach |
+| `GET` | `/records` | team | Totals per Trooper, and the days logged |
+| `PUT` | `/records/opening` | `ADMIN` | Opening hours |
+| `GET` `POST` | `/teams` | `OWNER` | Teams; a new one comes with its first-admin invite |
 | `POST` | `/teams/{id}/invites` | `OWNER` | Another invite into a team |
-| `GET` | `/invites` | `ADMIN` | The team's invites still waiting |
-| `POST` | `/invites` | `ADMIN` | Make an invite; the only response with its token |
-| `DELETE` | `/invites/{id}` | `ADMIN` | Revoke an invite |
-| `GET` | `/invites/{token}` | anyone | The team and role an invite is for |
-| `POST` | `/invites/{token}/accept` | anyone | Make the account and use the invite |
-| `GET` | `/members` | `ADMIN` | The team's accounts |
-| `PUT` | `/members/{id}` | `ADMIN` | Change a member's role |
-| `DELETE` | `/members/{id}` | `ADMIN` | Remove an account |
+| `GET` `POST` `DELETE` | `/invites[/{id}]` | `ADMIN` | The team's invites |
+| `GET` `POST` | `/invites/{token}[/accept]` | anyone | See, or accept, an invite |
+| `GET` `PUT` `DELETE` | `/members[/{id}]` | `ADMIN` | The team's accounts |
 
-A team member is an `ADMIN` or `USER`, and sees only their own team's data.
-The owner is refused these.
+"Team" is an `ADMIN` or `USER`, who sees only their own team's data.
 
-Write requests must send the CSRF token from `GET /api/session` in an
-`X-XSRF-TOKEN` header. The token changes on sign-in and sign-out.
+</details>
 
 ## Project layout
 
-```
+```text
 src/main/java/com/dutyscheduler/duty/
   domain/        duty days, slots, posts, demand, rules, troopers
   rules/         ScheduleValidator

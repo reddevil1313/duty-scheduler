@@ -14,8 +14,9 @@ import { AcceptInvitePage } from './team/AcceptInvitePage'
 import { OwnerConsole } from './team/OwnerConsole'
 import { TeamView } from './team/TeamView'
 import { clearInvite, inviteToken } from './team/invite'
+import { HelpView } from './help/HelpView'
 
-type View = 'board' | 'roster' | 'leave' | 'records' | 'team'
+type View = 'board' | 'roster' | 'leave' | 'records' | 'team' | 'help'
 
 const VIEWS: [View, string][] = [
   ['board', 'Board'],
@@ -98,17 +99,31 @@ function Who({ theme: { theme, cycle } }: { theme: ThemeState }) {
   )
 }
 
-/** The owner has no team, so none of the team tabs: only the teams themselves. */
+/** The owner has no team, so none of the team tabs: only the teams themselves, and help. */
 function Owner({ theme }: { theme: ThemeState }) {
+  const [view, setView] = useState<'teams' | 'help'>('teams')
   return (
     <div className="wrap">
       <Masthead title="All teams" />
       <nav className="viewbar">
-        <span className="vtab" aria-current="page">Teams</span>
+        {([['teams', 'Teams'], ['help', 'Help']] as const).map(([v, label]) => (
+          <button
+            key={v}
+            type="button"
+            className="vtab"
+            aria-current={view === v ? 'page' : undefined}
+            onClick={() => setView(v)}
+          >
+            {label}
+          </button>
+        ))}
         <Who theme={theme} />
       </nav>
-      <main>
+      <main hidden={view !== 'teams'}>
         <OwnerConsole />
+      </main>
+      <main hidden={view !== 'help'}>
+        <HelpView role="OWNER" />
       </main>
     </div>
   )
@@ -131,7 +146,8 @@ function SignedIn({ theme }: { theme: ThemeState }) {
       <Masthead title={session?.team ?? 'Duty Scheduler'} />
       <nav className="viewbar">
         {/* Team is for admins: accounts and invites are theirs to manage. */}
-        {[...VIEWS, ...(isAdmin ? [['team', 'Team'] as [View, string]] : [])].map(([v, label]) => (
+        {[...VIEWS, ...(isAdmin ? [['team', 'Team'] as [View, string]] : []), ['help', 'Help'] as [View, string]]
+          .map(([v, label]) => (
           <button
             key={v}
             type="button"
@@ -170,6 +186,9 @@ function SignedIn({ theme }: { theme: ThemeState }) {
           <TeamView active={view === 'team'} />
         </main>
       )}
+      <main hidden={view !== 'help'}>
+        <HelpView role={session?.role ?? 'USER'} />
+      </main>
     </div>
   )
 }
