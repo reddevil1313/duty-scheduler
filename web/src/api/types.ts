@@ -153,12 +153,67 @@ export interface AbsenceReach {
  * POST itself needs, before anybody is signed in at all. A 401 would satisfy the
  * first job and make the second impossible.
  */
+export type Role = 'OWNER' | 'ADMIN' | 'USER'
+
 export interface Session {
   authenticated: boolean
   username: string | null
   displayName: string | null
-  role: 'ADMIN' | 'USER' | null
+  /** OWNER runs the server and belongs to no team; ADMIN and USER belong to one. */
+  role: Role | null
+  /** The caller's team by name; null when signed out, and for the owner. */
+  team: string | null
   csrfToken: string
+}
+
+/** A team as the owner sees it: counts of accounts, never its data. */
+export interface Team {
+  id: number
+  name: string
+  createdAt: string
+  admins: number
+  users: number
+}
+
+/**
+ * An invite to join a team. `token` comes back only from the call that makes
+ * it: the server keeps a hash, so the link cannot be shown again later.
+ */
+export interface Invite {
+  id: number
+  role: 'ADMIN' | 'USER'
+  createdBy: string
+  createdAt: string
+  expiresAt: string
+  token: string | null
+}
+
+export interface TeamCreated {
+  team: Team
+  invite: Invite
+}
+
+/** What an invite link is for, shown to whoever opens it. */
+export interface InviteView {
+  team: string
+  role: 'ADMIN' | 'USER'
+  expiresAt: string
+}
+
+export interface NewAccount {
+  username: string
+  displayName: string
+  password: string
+}
+
+/** An account in the caller's team. */
+export interface Member {
+  id: number
+  username: string
+  displayName: string
+  role: 'ADMIN' | 'USER'
+  /** The caller's own row, which cannot be removed. */
+  you: boolean
 }
 
 /** RFC 9457, which is what the API returns for every failure. */

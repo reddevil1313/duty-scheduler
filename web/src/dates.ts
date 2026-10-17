@@ -8,6 +8,15 @@ export function today(): string {
   return new Date(now.getTime() - offset).toISOString().slice(0, 10)
 }
 
+/**
+ * The local date of an instant the server sent with a zone (`…Z`), such as
+ * an invite's expiry, as `YYYY-MM-DD` for shortDate.
+ */
+export function localDay(instant: string): string {
+  const d = new Date(instant)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 /** Local now as `YYYY-MM-DDTHH:MM`, the shape the API's instants take to the minute. */
 export function nowMinute(): string {
   const now = new Date()

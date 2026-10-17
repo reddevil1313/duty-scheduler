@@ -32,7 +32,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         // does the server is down, and showing the sign-in form is the honest
         // response — the user will find out when they try.
         if (!cancelled) {
-          adopt({ authenticated: false, username: null, displayName: null, role: null, csrfToken: '' })
+          adopt({ authenticated: false, username: null, displayName: null, role: null, team: null, csrfToken: '' })
         }
       })
     return () => {

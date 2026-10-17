@@ -1,6 +1,6 @@
 import type {
-  Absence, AbsenceReach, AbsenceRequest, GenerateOptions, ProblemDetail, Records, Schedule, Session, SheetCheck,
-  Ticks, Trooper,
+  Absence, AbsenceReach, AbsenceRequest, GenerateOptions, Invite, InviteView, Member, NewAccount, ProblemDetail,
+  Records, Schedule, Session, SheetCheck, Team, TeamCreated, Ticks, Trooper,
   TrooperParticulars,
 } from './types'
 
@@ -234,4 +234,45 @@ export const api = {
   /** ADMIN only. Archived if they stand on a logged sheet, deleted if not — 204 either way. */
   removeTrooper: (id: number) =>
     request<void>(`/api/troopers/${id}`, { method: 'DELETE' }),
+
+  /** OWNER only. */
+  teams: () => request<Team[]>('/api/teams'),
+
+  /** OWNER only. The team and the invite for its first admin; 409 for a name taken, ignoring case. */
+  createTeam: (name: string) =>
+    request<TeamCreated>('/api/teams', { method: 'POST', body: JSON.stringify({ name }) }),
+
+  /** OWNER only. Another way in, for a team whose admins have gone. */
+  inviteToTeam: (teamId: number, role: Invite['role']) =>
+    request<Invite>(`/api/teams/${teamId}/invites`, { method: 'POST', body: JSON.stringify({ role }) }),
+
+  /** ADMIN only: the team's invites still waiting, without their tokens. */
+  invites: () => request<Invite[]>('/api/invites'),
+
+  /** ADMIN only. The one response that carries the token. */
+  createInvite: (role: Invite['role']) =>
+    request<Invite>('/api/invites', { method: 'POST', body: JSON.stringify({ role }) }),
+
+  /** ADMIN only. The link stops working at once. */
+  revokeInvite: (id: number) => request<void>(`/api/invites/${id}`, { method: 'DELETE' }),
+
+  /** Anyone, signed in or not. 404 for a link that is unknown, used or expired. */
+  inviteView: (token: string) => request<InviteView>(`/api/invites/${encodeURIComponent(token)}`),
+
+  /** Anyone. Makes the account; signing in is a separate call. 409 for a username taken. */
+  acceptInvite: (token: string, account: NewAccount) =>
+    request<InviteView>(`/api/invites/${encodeURIComponent(token)}/accept`, {
+      method: 'POST',
+      body: JSON.stringify(account),
+    }),
+
+  /** ADMIN only. */
+  members: () => request<Member[]>('/api/members'),
+
+  /** ADMIN only. 422 when it would leave the team with no admin. */
+  setMemberRole: (id: number, role: Member['role']) =>
+    request<Member>(`/api/members/${id}`, { method: 'PUT', body: JSON.stringify({ role }) }),
+
+  /** ADMIN only. 422 for your own account, or the last admin. */
+  removeMember: (id: number) => request<void>(`/api/members/${id}`, { method: 'DELETE' }),
 }

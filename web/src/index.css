@@ -74,6 +74,10 @@ button, select, input { font: inherit; color: inherit; }
 /* ---------- masthead and view bar ---------- */
 .mast { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
 .mast h1 { font-size: 25px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
+.mast .app {
+  margin: 0 0 2px; font-size: 10.5px; font-weight: 600; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--brass);
+}
 .mast .sub { color: var(--muted); font-size: 12.5px; margin: 3px 0 0; }
 .rule { height: 3px; background: var(--brass); width: 42px; margin-bottom: 9px; border-radius: 2px; }
 
@@ -91,6 +95,8 @@ button, select, input { font: inherit; color: inherit; }
   border-radius: 3px; padding: 2px 6px; background: var(--sunk); color: var(--ink-2);
 }
 .role.admin { background: var(--brass-soft); color: var(--brass); }
+.role.owner { background: var(--pick-bg); color: var(--pick); }
+.viewbar span.vtab { display: inline-flex; align-items: center; }
 
 /* ---------- panels ---------- */
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); margin-bottom: 16px; }
@@ -424,6 +430,16 @@ td.row-actions > * + * { margin-left: 6px; }
 .leave-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 11px; padding: 13px; border-bottom: 1px solid var(--line); }
 .leave-form .times { display: flex; align-items: center; gap: 6px; color: var(--muted); }
 .leave-form .preview { flex-basis: 100%; margin: 0; }
+
+/* A row of fields and a button in a panel: the team and invite forms. */
+.inline-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 11px; padding: 13px; }
+.inline-form .full { flex-basis: 100%; margin: 0; }
+
+/* A link just made: shown once, with its copy button beside it. */
+.invite-link { padding: 0 13px 13px; }
+.invite-link .note { margin: 0 0 8px; }
+.invite-link .row { display: flex; gap: 8px; }
+.invite-link input { flex: 1; min-width: 0; font-family: var(--mono); font-size: 12px; }
 
 /* The register's filter sits in its heading, so it reads across, not stacked. */
 .panel-hd .filter { flex-direction: row; align-items: center; gap: 8px; }
