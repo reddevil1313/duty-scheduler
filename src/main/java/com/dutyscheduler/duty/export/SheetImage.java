@@ -59,6 +59,12 @@ public final class SheetImage {
     private static final Color LINE = new Color(0xCCD6DF);
     private static final Color PAPER = Color.WHITE;
     private static final Color BAND = new Color(0xF3F6F9);
+    /** The board's grid lines: light between hours, stronger at midnight and at the edges of the hours. */
+    static final Color GRID = new Color(0xDFE6EC);
+    static final Color GRID_STRONG = new Color(0xB6C4CF);
+
+    /** Slot 4 is midnight, where the date changes; the board rules it heavier too. */
+    private static final int MIDNIGHT = 4;
 
     /** Post colours: a light ground and a dark ink, each pair well above 4.5:1. */
     static final Map<Post, Color[]> POST_COLOURS = new EnumMap<>(Map.of(
@@ -124,8 +130,9 @@ public final class SheetImage {
                 drawMpRow(g, mp, x0, y);
                 y += ROW_H;
             }
-            g.setColor(LINE);
             g.setStroke(new BasicStroke(1));
+            drawGrid(g, x0, y - gridRows * ROW_H - HEAD_H, y);
+            g.setColor(LINE);
             g.drawRect(x0, y - gridRows * ROW_H - HEAD_H, gridW, gridRows * ROW_H + HEAD_H);
 
             g.setColor(DIM);
@@ -156,6 +163,23 @@ public final class SheetImage {
         return "2000 " + shortDate(day.date()) + " to 1959 " + shortDate(day.date().plusDays(1))
                 + " · " + hours + " hours over " + onDuty + " Trooper" + (onDuty == 1 ? "" : "s") + " · " + split
                 + (mpHours > 0 ? " · " + mpHours + " post-hour" + (mpHours == 1 ? "" : "s") + " to the MP team" : "");
+    }
+
+    /**
+     * A line down every hour's edge, so an hour can be read across a printed
+     * or forwarded sheet without a ruler. Drawn on the cells' own edges, which
+     * the post blocks stop one pixel short of, so no block is cut through.
+     */
+    private static void drawGrid(Graphics2D g, int x0, int top, int bottom) {
+        int hours = x0 + NAME_W;
+        for (int slot = 0; slot <= DutyDay.SLOT_COUNT; slot++) {
+            boolean strong = slot == 0 || slot == MIDNIGHT || slot == DutyDay.SLOT_COUNT;
+            g.setColor(strong ? GRID_STRONG : GRID);
+            g.drawLine(hours + slot * HOUR_W, top, hours + slot * HOUR_W, bottom);
+        }
+        int tally = hours + DutyDay.SLOT_COUNT * HOUR_W + TALLY_W;
+        g.setColor(GRID);
+        g.drawLine(tally, top, tally, bottom);
     }
 
     private static void drawHeader(Graphics2D g, DutyDay day, int x0, int y) {

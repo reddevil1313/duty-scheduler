@@ -121,4 +121,30 @@ class SheetImageTest {
         String line = SheetImage.subtitle(THURSDAY, withAway.rows(), null, 0);
         assertTrue(line.contains("47 hours over 9 Troopers"), line);
     }
+
+    @Test
+    @DisplayName("a grid line runs down every hour's edge, heavier at midnight")
+    void gridLines() throws IOException {
+        Schedule sheet = solve(null);
+        List<Schedule.Row> rows = sheet.rows().stream().filter(r -> r.hours() > 0).toList();
+        BufferedImage image = decode(SheetImage.png(sheet, null, "admin", Instant.now()));
+        int s = SheetImage.SCALE;
+
+        // Read halfway down each row, on the edge between two hours, where nobody
+        // is on either side of it, so the pixel is the line and not a post.
+        int checked = 0;
+        for (int r = 0; r < rows.size(); r++) {
+            for (int edge = 1; edge < DutyDay.SLOT_COUNT; edge++) {
+                if (rows.get(r).at(edge - 1) != null || rows.get(r).at(edge) != null) {
+                    continue;
+                }
+                Color expected = edge == 4 ? SheetImage.GRID_STRONG : SheetImage.GRID;
+                Color actual = new Color(image.getRGB((PAD + NAME_W + edge * HOUR_W) * s,
+                        (FIRST_ROW_Y + r * ROW_H + ROW_H / 2) * s));
+                assertEquals(expected, actual, rows.get(r).trooper().name() + " at the edge before slot " + edge);
+                checked++;
+            }
+        }
+        assertTrue(checked > 50, "enough empty edges to mean something: " + checked);
+    }
 }
