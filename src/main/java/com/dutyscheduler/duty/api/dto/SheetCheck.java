@@ -5,6 +5,8 @@ import com.dutyscheduler.duty.domain.DayDemand;
 import com.dutyscheduler.duty.domain.DutyDay;
 import com.dutyscheduler.duty.domain.Post;
 import com.dutyscheduler.duty.domain.Schedule;
+import com.dutyscheduler.duty.domain.Trooper;
+import com.dutyscheduler.duty.rules.Availability;
 import com.dutyscheduler.duty.rules.ValidationResult;
 
 import java.util.ArrayList;
@@ -26,9 +28,10 @@ import java.util.Map;
  * @param sheet  the sheet as checked, with hours and span worked out again.
  *               Span is rest-aware, which is domain logic the board should
  *               show rather than copy.
- * @param away   per Trooper on leave during this sheet, 24 entries: the kind
- *               of leave covering that hour, or null where they are free.
- *               Troopers with no leave on the sheet are left out. The board
+ * @param away   per Trooper away during this sheet, 24 entries: the kind of
+ *               leave covering that hour, {@code SO} for a stay-out on a sheet
+ *               with no hour they can stand (a weekend), or null where they
+ *               are free. Troopers away no hour of it are left out. The board
  *               greys these hours, or the whole row when every hour is away.
  */
 public record SheetCheck(List<Issue> issues, List<Map<Post, Integer>> demand, ScheduleResponse sheet,
@@ -43,6 +46,9 @@ public record SheetCheck(List<Issue> issues, List<Map<Post, Integer>> demand, Sc
     }
 
     public static final String ON_LEAVE = "ON_LEAVE";
+
+    /** A stay-out with no hour of this sheet open to them: the weekend, when they are not in. */
+    public static final String STAY_OUT = "SO";
 
     public static SheetCheck of(Schedule schedule, ValidationResult result, List<Issue> leaveClashes,
             List<Absence> absences) {
@@ -60,11 +66,19 @@ public record SheetCheck(List<Issue> issues, List<Map<Post, Integer>> demand, Sc
             bySlot.add(needs);
         }
         return new SheetCheck(List.copyOf(issues), List.copyOf(bySlot), ScheduleResponse.from(schedule),
-                away(day, absences));
+                away(day, absences, schedule.rows().stream().map(Schedule.Row::trooper).toList()));
     }
 
-    /** Which hours each Trooper is away, and why. Where two bookings overlap, the first listed wins. */
-    static Map<String, List<String>> away(DutyDay day, List<Absence> absences) {
+    /**
+     * Which hours each Trooper is away, and why. Where two bookings overlap,
+     * the first listed wins. A stay-out who could stand no hour of this sheet
+     * even with no leave at all — every weekend sheet — is away for every hour
+     * leave does not already cover, shown as they would be on leave rather than
+     * as an empty row nobody posted. Whether an hour is open is asked of
+     * {@link Availability}, which owns the stay-out window; this does not know
+     * which days are weekends.
+     */
+    static Map<String, List<String>> away(DutyDay day, List<Absence> absences, List<Trooper> troopers) {
         Map<String, String[]> byName = new LinkedHashMap<>();
         for (Absence absence : absences) {
             for (int slot = 0; slot < DutyDay.SLOT_COUNT; slot++) {
@@ -78,9 +92,29 @@ public record SheetCheck(List<Issue> issues, List<Map<Post, Integer>> demand, Sc
                 }
             }
         }
+        for (Trooper trooper : troopers) {
+            if (!trooper.stayOut() || openAtAll(Availability.mask(trooper, day, List.of()))) {
+                continue;
+            }
+            String[] hours = byName.computeIfAbsent(trooper.name(), n -> new String[DutyDay.SLOT_COUNT]);
+            for (int slot = 0; slot < DutyDay.SLOT_COUNT; slot++) {
+                if (hours[slot] == null) {
+                    hours[slot] = STAY_OUT;
+                }
+            }
+        }
         Map<String, List<String>> out = new LinkedHashMap<>();
         // Arrays.asList, not List.of: List.of refuses the nulls that mean "free".
         byName.forEach((name, hours) -> out.put(name, Collections.unmodifiableList(Arrays.asList(hours))));
         return Collections.unmodifiableMap(out);
+    }
+
+    private static boolean openAtAll(boolean[] mask) {
+        for (boolean open : mask) {
+            if (open) {
+                return true;
+            }
+        }
+        return false;
     }
 }

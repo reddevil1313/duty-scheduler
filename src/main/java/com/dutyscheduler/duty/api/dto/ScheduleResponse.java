@@ -5,8 +5,8 @@ import com.dutyscheduler.duty.domain.Schedule;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Comparator;
 import java.util.Set;
-import java.util.stream.Stream;
 
 /**
  * A sheet, flattened for the wire.
@@ -40,16 +40,33 @@ public record ScheduleResponse(LocalDate date, List<Row> rows, int totalHours, I
     }
 
     /**
-     * The same sheet with these Troopers' rows moved to the bottom, in their
-     * order. For the rows of people who cannot stand any hour: listed among the
-     * rest they read as Troopers nobody posted.
+     * The same sheet with its rows in board order: the night group, then day
+     * duty, then stay-outs, then anyone away the whole sheet, in roster order
+     * within each. Night is anyone with a silent hour on this sheet, so the
+     * order follows the sheet itself and reads the same for a logged one. The
+     * board sorts the same way (web/src/board/edit.ts), so a generated sheet
+     * does not move when its check arrives.
+     *
+     * @param silent which slots are the silent hours
+     * @param away   who cannot stand any hour of this sheet
      */
-    public ScheduleResponse withLast(Set<String> last) {
-        List<Row> ordered = Stream.concat(
-                rows.stream().filter(r -> !last.contains(r.trooper())),
-                rows.stream().filter(r -> last.contains(r.trooper())))
+    public ScheduleResponse inBoardOrder(boolean[] silent, Set<String> away) {
+        List<Row> ordered = rows.stream()
+                .sorted(Comparator.comparingInt(r -> group(r, silent, away)))
                 .toList();
         return new ScheduleResponse(date, ordered, totalHours, turnout, reusedFrom);
+    }
+
+    private static int group(Row row, boolean[] silent, Set<String> away) {
+        if (away.contains(row.trooper())) {
+            return 3;
+        }
+        for (int slot = 0; slot < DutyDay.SLOT_COUNT; slot++) {
+            if (silent[slot] && row.posts().get(slot) != null) {
+                return 0;
+            }
+        }
+        return row.stayOut() ? 2 : 1;
     }
 
     private static List<String> cellsOf(Schedule.Row row) {

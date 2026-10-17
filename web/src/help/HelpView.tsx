@@ -63,7 +63,10 @@ const SECTIONS: Section[] = [
             Each coloured block is one stint at one post: <b>AP</b> and <b>GG</b> every hour, and <b>PAC</b> and{' '}
             <b>BUS</b> on weekdays. BUS is the 0700–1000 run.
           </li>
-          <li>Hatched hours are leave. Anyone away for the whole sheet is listed at the bottom.</li>
+          <li>
+            Rows run night group first, then day duty, then stay-outs. Hatched hours are leave; anyone away for the
+            whole sheet is listed at the bottom, as are stay-outs on a weekend sheet, when they are not in.
+          </li>
           <li>
             The coverage row under the grid shows how many posts are manned each hour against how many are
             needed. <b>Hrs</b> is each person's total; <b>Span</b> is from their first hour on to their last.

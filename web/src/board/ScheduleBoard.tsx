@@ -6,7 +6,7 @@ import { useSession } from '../auth/session-context'
 import { shortDate } from '../dates'
 import { download } from '../download'
 import type { RosterState } from '../roster/useRoster'
-import { availableFirst, mpShortfall, setCell, swapRows } from './edit'
+import { boardOrder, mpShortfall, setCell, swapRows } from './edit'
 import { SheetGrid, type Mode } from './SheetGrid'
 import { isSilent } from './slots'
 
@@ -61,11 +61,12 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
   const latest = check && schedule && check.of.date === schedule.date ? check.result : null
 
   /**
-   * The sheet as it goes to the server: rows in the order the board shows
-   * them, so the logged sheet and its image list them the same way.
+   * The sheet as it goes to the server: rows in board order by what each
+   * Trooper now stands, edits included, so the logged sheet and its image read
+   * night first even where an edit moved someone onto or off the night.
    */
   const asShown = (sheet: Schedule): Schedule =>
-    ({ ...sheet, rows: availableFirst(sheet.rows, latest?.away), turnout: sheetTurnout })
+    ({ ...sheet, rows: boardOrder(sheet.rows, latest?.away), turnout: sheetTurnout })
 
   /** A fresh sheet on the board: nothing edited, nothing picked. */
   const show = (sheet: Schedule | null, from: Source | null, withTurnout: number | null = null) => {
@@ -250,6 +251,11 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
   const nightOn = schedule
     ? schedule.rows.filter((r) => r.posts.some((p, slot) => p !== null && isSilent(slot))).map((r) => r.trooper)
     : []
+  // Those who can stand an hour of this sheet: not anyone away all of it, a
+  // stay-out on a weekend sheet included, who is a row but not a Trooper on it.
+  const available = schedule
+    ? schedule.rows.filter((r) => !latest?.away[r.trooper]?.every((k) => k !== null)).length
+    : 0
   const manned = (slot: number) => !!schedule?.rows.some((r) => r.posts[slot] !== null)
 
   // From the latest check, dimmed while a newer one is on its way, so the list
@@ -394,7 +400,7 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
               {mpHours > 0 && ` ${mpHours} post-hour${mpHours === 1 ? '' : 's'} to the MP team.`}
               {edited && ' Edited by hand.'}
               {' '}
-              {current?.sheet.totalHours ?? schedule.totalHours} hours over {schedule.rows.length} Troopers.
+              {current?.sheet.totalHours ?? schedule.totalHours} hours over {available} Trooper{available === 1 ? '' : 's'}.
             </p>
             {!isAdmin && source === 'logged' && (
               <div className="actions">
@@ -434,6 +440,7 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
           <div className="scroller">
             <SheetGrid
               sheet={schedule}
+              orderBasis={original?.rows}
               check={latest}
               fresh={current !== null}
               mp={sheetTurnout !== null}

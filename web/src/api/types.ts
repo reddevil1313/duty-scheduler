@@ -46,10 +46,11 @@ export interface SheetCheck {
   /** The sheet as checked, with hours and span worked out again by the server. */
   sheet: Schedule
   /**
-   * Per Trooper with leave on this sheet, 24 entries: the kind of leave
-   * covering that hour, or null where they are free.
+   * Per Trooper away during this sheet, 24 entries: the kind of leave covering
+   * that hour, `SO` for a stay-out with no hour of this sheet open to them (a
+   * weekend), or null where they are free.
    */
-  away: Record<string, (AbsenceKind | null)[]>
+  away: Record<string, (AbsenceKind | 'SO' | null)[]>
 }
 
 export interface TrooperRecord {

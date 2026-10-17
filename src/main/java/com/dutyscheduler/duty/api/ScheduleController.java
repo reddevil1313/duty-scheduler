@@ -102,14 +102,15 @@ public class ScheduleController {
         if (!result.isSolved()) {
             throw new UnsolvableException(result.reason());
         }
-        // Those who cannot stand any hour go last, so the board, the logged
-        // sheet and its image all list them below everyone working.
+        // Night, day, stay-outs, then anyone who cannot stand any hour — a
+        // stay-out on a weekend sheet among them — so the board, the logged
+        // sheet and its image all read in that order.
         Set<String> unavailable = roster.stream()
                 .filter(t -> !availableAtAll(t, day, absences))
                 .map(Trooper::name)
                 .collect(Collectors.toSet());
         return ResponseEntity.ok(ScheduleResponse.from(result.schedule(), request.turnout(), result.reusedFrom())
-                .withLast(unavailable));
+                .inBoardOrder(Availability.silentSlots(day), unavailable));
     }
 
     /** Whether any hour of the sheet is free of leave and ticks for this Trooper. */

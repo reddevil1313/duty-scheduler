@@ -1,5 +1,5 @@
 import type { Post, Schedule, ScheduleRow, SheetCheck } from '../api/types'
-import { SLOT_COUNT } from './slots'
+import { SLOT_COUNT, isSilent } from './slots'
 
 /**
  * Hand edits to a sheet. Each returns a new sheet and leaves the old one
@@ -95,14 +95,31 @@ export function mpShortfall(sheet: Schedule, demand: SheetCheck['demand']): Post
   })
 }
 
+type Placed = Pick<ScheduleRow, 'trooper' | 'stayOut' | 'posts'>
+
+/** Night, day, stay-outs, then away: 0 to 3. */
+function groupOf(row: Placed, away: SheetCheck['away'] | undefined): number {
+  if (away?.[row.trooper]?.every((k) => k !== null)) return 3
+  if (row.posts.some((post, slot) => post !== null && isSilent(slot))) return 0
+  return row.stayOut ? 2 : 1
+}
+
 /**
- * Rows of Troopers away every hour moved to the bottom, the rest in their
- * order. Stable, so a sheet already in this order — as the server generates
- * it — does not move when its check arrives.
+ * Rows in board order: the night group, then day duty, then stay-outs, then
+ * anyone away the whole sheet, each group in the order it came in. The server
+ * generates sheets in this order too (ScheduleResponse.inBoardOrder), so a
+ * new sheet does not move when its check arrives.
+ *
+ * Night is anyone with a silent hour. `basis`, when given, is the sheet those
+ * groups are read from — the board passes the sheet as generated or loaded,
+ * so a row does not jump to the top under the cursor when it is given a
+ * silent hour mid-edit. Without it, as when logging, they are read from the
+ * rows themselves.
  */
-export function availableFirst<R extends { trooper: string }>(rows: R[], away: SheetCheck['away'] | undefined): R[] {
-  if (!away) return rows
-  const out = (r: R) => !!away[r.trooper]?.every((k) => k !== null)
-  const last = rows.filter(out)
-  return last.length === 0 ? rows : [...rows.filter((r) => !out(r)), ...last]
+export function boardOrder<R extends Placed>(rows: R[], away: SheetCheck['away'] | undefined, basis?: Placed[]): R[] {
+  const from = new Map((basis ?? []).map((r) => [r.trooper, r]))
+  return rows
+    .map((row, i) => ({ row, i, group: groupOf(from.get(row.trooper) ?? row, away) }))
+    .sort((a, b) => a.group - b.group || a.i - b.i)
+    .map((x) => x.row)
 }

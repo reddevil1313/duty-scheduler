@@ -1,6 +1,6 @@
 import { useEffect, useState, type MouseEvent } from 'react'
 import type { Post, Schedule, ScheduleRow, SheetCheck } from '../api/types'
-import { availableFirst, coverage, mpShortfall } from './edit'
+import { boardOrder, coverage, mpShortfall } from './edit'
 import { shortDate } from '../dates'
 import { SLOT_COUNT, dateAt, isCrossover, labelAt } from './slots'
 
@@ -14,6 +14,8 @@ export interface SpareTrooper {
 
 interface Props {
   sheet: Schedule
+  /** The rows the board's groups are read from: the sheet before any edits. */
+  orderBasis?: ScheduleRow[]
   /**
    * The latest check for this date, possibly of an earlier edit. Its numbers
    * are shown while a newer check is on its way, so nothing blanks and reflows
@@ -57,7 +59,7 @@ const MENU_WIDTH = 160
 const MIDNIGHT = 4
 const mid = (slot: number) => (slot === MIDNIGHT ? ' mid' : '')
 
-export function SheetGrid({ sheet, check, fresh, mp, mode, spare, swapPick, onSetCell, onPickRow }: Props) {
+export function SheetGrid({ sheet, check, fresh, mp, mode, spare, swapPick, onSetCell, onPickRow, orderBasis }: Props) {
   const [menu, setMenu] = useState<Menu | null>(null)
 
   // A click elsewhere, Escape, or a resize closes the menu. A scroll does not:
@@ -82,13 +84,13 @@ export function SheetGrid({ sheet, check, fresh, mp, mode, spare, swapPick, onSe
   // effect that resets state.
   const openMenu = mode === 'edit' ? menu : null
 
-  // Anyone away the whole sheet goes to the bottom, below even the spare rows,
-  // so the rows at the top are the people who can work.
-  const rows: ScheduleRow[] = availableFirst(mode === 'edit'
+  // Night, day, stay-outs, then anyone away the whole sheet, grouped by the
+  // sheet as it was before any edits so rows hold still while it is edited.
+  const rows: ScheduleRow[] = boardOrder(mode === 'edit'
     ? [...sheet.rows, ...spare.map((s) => ({
         trooper: s.name, stayOut: s.stayOut, posts: Array(SLOT_COUNT).fill(null), hours: 0, span: 0,
       }))]
-    : sheet.rows, check?.away)
+    : sheet.rows, check?.away, orderBasis)
 
   // Hours as counted here, span as the server last worked it out — dimmed
   // while a newer answer is on its way, but never blanked.
@@ -187,7 +189,8 @@ export function SheetGrid({ sheet, check, fresh, mp, mode, spare, swapPick, onSe
               </div>
               {asBand ? (
                 <div className="band" role="cell">
-                  <span className="why">{away[0]}</span>
+                  {/* A stay-out's SO tag is already by their name; the band says what it means. */}
+                  <span className="why">{away[0] === 'SO' ? 'Not in' : away[0]}</span>
                 </div>
               ) : row.posts.map((post, slot) => (
                 <div
