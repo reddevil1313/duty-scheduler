@@ -109,4 +109,16 @@ class SheetImageTest {
         Instant at = Instant.parse("2026-09-10T12:00:00Z");
         assertArrayEquals(SheetImage.png(sheet, null, "admin", at), SheetImage.png(sheet, null, "admin", at));
     }
+
+    @Test
+    @DisplayName("the subtitle counts only Troopers with an hour on the sheet, as the board does")
+    void subtitleCountsOnDuty() {
+        Schedule solved = solve(null);
+        Schedule.Builder builder = Schedule.builder(THURSDAY);
+        solved.rows().forEach(r -> builder.row(r.trooper(), r.posts()));
+        Schedule withAway = builder.empty(new Trooper("TROOPER_Z", true)).build();
+
+        String line = SheetImage.subtitle(THURSDAY, withAway.rows(), null, 0);
+        assertTrue(line.contains("47 hours over 9 Troopers"), line);
+    }
 }

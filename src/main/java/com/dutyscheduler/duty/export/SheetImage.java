@@ -107,12 +107,7 @@ public final class SheetImage {
             g.drawString("Duty sheet · " + longDate(day.date()), PAD, y + 20);
             y += 30;
 
-            int hours = rows.stream().mapToInt(Schedule.Row::hours).sum();
-            int mpHours = mp.stream().mapToInt(List::size).sum();
-            String split = turnout == null ? "free split" : turnout + "h each";
-            String subtitle = "2000 " + shortDate(day.date()) + " to 1959 " + shortDate(day.date().plusDays(1))
-                    + " · " + hours + " Trooper-hours over " + rows.size() + " · " + split
-                    + (mpHours > 0 ? " · " + mpHours + " post-hour" + (mpHours == 1 ? "" : "s") + " to the MP team" : "");
+            String subtitle = subtitle(day, rows, turnout, mp.stream().mapToInt(List::size).sum());
             g.setColor(DIM);
             g.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 13));
             g.drawString(subtitle, PAD, y + 14);
@@ -147,6 +142,20 @@ public final class SheetImage {
             throw new UncheckedIOException(e);
         }
         return out.toByteArray();
+    }
+
+    /**
+     * The line under the title. Counts the Troopers with an hour on the sheet,
+     * as the board's summary does, so a row for someone away all of it — on
+     * leave, or a stay-out on a weekend — is not counted as someone on duty.
+     */
+    static String subtitle(DutyDay day, List<Schedule.Row> rows, Integer turnout, int mpHours) {
+        int hours = rows.stream().mapToInt(Schedule.Row::hours).sum();
+        long onDuty = rows.stream().filter(r -> r.hours() > 0).count();
+        String split = turnout == null ? "free split" : turnout + "h each";
+        return "2000 " + shortDate(day.date()) + " to 1959 " + shortDate(day.date().plusDays(1))
+                + " · " + hours + " hours over " + onDuty + " Trooper" + (onDuty == 1 ? "" : "s") + " · " + split
+                + (mpHours > 0 ? " · " + mpHours + " post-hour" + (mpHours == 1 ? "" : "s") + " to the MP team" : "");
     }
 
     private static void drawHeader(Graphics2D g, DutyDay day, int x0, int y) {

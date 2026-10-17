@@ -251,11 +251,10 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
   const nightOn = schedule
     ? schedule.rows.filter((r) => r.posts.some((p, slot) => p !== null && isSilent(slot))).map((r) => r.trooper)
     : []
-  // Those who can stand an hour of this sheet: not anyone away all of it, a
-  // stay-out on a weekend sheet included, who is a row but not a Trooper on it.
-  const available = schedule
-    ? schedule.rows.filter((r) => !latest?.away[r.trooper]?.every((k) => k !== null)).length
-    : 0
+  // Troopers with an hour on the sheet as it stands, edits included: not the
+  // rows of anyone away all of it. The sheet image counts the same way
+  // (SheetImage.subtitle), so the two always agree.
+  const available = schedule ? schedule.rows.filter((r) => r.posts.some((p) => p !== null)).length : 0
   const manned = (slot: number) => !!schedule?.rows.some((r) => r.posts[slot] !== null)
 
   // From the latest check, dimmed while a newer one is on its way, so the list
