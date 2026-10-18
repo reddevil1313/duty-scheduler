@@ -139,7 +139,7 @@ public final class SheetImage {
     static String subtitle(DutyDay day, List<Schedule.Row> rows, Integer turnout, int mpHours) {
         int hours = rows.stream().mapToInt(Schedule.Row::hours).sum();
         long onDuty = rows.stream().filter(r -> r.hours() > 0).count();
-        String split = turnout == null ? "free split" : turnout + "h each";
+        String split = turnout == null ? "full coverage" : turnout + "h each";
         return "2000 " + shortDate(day.date()) + " to 1959 " + shortDate(day.date().plusDays(1))
                 + " · " + hours + " hours over " + onDuty + " Trooper" + (onDuty == 1 ? "" : "s") + " · " + split
                 + (mpHours > 0 ? " · " + mpHours + " post-hour" + (mpHours == 1 ? "" : "s") + " to the MP team" : "");

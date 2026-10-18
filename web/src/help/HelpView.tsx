@@ -65,7 +65,7 @@ const SECTIONS: Section[] = [
             <span className="tag">SO</span> marks a stay-out, who is in from 0800 to 1800 on weekdays only.
           </li>
           <li>
-            On a sheet made with a fixed turnout, the <b>MP</b> row shows the hours left to the MP team.
+            On a sheet made with fixed manpower, the <b>MP</b> row shows the hours left to the MP team.
           </li>
         </ul>
         <p>
@@ -91,13 +91,13 @@ const SECTIONS: Section[] = [
           person out on its own. The form says which sheets a booking reaches before you book it.
         </li>
         <li>
-          <b>Board.</b> Pick the <b>Duty date</b>, tick the <b>Night group</b>, choose who takes{' '}
+          <b>Schedule.</b> Pick the <b>Duty date</b>, tick the <b>Night group</b>, choose who takes{' '}
           <b>BUS 0700–1000</b> (or leave it to <b>Any</b>), and press <b>Generate</b>. The solver shares the hours
           out as evenly as the rules allow, taking into account who has done most lately. If a sheet already logged
-          for a day of the same shape and headcount fits, it is used again, and the board says which.
+          for a day of the same shape and headcount fits, it is used again, and the schedule says which.
         </li>
         <li>
-          <b>Short-handed?</b> Choose a <b>Turnout</b> of 5, 6 or 7 hours each. Everyone does that many, the
+          <b>Short-handed?</b> Set <b>Manpower</b> to 5, 6 or 7 hours each. Everyone does that many, the
           silent hours stay fully manned, and what is left goes to the MP team.
         </li>
         <li>
@@ -158,7 +158,7 @@ const SECTIONS: Section[] = [
       <>
         <p>
           Each person's totals across every logged day: hours stood, nights, BUS runs and leave taken, plus a line
-          per day logged. <b>Open on board</b> shows that day's sheet.
+          per day logged. <b>Open in schedule</b> shows that day's sheet.
         </p>
         <p>
           An admin can set <b>opening hours</b>, for hours done before the app was in use, and <b>credit hours</b>{' '}

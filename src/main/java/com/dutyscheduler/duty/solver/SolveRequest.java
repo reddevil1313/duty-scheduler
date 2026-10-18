@@ -41,7 +41,7 @@ public record SolveRequest(DutyDay day,
         }
         if (turnout != null && (turnout < MIN_TURNOUT || turnout > MAX_TURNOUT)) {
             throw new IllegalArgumentException(
-                    "A fixed turnout is " + MIN_TURNOUT + " to " + MAX_TURNOUT + " hours, not " + turnout + ".");
+                    "Manpower is " + MIN_TURNOUT + " to " + MAX_TURNOUT + " hours each, not " + turnout + ".");
         }
     }
 

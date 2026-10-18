@@ -157,7 +157,7 @@ export function SheetGrid({ sheet, check, fresh, mp, mode, spare, swapPick, onSe
                 role="rowheader"
                 onClick={mode === 'swap' && !isSpare && !asBand ? () => onPickRow(row.trooper) : undefined}
               >
-                {row.trooper}
+                <span className="nm" title={row.trooper}>{row.trooper}</span>
                 {row.stayOut && <span className="tag">SO</span>}
               </div>
               {asBand ? (

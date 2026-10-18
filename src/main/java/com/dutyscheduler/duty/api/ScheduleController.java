@@ -250,7 +250,7 @@ public class ScheduleController {
     /** 5 to 7, or null for the free split. */
     static Integer checkedTurnout(Integer turnout) {
         if (turnout != null && (turnout < SolveRequest.MIN_TURNOUT || turnout > SolveRequest.MAX_TURNOUT)) {
-            throw new IllegalArgumentException("A fixed turnout is 5 to 7 hours, not " + turnout + ".");
+            throw new IllegalArgumentException("Manpower is 5 to 7 hours each, not " + turnout + ".");
         }
         return turnout;
     }

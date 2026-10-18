@@ -11,14 +11,14 @@ hosts many teams, and no team sees another's data.
 - **Shipped** as one image: the API serves the built client from the same
   origin
 
-![The board: a generated Thursday sheet, one Trooper on MC listed at the bottom](docs/board.png)
+![The schedule: a generated Thursday sheet, one Trooper on MC listed at the bottom](docs/board.png)
 
 ## Features
 
 - **Generate a sheet** for any date. The solver shares the hours out evenly
   within the rules, with a chosen night group and BUS Trooper, and reuses a
   logged sheet of the same shape and headcount when one fits.
-- **Fixed turnouts** of 5, 6 or 7 hours for a short-handed day, with the rest
+- **Fixed manpower** of 5, 6 or 7 hours each for a short-handed day, with the rest
   left to the MP team.
 - **Edit by hand**, checked against the rules as you go. A sheet that breaks
   one can still be logged, after a warning: the log records what was used.

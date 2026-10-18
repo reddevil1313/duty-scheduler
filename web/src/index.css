@@ -142,7 +142,6 @@ input[type="checkbox"], input[type="radio"] { height: auto; padding: 0; accent-c
 .pill:has(input:disabled) { cursor: not-allowed; }
 .pill.ticked { color: var(--muted); border-style: dashed; }
 .night .pill:has(input:checked) { background: var(--ap-bg); color: var(--ap); border-color: var(--ap); }
-.bus .pill:has(input:checked) { background: var(--bus-bg); color: var(--bus); border-color: var(--bus); }
 
 .tag {
   font-family: var(--mono); font-size: 9px; font-weight: 600; letter-spacing: .05em;
@@ -168,8 +167,8 @@ input[type="checkbox"], input[type="radio"] { height: auto; padding: 0; accent-c
 
 /* ---------- board controls ---------- */
 .controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 16px; padding: 13px; }
-.night, .bus { display: flex; flex-wrap: wrap; gap: 5px; border: 0; padding: 0; margin: 0; max-width: 100%; }
-.night legend, .bus legend {
+.night { display: flex; flex-wrap: wrap; gap: 5px; border: 0; padding: 0; margin: 0; max-width: 100%; }
+.night legend {
   font-size: 10.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
   padding: 0; margin-bottom: 5px;
 }
@@ -200,7 +199,8 @@ p.ticks {
   border: 1px solid color-mix(in srgb, var(--brass) 30%, transparent); white-space: nowrap;
 }
 .sheet > p.hint { margin: 0; padding: 2px 13px; min-height: 1.6rem; line-height: 1.6rem; }
-.scroller { overflow-x: auto; padding: 0 13px 6px; }
+/* Margin, not padding: cells scrolled under the sticky names would show in the padding. */
+.scroller { overflow-x: auto; margin: 0 13px; padding-bottom: 6px; }
 
 .grid { min-width: 860px; font-variant-numeric: tabular-nums; }
 
@@ -218,6 +218,7 @@ p.ticks {
   text-align: left; padding: 0 8px; font-weight: 500; font-size: 12.5px;
   display: flex; align-items: center; background: var(--surface);
 }
+.name .nm { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .name .tag { font-size: 8.5px; }
 
 .row.days { border: 0; min-height: 0; }
@@ -381,9 +382,13 @@ p.ticks {
 .register td.total { font-weight: 600; color: var(--ink); }
 .register tr.past td { opacity: .5; }
 .register tr.editing td, .roster tr.editing td { padding: 0; background: var(--surface-2); }
+.default-bus { padding: 0 13px 12px; }
+/* Names stay in view while the table scrolls on a phone. */
+.roster th:first-child, .roster td:first-child { position: sticky; left: 0; z-index: 1; background: var(--surface); }
+.roster tbody tr:hover td:first-child { background: var(--surface-2); }
 .roster th.tick, .roster td.tick { text-align: center; padding-left: 6px; padding-right: 6px; }
 .row-actions { display: flex; gap: 6px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
-td.row-actions { display: table-cell; text-align: right; }
+td.row-actions { display: table-cell; text-align: right; white-space: nowrap; }
 td.row-actions > * + * { margin-left: 6px; }
 .roster tr.editing form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; padding: 10px 13px; }
 .roster tr.editing .pill, .add-trooper .pill { align-self: flex-end; min-height: 34px; }
@@ -452,6 +457,12 @@ input.hours { width: 5.5rem; }
   .mast h1 { font-size: 20px; }
   .who { margin-left: 0; width: 100%; }
   .controls > label, .controls input, .controls select { width: 100%; }
+  .controls .actions { width: 100%; }
+  .controls .actions button { flex: 1 1 auto; min-width: 0; }
+  .grid { min-width: 720px; }
+  .row { grid-template-columns: 8rem repeat(24, minmax(0, 1fr)) 2.4rem 2.7rem; }
+  .name { padding: 0 6px; font-size: 12px; }
+  .roster th, .roster td { padding: 6px 8px; }
 }
 
 .sheet-bar button { min-height: 28px; padding: 3px 11px; font-size: 12.5px; }

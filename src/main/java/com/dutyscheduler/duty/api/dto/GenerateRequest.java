@@ -29,6 +29,6 @@ public record GenerateRequest(
 
         Boolean busDefault,
 
-        @Min(value = 5, message = "A fixed turnout is 5 to 7 hours.")
-        @Max(value = 7, message = "A fixed turnout is 5 to 7 hours.") Integer turnout) {
+        @Min(value = 5, message = "Manpower is 5 to 7 hours each.")
+        @Max(value = 7, message = "Manpower is 5 to 7 hours each.") Integer turnout) {
 }

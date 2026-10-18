@@ -19,7 +19,7 @@ import { HelpView } from './help/HelpView'
 type View = 'board' | 'roster' | 'leave' | 'records' | 'team' | 'help'
 
 const VIEWS: [View, string][] = [
-  ['board', 'Board'],
+  ['board', 'Schedule'],
   ['roster', 'Roster'],
   ['leave', 'Leave register'],
   ['records', 'Records'],

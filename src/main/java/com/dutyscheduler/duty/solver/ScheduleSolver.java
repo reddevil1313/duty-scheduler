@@ -173,13 +173,13 @@ public final class ScheduleSolver {
         if (night < silentDemand) {
             return SolveResult.failed("The silent hours need " + silentDemand + " Trooper-hours, and the night group"
                     + " at " + n + "h, or " + (n + 1) + "h, each can give only " + night
-                    + ". Add someone to the night group, or use the free split.", null, 0);
+                    + ". Add someone to the night group, or use full coverage.", null, 0);
         }
         int crossover = night - silentDemand;
         if (crossover > crossCeiling) {
             return SolveResult.failed("At " + n + "h each the night group makes " + night + " hours, more than the"
                     + " silent hours and the morning after can take (" + (silentDemand + crossCeiling)
-                    + "). Use the free split, or a shorter turnout.", null, 0);
+                    + "). Use full coverage, or fewer hours each.", null, 0);
         }
 
         int dayHours = 0;
@@ -192,8 +192,8 @@ public final class ScheduleSolver {
         }
         if (dayHours > dayDemand - crossover) {
             return SolveResult.failed("At " + n + "h each the team makes " + (night + dayHours) + " hours, more than"
-                    + " the " + (silentDemand + dayDemand) + " this sheet needs. Use the free split, or a shorter"
-                    + " turnout.", null, 0);
+                    + " the " + (silentDemand + dayDemand) + " this sheet needs. Use full coverage, or fewer"
+                    + " hours each.", null, 0);
         }
 
         HourTargets targets = new HourTargets(hours, silentDemand + crossover, dayHours);
@@ -357,7 +357,7 @@ public final class ScheduleSolver {
             if (fixed && targets.total() < mandatory(0)) {
                 return "At " + request.turnout() + "h each there are " + targets.total() + " hours for "
                         + mandatory(0) + " that must have a Trooper on: every silent post-hour, and one post"
-                        + " every other hour. Use a longer turnout, or the free split.";
+                        + " every other hour. Use more hours each, or full coverage.";
             }
             if (targets.total() > positions.size()) {
                 return "The hour targets over-subscribe the sheet.";

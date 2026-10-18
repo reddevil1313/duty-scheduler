@@ -85,7 +85,7 @@ class FixedTurnoutIT {
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.detail").value(
                         "At 7h each the team makes 63 hours, more than the 47 this sheet needs."
-                                + " Use the free split, or a shorter turnout."));
+                                + " Use full coverage, or fewer hours each."));
     }
 
     @Test

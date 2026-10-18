@@ -123,7 +123,7 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
         r.trooper !== busPick && r.posts.includes('BUS'))
       const notes = [
         gaveWay && `${busPick}, the default BUS Trooper, could not take BUS on this sheet, so the solver chose.`,
-        sheet.reusedFrom && `Reused the sheet logged for ${shortDate(sheet.reusedFrom)}: the same posts, headcount and turnout.`,
+        sheet.reusedFrom && `Reused the sheet logged for ${shortDate(sheet.reusedFrom)}: the same posts, headcount and manpower.`,
       ].filter(Boolean)
       if (notes.length > 0) setNote(notes.join(' '))
     } catch (e) {
@@ -262,36 +262,27 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
         )}
 
         {isAdmin && (
-          <fieldset className="bus">
-            <legend>BUS 0700–1000</legend>
-            <label className="pill">
-              <input type="radio" name="bus" checked={busPick === null} onChange={() => setBus(null)} />
-              Any
-            </label>
-            {roster.filter((t) => !t.stayOut).map((t) => (
-              <label key={t.name} className={`pill${t.name in ticks ? ' ticked' : ''}`}>
-                <input
-                  type="radio"
-                  name="bus"
-                  checked={busPick === t.name}
-                  disabled={t.name in ticks}
-                  onChange={() => setBus(t.name)}
-                />
-                {t.name}
-                {t.name === defaultBus && <span className="tag">default</span>}
-              </label>
-            ))}
-          </fieldset>
+          <label>
+            BUS 0700–1000
+            <select value={busPick ?? ''} onChange={(e) => setBus(e.target.value === '' ? null : e.target.value)}>
+              <option value="">Any</option>
+              {roster.filter((t) => !t.stayOut).map((t) => (
+                <option key={t.name} value={t.name} disabled={t.name in ticks}>
+                  {t.name}{t.name === defaultBus ? ' (default)' : ''}{t.name in ticks ? ` (${ticks[t.name]})` : ''}
+                </option>
+              ))}
+            </select>
+          </label>
         )}
 
         {isAdmin && (
           <label>
-            Turnout
+            Manpower
             <select
               value={turnout ?? ''}
               onChange={(e) => setTurnout(e.target.value === '' ? null : Number(e.target.value))}
             >
-              <option value="">Free split</option>
+              <option value="">Full coverage</option>
               <option value="5">5h each, rest to MP</option>
               <option value="6">6h each, rest to MP</option>
               <option value="7">7h each, rest to MP</option>

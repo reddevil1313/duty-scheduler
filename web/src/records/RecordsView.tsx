@@ -19,7 +19,7 @@ function days(n: number): string {
 
 /**
  * Totals per Trooper and a line per logged day. Only opening and credited
- * hours are edited here; anything on the grid is fixed on the board.
+ * hours are edited here; anything on the grid is fixed in the schedule.
  */
 export function RecordsView({ active, onOpen }: Props) {
   const { session } = useSession()
@@ -129,7 +129,7 @@ export function RecordsView({ active, onOpen }: Props) {
                   <td>{day.bus.join(', ')}</td>
                   <td>{day.issues > 0 && <span className="kind MC">{day.issues} BROKEN</span>}</td>
                   <td className="row-actions">
-                    <button type="button" onClick={() => onOpen(day.date)}>Open on board</button>
+                    <button type="button" onClick={() => onOpen(day.date)}>Open in schedule</button>
                     {isAdmin && (
                       <button type="button" onClick={() => setCrediting(day.date)}>Credit hours</button>
                     )}
@@ -265,7 +265,7 @@ function CreditForm({ day, troopers, onSaved, onCancel, onError }: CreditProps) 
     <form className="leave-form" onSubmit={(e) => void submit(e)}>
       <p className="note preview">
         Hours credited for {shortDate(day.date)} to anyone who did not stand them, such as an MC or OL day.
-        To change who stood what, open the day on the board instead.
+        To change who stood what, open the day in the schedule instead.
       </p>
       {troopers.map((t) => (
         <label key={t.name}>

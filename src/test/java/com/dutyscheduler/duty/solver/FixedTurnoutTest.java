@@ -130,7 +130,7 @@ class FixedTurnoutTest {
 
         assertFalse(result.isSolved());
         assertEquals("At 5h each the team makes 56 hours, more than the 47 this sheet needs."
-                + " Use the free split, or a shorter turnout.", result.reason());
+                + " Use full coverage, or fewer hours each.", result.reason());
         assertEquals(0, result.nodes(), "refused before searching");
     }
 
@@ -151,7 +151,7 @@ class FixedTurnoutTest {
 
         assertFalse(result.isSolved());
         assertEquals("The silent hours need 16 Trooper-hours, and the night group at 5h, or 6h, each can give only 12."
-                + " Add someone to the night group, or use the free split.", result.reason());
+                + " Add someone to the night group, or use full coverage.", result.reason());
     }
 
     @Test
