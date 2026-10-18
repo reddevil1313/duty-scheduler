@@ -108,7 +108,7 @@ jobs:
       - name: Copy the image and config
         run: |
           docker save duty-scheduler:latest | gzip -1 | ssh "$VM" 'gunzip | docker load'
-          scp deploy/compose.yml deploy/Caddyfile "$VM":duty-scheduler/
+          scp deploy/compose.yml deploy/Caddyfile deploy/backup.sh "$VM":duty-scheduler/
       - name: Restart
         run: |
           ssh "$VM" 'cd duty-scheduler && docker compose up -d --remove-orphans && docker image prune -f >/dev/null

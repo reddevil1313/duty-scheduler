@@ -1,0 +1,43 @@
+name: Backup
+
+on:
+  schedule:
+    - cron: '30 19 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    name: Database dump
+    runs-on: ubuntu-latest
+    env:
+      VM: ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}
+    steps:
+      - name: SSH key
+        run: |
+          install -m 700 -d ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519
+      # Encrypted, because artifacts on a public repo can be downloaded by
+      # any signed-in GitHub user.
+      - name: Dump and encrypt
+        env:
+          PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          name="duty-$(date -u +%F)"
+          ssh "$VM" 'cd duty-scheduler && docker compose exec -T db pg_dump -U duty --clean --if-exists duty' \
+            | gzip > "$name.sql.gz"
+          test "$(gunzip -c "$name.sql.gz" | grep -c 'PostgreSQL database dump complete')" -eq 1
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$PASSPHRASE" \
+            --symmetric --cipher-algo AES256 -o "$name.sql.gz.gpg" "$name.sql.gz"
+          rm "$name.sql.gz"
+          echo "NAME=$name" >> "$GITHUB_ENV"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.NAME }}
+          path: ${{ env.NAME }}.sql.gz.gpg
+          retention-days: 90
+          if-no-files-found: error

@@ -29,6 +29,21 @@ Use `linux/arm64` on an ARM VM.
 
 ## Backups
 
+- **On the VM:** `backup.sh` runs from cron at 19:00 UTC and keeps 7 days in
+  `duty-scheduler/backups/`.
+- **Off the VM:** the `Backup` workflow dumps nightly at 19:30 UTC, encrypts
+  with the `BACKUP_PASSPHRASE` secret and keeps it as an artifact for 90 days.
+  Run it by hand from the Actions tab.
+
+Decrypt an artifact (unzip the download first):
+
 ```sh
-ssh vm 'cd duty-scheduler && docker compose exec -T db pg_dump -U duty duty' > duty-$(date +%F).sql
+gpg -d duty-2026-10-18.sql.gz.gpg > duty.sql.gz
+```
+
+Restore (replaces the current data):
+
+```sh
+gunzip -c duty.sql.gz | ssh vm 'cd duty-scheduler && docker compose exec -T db psql -q -U duty -d duty'
+ssh vm 'cd duty-scheduler && docker compose restart app'
 ```
