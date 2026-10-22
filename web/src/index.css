@@ -456,9 +456,12 @@ input.hours { width: 5.5rem; }
 @media (max-width: 560px) {
   .mast h1 { font-size: 20px; }
   .who { margin-left: 0; width: 100%; }
-  .controls > label, .controls input, .controls select { width: 100%; }
+  .controls > label, .controls > label > input, .controls > label > select { width: 100%; }
   .controls .actions { width: 100%; }
   .controls .actions button { flex: 1 1 auto; min-width: 0; }
+  .sheet-bar .actions { width: 100%; }
+  .sheet-bar .actions button { flex: 1 1 auto; min-width: 0; }
+  .sheet-bar .actions button.placeholder { display: none; }
   .grid { min-width: 720px; }
   .row { grid-template-columns: 8rem repeat(24, minmax(0, 1fr)) 2.4rem 2.7rem; }
   .name { padding: 0 6px; font-size: 12px; }

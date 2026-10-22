@@ -6,7 +6,6 @@ import com.dutyscheduler.duty.domain.Post;
 import com.dutyscheduler.duty.domain.Schedule;
 import com.dutyscheduler.duty.domain.Trooper;
 import com.dutyscheduler.duty.rules.Availability;
-import com.dutyscheduler.duty.rules.HourTargets;
 import com.dutyscheduler.duty.rules.Rule;
 import com.dutyscheduler.duty.rules.ScheduleValidator;
 import com.dutyscheduler.duty.rules.ValidationResult;
@@ -21,8 +20,8 @@ import java.util.Optional;
  * only who stands each one changes. A row can go to anyone who:
  * <ul>
  * <li>is available for all of its hours;
- * <li>is on night if it has silent hours, and if on night, has nothing past
- * the crossover window;
+ * <li>is not on night, or it has silent hours (a hand-edited sheet may have
+ * put day Troopers on silent hours too);
  * <li>is the chosen BUS Trooper, for the row with the BUS run.
  * </ul>
  * Longer rows go to whoever has done the fewest hours. The result must pass
@@ -51,7 +50,6 @@ final class SheetReuse {
         }
 
         boolean[] silent = Availability.silentSlots(day);
-        boolean[] cross = HourTargets.crossoverWindow(day);
         int n = available.size();
         boolean[][] fits = new boolean[n][n]; // [trooper][row]
         for (int t = 0; t < n; t++) {
@@ -59,7 +57,7 @@ final class SheetReuse {
             boolean[] free = Availability.mask(trooper, day, request.absences());
             boolean night = request.nightGroup().contains(trooper);
             for (int r = 0; r < n; r++) {
-                fits[t][r] = canStand(rows.get(r), free, night, silent, cross)
+                fits[t][r] = canStand(rows.get(r), free, night, silent)
                         && busAllows(request.bus(), trooper, rows.get(r));
             }
         }
@@ -101,7 +99,8 @@ final class SheetReuse {
         return false;
     }
 
-    private static boolean canStand(List<Post> row, boolean[] free, boolean night, boolean[] silent, boolean[] cross) {
+    private static boolean canStand(List<Post> row, boolean[] free, boolean night, boolean[] silent) {
+        boolean anySilent = false;
         for (int slot = 0; slot < row.size(); slot++) {
             if (row.get(slot) == null) {
                 continue;
@@ -109,14 +108,9 @@ final class SheetReuse {
             if (!free[slot]) {
                 return false;
             }
-            if (silent[slot] && !night) {
-                return false;
-            }
-            if (night && !silent[slot] && !cross[slot]) {
-                return false;
-            }
+            anySilent |= silent[slot];
         }
-        return true;
+        return !night || anySilent;
     }
 
     /** The chosen BUS Trooper's row has the BUS run, and nobody else's does. */

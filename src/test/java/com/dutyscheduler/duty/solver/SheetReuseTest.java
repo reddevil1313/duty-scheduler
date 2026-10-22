@@ -116,6 +116,30 @@ class SheetReuseTest {
     }
 
     @Test
+    @DisplayName("a hand-edited sheet with day Troopers on silent hours is reused")
+    void handEditedSheetIsReused() {
+        // TROOPER_E and TROOPER_F took silent hours by hand, outside the night group.
+        Schedule thursday = Schedule.builder(THURSDAY)
+                .row(TROOPER_A, ".   .   .   .   GG  GG  GG  .   .   .   PAC PAC .   .   .   .   .   .   .   .   .   .   .   .")
+                .row(TROOPER_B, ".   .   .   .   AP  AP  .   GG  GG  GG  .   .   .   .   .   .   .   .   .   .   .   .   .   .")
+                .row(TROOPER_C, ".   .   GG  GG  .   .   AP  AP  AP  .   .   .   .   .   .   .   .   .   .   .   .   .   .   .")
+                .row(TROOPER_D, ".   .   .   .   .   .   .   .   .   .   .   BUS BUS BUS .   .   .   .   .   .   .   .   PAC PAC")
+                .row(TROOPER_E, ".   .   AP  AP  .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   .   PAC .   PAC PAC")
+                .row(TROOPER_F, ".   .   .   .   .   .   .   .   .   AP  PAC PAC .   .   PAC PAC .   .   .   .   .   .   .   .")
+                .row(TROOPER_G, ".   .   .   .   .   .   .   .   .   .   .   .   PAC .   .   .   PAC .   PAC PAC PAC .   .   .")
+                .row(TROOPER_H, ".   .   .   .   .   .   .   .   .   .   .   .   .   PAC PAC .   .   PAC PAC PAC .   PAC .   .")
+                .row(TROOPER_I, ".   .   .   .   .   .   .   .   .   .   .   .   PAC PAC .   PAC PAC PAC .   .   .   PAC .   .")
+                .build();
+        assertTrue(validator.validate(thursday).ok(), validator.validate(thursday)::describe);
+
+        SolveResult monday = solver.solve(SolveRequest.of(MONDAY, NINE, NIGHT)
+                .withBus(TROOPER_D).withReusable(List.of(thursday)));
+
+        assertEquals(THURSDAY.date(), monday.reusedFrom());
+        assertEquals(turnouts(thursday), turnouts(monday.schedule()));
+    }
+
+    @Test
     @DisplayName("a BUS pick takes the row with the BUS run")
     void busPickTakesTheBusRow() {
         Schedule thursday = logged(SolveRequest.of(THURSDAY, NINE, NIGHT).withBus(TROOPER_D));

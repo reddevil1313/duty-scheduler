@@ -84,7 +84,9 @@ export function RecordsView({ active, onOpen }: Props) {
             onError={report}
           />
         ) : (
-          <TotalsTable troopers={records.troopers} />
+          <div className="table-scroll">
+            <TotalsTable troopers={records.troopers} />
+          </div>
         )}
       </div>
 
@@ -95,49 +97,51 @@ export function RecordsView({ active, onOpen }: Props) {
         {records.days.length === 0 ? (
           <p className="empty">No sheets logged yet.</p>
         ) : (
-          <table className="register">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th className="n">Hours</th>
-                <th className="n">Credited</th>
-                <th>Night</th>
-                <th>BUS</th>
-                <th>Issues</th>
-                <th aria-label="Actions" />
-              </tr>
-            </thead>
-            <tbody>
-              {records.days.map((day) => crediting === day.date ? (
-                <tr key={day.date} className="editing">
-                  <td colSpan={7}>
-                    <CreditForm
-                      day={day}
-                      troopers={records.troopers}
-                      onSaved={() => credited(day.date)}
-                      onCancel={() => setCrediting(null)}
-                      onError={report}
-                    />
-                  </td>
+          <div className="table-scroll">
+            <table className="register">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th className="n">Hours</th>
+                  <th className="n">Credited</th>
+                  <th>Night</th>
+                  <th>BUS</th>
+                  <th>Issues</th>
+                  <th aria-label="Actions" />
                 </tr>
-              ) : (
-                <tr key={day.date}>
-                  <td>{shortDate(day.date)}</td>
-                  <td className="n">{day.worked}</td>
-                  <td className="n">{day.credited || ''}</td>
-                  <td>{day.night.join(', ')}</td>
-                  <td>{day.bus.join(', ')}</td>
-                  <td>{day.issues > 0 && <span className="kind MC">{day.issues} BROKEN</span>}</td>
-                  <td className="row-actions">
-                    <button type="button" onClick={() => onOpen(day.date)}>Open in schedule</button>
-                    {isAdmin && (
-                      <button type="button" onClick={() => setCrediting(day.date)}>Credit hours</button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {records.days.map((day) => crediting === day.date ? (
+                  <tr key={day.date} className="editing">
+                    <td colSpan={7}>
+                      <CreditForm
+                        day={day}
+                        troopers={records.troopers}
+                        onSaved={() => credited(day.date)}
+                        onCancel={() => setCrediting(null)}
+                        onError={report}
+                      />
+                    </td>
+                  </tr>
+                ) : (
+                  <tr key={day.date}>
+                    <td>{shortDate(day.date)}</td>
+                    <td className="n">{day.worked}</td>
+                    <td className="n">{day.credited || ''}</td>
+                    <td>{day.night.join(', ')}</td>
+                    <td>{day.bus.join(', ')}</td>
+                    <td>{day.issues > 0 && <span className="kind MC">{day.issues} BROKEN</span>}</td>
+                    <td className="row-actions">
+                      <button type="button" onClick={() => onOpen(day.date)}>Open in schedule</button>
+                      {isAdmin && (
+                        <button type="button" onClick={() => setCrediting(day.date)}>Credit hours</button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </section>
