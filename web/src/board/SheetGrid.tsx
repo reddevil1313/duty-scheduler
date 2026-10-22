@@ -1,4 +1,4 @@
-import { useEffect, useState, type MouseEvent } from 'react'
+import { useEffect, useState, type CSSProperties, type MouseEvent } from 'react'
 import type { Post, Schedule, ScheduleRow, SheetCheck } from '../api/types'
 import { boardOrder, coverage, mpShortfall } from './edit'
 import { shortDate } from '../dates'
@@ -44,6 +44,13 @@ const POSTS: Post[] = ['AP', 'GG', 'PAC', 'BUS']
 const MENU_ROW = 32
 const MENU_PAD = 12
 const MENU_WIDTH = 160
+
+/** Hours in the stint starting at `slot`: one block spans them, so the label sits in its middle. */
+function runFrom(posts: (Post | null)[], slot: number): number {
+  let end = slot
+  while (end + 1 < posts.length && posts[end + 1] === posts[slot]) end++
+  return end - slot + 1
+}
 
 /** Midnight, drawn with a heavier line. */
 const MIDNIGHT = 4
@@ -180,10 +187,8 @@ export function SheetGrid({ sheet, check, fresh, mp, mode, spare, swapPick, onSe
                   title={`${labelAt(slot)} — ${post ?? 'off'}${away?.[slot] ? ` · ${away[slot]}` : ''}`}
                   onClick={(e) => clickCell(e, row, slot)}
                 >
-                  {post && (
-                    <span className="blk">
-                      {row.posts[slot - 1] === post ? '' : post}
-                    </span>
+                  {post && row.posts[slot - 1] !== post && (
+                    <span className="blk" style={{ '--run': runFrom(row.posts, slot) } as CSSProperties}>{post}</span>
                   )}
                 </div>
               ))}

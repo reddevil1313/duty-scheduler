@@ -130,6 +130,9 @@ input, select {
   background: var(--surface-2); border: 1px solid var(--line-2); border-radius: 5px;
   padding: 0 9px; height: 34px;
 }
+/* iOS gives date fields a native minimum width that ignores width: 100%. */
+input[type="date"] { -webkit-appearance: none; appearance: none; min-width: 0; display: block; }
+input[type="date"]::-webkit-date-and-time-value { text-align: left; }
 input[type="checkbox"], input[type="radio"] { height: auto; padding: 0; accent-color: var(--brass); margin: 0; }
 
 /* Tickable chips. */
@@ -249,17 +252,15 @@ p.ticks {
 .row > .tally:nth-last-child(2) { border-left: 1.5px solid var(--grid-strong); }
 .row.head > .tally { display: block; }
 
-/* One rounded block per stint. */
+/* One rounded block per stint, drawn from its first hour across the rest. */
 .cell .blk {
-  position: absolute; inset: 3px 0; display: flex; align-items: center; justify-content: center;
+  position: absolute; inset: 3px 0; left: 2px; z-index: 1;
+  right: calc(2px - (var(--run, 1) - 1) * (100% + 1px));
+  display: flex; align-items: center; justify-content: center;
   font-family: var(--mono); font-size: 9.5px; font-weight: 600;
-  border-top: 1px solid transparent; border-bottom: 1px solid transparent;
+  border: 1px solid transparent; border-radius: 4px;
 }
 .cell.on:not(.s-start) { border-left-color: transparent; }
-.cell.on:not(.s-start) .blk { left: -1px; }
-.cell.s-start .blk { left: 2px; border-left: 1px solid transparent; border-radius: 4px 0 0 4px; }
-.cell.s-end .blk { right: 2px; border-right: 1px solid transparent; border-top-right-radius: 4px; border-bottom-right-radius: 4px; }
-.cell.s-start.s-end .blk { border-radius: 4px; }
 .cell.ap .blk { background: var(--ap-bg); color: var(--ap); border-color: color-mix(in srgb, var(--ap) 30%, transparent); }
 .cell.gg .blk { background: var(--gg-bg); color: var(--gg); border-color: color-mix(in srgb, var(--gg) 30%, transparent); }
 .cell.pac .blk { background: var(--pac-bg); color: var(--pac); border-color: color-mix(in srgb, var(--pac) 30%, transparent); }
