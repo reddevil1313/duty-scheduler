@@ -60,6 +60,8 @@ public final class SheetImage {
             Post.PAC, new Color[] { new Color(0xF8E6D2), new Color(0x7D480C) },
             Post.BUS, new Color[] { new Color(0xF7DDE2), new Color(0x7A2C3D) }));
     static final Color[] MP_COLOURS = { new Color(0xEFE3FA), new Color(0x5B3590) };
+    /** Leave, labelled by kind. */
+    static final Color[] AWAY_COLOURS = { new Color(0xE6EAEE), new Color(0x4A5863) };
 
     private static final String[] DAYS = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" };
     private static final String[] MONTHS = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep",
@@ -70,8 +72,10 @@ public final class SheetImage {
 
     /**
      * @param turnout  null for the free split; otherwise an MP row is drawn
+     * @param away     per Trooper, 24 entries: leave kind or null, as {@code SheetCheck.away}
      */
-    public static byte[] png(Schedule sheet, Integer turnout, String loggedBy, Instant loggedAt) {
+    public static byte[] png(Schedule sheet, Integer turnout, Map<String, List<String>> away, String loggedBy,
+            Instant loggedAt) {
         DutyDay day = sheet.day();
         List<Schedule.Row> rows = sheet.rows().stream().filter(r -> r.hours() > 0).toList();
         List<List<Post>> mp = turnout == null ? List.of() : shortfall(sheet);
@@ -107,7 +111,7 @@ public final class SheetImage {
             drawHeader(g, day, x0, y);
             y += HEAD_H;
             for (Schedule.Row row : rows) {
-                drawRow(g, row, x0, y);
+                drawRow(g, row, away.get(row.trooper().name()), x0, y);
                 y += ROW_H;
             }
             if (hasMp) {
@@ -172,7 +176,7 @@ public final class SheetImage {
         centre(g, "Span", tx + TALLY_W, TALLY_W, y + 15);
     }
 
-    private static void drawRow(Graphics2D g, Schedule.Row row, int x0, int y) {
+    private static void drawRow(Graphics2D g, Schedule.Row row, List<String> away, int x0, int y) {
         g.setColor(LINE);
         g.drawLine(x0, y, x0 + NAME_W + DutyDay.SLOT_COUNT * HOUR_W + 2 * TALLY_W, y);
         g.setColor(INK);
@@ -182,15 +186,16 @@ public final class SheetImage {
         g.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 10));
         for (int slot = 0; slot < DutyDay.SLOT_COUNT; slot++) {
             Post post = row.at(slot);
-            if (post == null) {
+            String kind = away == null ? null : away.get(slot);
+            if (post == null && kind == null) {
                 continue;
             }
-            Color[] colours = POST_COLOURS.get(post);
+            Color[] colours = post == null ? AWAY_COLOURS : POST_COLOURS.get(post);
             int cx = x0 + NAME_W + slot * HOUR_W;
             g.setColor(colours[0]);
             g.fillRect(cx + 1, y + 3, HOUR_W - 2, ROW_H - 6);
             g.setColor(colours[1]);
-            centre(g, post.name(), cx, HOUR_W, y + 17);
+            centre(g, post == null ? kind : post.name(), cx, HOUR_W, y + 17);
         }
         int tx = x0 + NAME_W + DutyDay.SLOT_COUNT * HOUR_W;
         g.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));

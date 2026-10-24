@@ -1,6 +1,7 @@
 package com.dutyscheduler.duty.api;
 
 import com.dutyscheduler.duty.api.dto.ScheduleResponse;
+import com.dutyscheduler.duty.api.dto.SheetCheck;
 import com.dutyscheduler.duty.domain.Schedule;
 import com.dutyscheduler.duty.export.SheetImage;
 import com.dutyscheduler.duty.persistence.DutySheetStore;
@@ -22,6 +23,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.security.Principal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
 
 /**
  * The sheet as an image. Making the image logs the sheet, so every image sent
@@ -54,7 +57,7 @@ public class SheetImageController {
             Principal principal) {
         Schedule schedule = ScheduleAssembler.toDomain(date, body, troopers);
         Integer turnout = ScheduleController.checkedTurnout(body.turnout());
-        byte[] png = SheetImage.png(schedule, turnout, principal.getName(), Instant.now());
+        byte[] png = SheetImage.png(schedule, turnout, away(schedule), principal.getName(), Instant.now());
         store.save(schedule, principal.getName(), turnout);
         metrics.logged("image");
         return image(date, png);
@@ -64,10 +67,16 @@ public class SheetImageController {
     @GetMapping("/{date}/image")
     public ResponseEntity<byte[]> draw(@PathVariable LocalDate date) {
         return store.loadLogged(date)
-                .map(l -> image(date, SheetImage.png(l.schedule(), l.turnout(),
+                .map(l -> image(date, SheetImage.png(l.schedule(), l.turnout(), away(l.schedule()),
                         l.loggedBy() == null ? "unknown" : l.loggedBy(),
                         l.loggedAt() == null ? Instant.now() : l.loggedAt())))
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
+    }
+
+    /** Booked leave only: roster ticks are whole-sheet, so those rows have no hours to draw. */
+    private Map<String, List<String>> away(Schedule schedule) {
+        return SheetCheck.away(schedule.day(), store.absencesTouching(schedule.day()),
+                schedule.rows().stream().map(Schedule.Row::trooper).toList());
     }
 
     private static ResponseEntity<byte[]> image(LocalDate date, byte[] png) {

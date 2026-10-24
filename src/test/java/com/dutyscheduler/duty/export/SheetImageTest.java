@@ -16,7 +16,9 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -54,7 +56,7 @@ class SheetImageTest {
         Schedule sheet = solve(null);
         int rows = (int) sheet.rows().stream().filter(r -> r.hours() > 0).count();
 
-        BufferedImage image = decode(SheetImage.png(sheet, null, "admin", Instant.now()));
+        BufferedImage image = decode(SheetImage.png(sheet, null, Map.of(), "admin", Instant.now()));
 
         int s = SheetImage.SCALE;
         assertEquals((PAD * 2 + NAME_W + DutyDay.SLOT_COUNT * HOUR_W + 2 * TALLY_W) * s, image.getWidth());
@@ -67,7 +69,7 @@ class SheetImageTest {
         Schedule sheet = solve(null);
         List<Schedule.Row> rows = sheet.rows().stream().filter(r -> r.hours() > 0).toList();
 
-        BufferedImage image = decode(SheetImage.png(sheet, null, "admin", Instant.now()));
+        BufferedImage image = decode(SheetImage.png(sheet, null, Map.of(), "admin", Instant.now()));
 
         for (int r = 0; r < rows.size(); r++) {
             for (int slot = 0; slot < DutyDay.SLOT_COUNT; slot++) {
@@ -90,7 +92,7 @@ class SheetImageTest {
             slot++;
         }
 
-        BufferedImage image = decode(SheetImage.png(sheet, 5, "admin", Instant.now()));
+        BufferedImage image = decode(SheetImage.png(sheet, 5, Map.of(), "admin", Instant.now()));
 
         assertEquals((PAD + 30 + 22 + 14 + HEAD_H + (rows + 1) * ROW_H + 18 + 16 + PAD) * SheetImage.SCALE, image.getHeight(),
                 "one row more than the Troopers: the MP team's");
@@ -98,11 +100,29 @@ class SheetImageTest {
     }
 
     @Test
+    @DisplayName("free hours on leave show the kind")
+    void leaveHoursAreDrawn() throws IOException {
+        Schedule sheet = solve(null);
+        Schedule.Row first = sheet.rows().stream().filter(r -> r.hours() > 0).findFirst().orElseThrow();
+        int free = 0;
+        while (first.at(free) != null) {
+            free++;
+        }
+        String[] hours = new String[DutyDay.SLOT_COUNT];
+        hours[free] = "MA";
+
+        BufferedImage image = decode(SheetImage.png(sheet, null,
+                Map.of(first.trooper().name(), Arrays.asList(hours)), "admin", Instant.now()));
+
+        assertEquals(SheetImage.AWAY_COLOURS[0], groundAt(image, 0, free));
+    }
+
+    @Test
     @DisplayName("deterministic")
     void deterministic() {
         Schedule sheet = solve(null);
         Instant at = Instant.parse("2026-09-10T12:00:00Z");
-        assertArrayEquals(SheetImage.png(sheet, null, "admin", at), SheetImage.png(sheet, null, "admin", at));
+        assertArrayEquals(SheetImage.png(sheet, null, Map.of(), "admin", at), SheetImage.png(sheet, null, Map.of(), "admin", at));
     }
 
     @Test
@@ -122,7 +142,7 @@ class SheetImageTest {
     void gridLines() throws IOException {
         Schedule sheet = solve(null);
         List<Schedule.Row> rows = sheet.rows().stream().filter(r -> r.hours() > 0).toList();
-        BufferedImage image = decode(SheetImage.png(sheet, null, "admin", Instant.now()));
+        BufferedImage image = decode(SheetImage.png(sheet, null, Map.of(), "admin", Instant.now()));
         int s = SheetImage.SCALE;
 
         // On an hour edge with nobody on either side.

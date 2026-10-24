@@ -67,7 +67,7 @@ public record SheetCheck(List<Issue> issues, List<Map<Post, Integer>> demand, Sc
      * wins. A stay-out with no open hour on this sheet is {@code SO} wherever
      * leave doesn't already cover.
      */
-    static Map<String, List<String>> away(DutyDay day, List<Absence> absences, List<Trooper> troopers) {
+    public static Map<String, List<String>> away(DutyDay day, List<Absence> absences, List<Trooper> troopers) {
         Map<String, String[]> byName = new LinkedHashMap<>();
         for (Absence absence : absences) {
             for (int slot = 0; slot < DutyDay.SLOT_COUNT; slot++) {
