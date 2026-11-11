@@ -113,12 +113,16 @@ public final class Availability {
         return silent;
     }
 
-    /** The rest of the sheet. */
+    /**
+     * The rest of the sheet, where a post stands. Weekday 2000-2200 has none, and
+     * counting it as room gave a half-day Trooper hours that could never be placed.
+     */
     public static boolean[] daySlots(DutyDay day) {
         boolean[] silent = silentSlots(day);
+        DayDemand demand = DayDemand.of(day);
         boolean[] out = new boolean[DutyDay.SLOT_COUNT];
         for (int i = 0; i < DutyDay.SLOT_COUNT; i++) {
-            out[i] = !silent[i];
+            out[i] = !silent[i] && demand.headcountAt(i) > 0;
         }
         return out;
     }

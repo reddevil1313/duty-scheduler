@@ -15,6 +15,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.ToIntFunction;
 
 /**
  * Backtracking search that fills every post on a sheet with a legal schedule.
@@ -149,32 +150,44 @@ public final class ScheduleSolver {
 
         Map<Trooper, Integer> hours = new LinkedHashMap<>();
         Map<Trooper, Integer> room = new LinkedHashMap<>();
+        Map<Trooper, Integer> silentRoom = new LinkedHashMap<>();
         for (Trooper t : request.nightGroup()) {
-            int cap = Math.min(DutyRules.HOUR_CAP,
-                    Availability.capacityWithin(Availability.mask(t, day, request.absences()), nightWindow));
+            boolean[] mask = Availability.mask(t, day, request.absences());
+            int cap = Math.min(DutyRules.HOUR_CAP, Availability.capacityWithin(mask, nightWindow));
             room.put(t, cap);
+            silentRoom.put(t, Availability.capacityWithin(mask, silent));
             hours.put(t, Math.min(n, cap));
         }
-        int night = hours.values().stream().mapToInt(Integer::intValue).sum();
-        // Short of the silent hours: give N + 1, fewest past hours first.
+        // What each can give the silent hours: capped by their room there, less a BUS run.
+        int busRun = busSlots(day).size();
+        ToIntFunction<Trooper> toSilent = t -> Math.min(silentRoom.get(t),
+                hours.get(t) - (t.equals(request.bus()) ? busRun : 0));
+        int supply = request.nightGroup().stream().mapToInt(toSilent).sum();
+        // Short of the silent hours: N + 1, fewest past hours first, where it adds a silent hour.
         List<Trooper> byHistory = request.nightGroup().stream()
                 .sorted(Comparator.comparingInt((Trooper t) -> request.history().getOrDefault(t, 0))
                         .thenComparing(Trooper::name))
                 .toList();
         for (Trooper t : byHistory) {
-            if (night >= silentDemand) {
+            if (supply >= silentDemand) {
                 break;
             }
+            int before = toSilent.applyAsInt(t);
             if (hours.get(t) == n && room.get(t) > n) {
                 hours.put(t, n + 1);
-                night++;
+                if (toSilent.applyAsInt(t) > before) {
+                    supply++;
+                } else {
+                    hours.put(t, n);
+                }
             }
         }
-        if (night < silentDemand) {
+        if (supply < silentDemand) {
             return SolveResult.failed("The silent hours need " + silentDemand + " Trooper-hours, and the night group"
-                    + " at " + n + "h, or " + (n + 1) + "h, each can give only " + night
+                    + " at " + n + "h, or " + (n + 1) + "h, each can give only " + supply
                     + ". Add someone to the night group, or use full coverage.", null, 0);
         }
+        int night = hours.values().stream().mapToInt(Integer::intValue).sum();
         int crossover = night - silentDemand;
         if (crossover > crossCeiling) {
             return SolveResult.failed("At " + n + "h each the night group makes " + night + " hours, more than the"
@@ -321,8 +334,12 @@ public final class ScheduleSolver {
                 }
                 return SolveResult.solved(toSchedule(), targets, nodes);
             }
-            return SolveResult.failed(exhausted
-                    ? "Gave up looking for an arrangement of this split."
+            if (exhausted) {
+                return SolveResult.failed("Gave up looking for an arrangement of this split.", targets, nodes);
+            }
+            return SolveResult.failed(fixed
+                    ? "At " + request.turnout() + "h each there is no way to keep a Trooper on every hour."
+                            + " Use more hours each, or full coverage."
                     : "No legal arrangement of these hours exists for this manpower.", targets, nodes);
         }
 
@@ -393,10 +410,15 @@ public final class ScheduleSolver {
                 if (need == 0) {
                     continue;
                 }
+                // canPlace, so the BUS Trooper doesn't count the hour before their run.
                 int bodies = 0;
                 for (int t = 0; t < troopers.size(); t++) {
-                    if (owed[t] > 0 && available[t][slot] && rightGroup(t, slot) && grid[t][slot] == null) {
-                        bodies++;
+                    for (int i = 0; i < positions.size(); i++) {
+                        Position p = positions.get(i);
+                        if (p.slot() == slot && filledBy[i] < 0 && canPlace(t, slot, p.post())) {
+                            bodies++;
+                            break;
+                        }
                     }
                 }
                 if (bodies < need) {
@@ -498,7 +520,8 @@ public final class ScheduleSolver {
             }
             int count = 0;
             boolean[] counted = new boolean[DutyDay.SLOT_COUNT];
-            for (int i = 0; i < from && i < positions.size(); i++) {
+            // All of them first: a pinned BUS comes after that hour's open PAC positions.
+            for (int i = 0; i < positions.size(); i++) {
                 if (filledBy[i] >= 0) {
                     counted[positions.get(i).slot()] = true;
                 }
@@ -506,7 +529,6 @@ public final class ScheduleSolver {
             for (int i = from; i < positions.size(); i++) {
                 int slot = positions.get(i).slot();
                 if (filledBy[i] >= 0) {
-                    counted[slot] = true; // pinned
                     continue;
                 }
                 if (silent[slot]) {

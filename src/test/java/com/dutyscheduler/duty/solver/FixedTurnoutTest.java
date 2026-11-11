@@ -1,5 +1,7 @@
 package com.dutyscheduler.duty.solver;
 
+import com.dutyscheduler.duty.domain.Absence;
+import com.dutyscheduler.duty.domain.AbsenceKind;
 import com.dutyscheduler.duty.domain.DayDemand;
 import com.dutyscheduler.duty.domain.DutyDay;
 import com.dutyscheduler.duty.domain.Post;
@@ -16,6 +18,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -42,7 +45,12 @@ class FixedTurnoutTest {
     private static final List<Trooper> SIX = List.of(TROOPER_A, TROOPER_B, TROOPER_C, TROOPER_D, TROOPER_E, TROOPER_F);
     private static final List<Trooper> NIGHT = List.of(TROOPER_A, TROOPER_B, TROOPER_C);
 
+    /** Three night, two day, two stay-outs. */
+    private static final List<Trooper> SEVEN = List.of(
+            TROOPER_A, TROOPER_B, TROOPER_C, TROOPER_D, TROOPER_E, TROOPER_H, TROOPER_I);
+
     private static final DutyDay THURSDAY = DutyDay.of(LocalDate.of(2026, 9, 10));
+    private static final LocalDate FRIDAY = LocalDate.of(2026, 9, 11);
 
     private final ScheduleSolver solver = new ScheduleSolver();
     private final ScheduleValidator validator = new ScheduleValidator();
@@ -176,6 +184,61 @@ class FixedTurnoutTest {
         assertKeepsTheRules(result.schedule(), 5);
         Schedule.Row d = result.schedule().row(TROOPER_D).orElseThrow();
         assertEquals(List.of(Post.BUS, Post.BUS, Post.BUS), List.of(d.at(11), d.at(12), d.at(13)));
+    }
+
+    @Test
+    @DisplayName("BUS on night: the run is crossover, and the BUS Trooper goes over")
+    void nightBus() {
+        // B has the fewest past hours, but only A's extra hour adds a silent hour.
+        SolveRequest request = SolveRequest.of(THURSDAY, SEVEN, NIGHT)
+                .withHistory(Map.of(TROOPER_A, 10, TROOPER_C, 10)).withBus(TROOPER_A);
+
+        SolveResult six = solver.solve(request.withTurnout(6));
+        assertTrue(six.isSolved(), () -> "did not solve: " + six.reason());
+        assertKeepsTheRules(six.schedule(), 6);
+        assertEquals(7, six.schedule().hours(TROOPER_A));
+
+        SolveResult five = solver.solve(request.withTurnout(5));
+        assertFalse(five.isSolved());
+        assertEquals("The silent hours need 16 Trooper-hours, and the night group at 5h, or 6h, each can give only 15."
+                + " Add someone to the night group, or use full coverage.", five.reason());
+    }
+
+    @Test
+    @DisplayName("a half day's room is only hours with a post")
+    void halfDay() {
+        // Off 0800-2000, D has 0600-0759; 2000-2159 has no post to stand.
+        List<Absence> half = List.of(Absence.dayHalf(TROOPER_D, AbsenceKind.OL, FRIDAY));
+        SolveResult result = solver.solve(SolveRequest.of(THURSDAY, SEVEN, NIGHT).withAbsences(half).withTurnout(5));
+
+        assertTrue(result.isSolved(), () -> "did not solve: " + result.reason());
+        ValidationResult check = validator.validate(result.schedule());
+        assertTrue(check.violations().stream().allMatch(v -> v.rule() == Rule.UNDER_MANNED), check::describe);
+        assertEquals(2, result.schedule().hours(TROOPER_D));
+    }
+
+    @Test
+    @DisplayName("BUS pick on a thin day leaves PAC to MP")
+    void busOnThinDay() {
+        // Three on days; the pinned BUS mans 0700-0959 even though it sorts after PAC.
+        List<Absence> half = List.of(Absence.dayHalf(TROOPER_I, AbsenceKind.OL, FRIDAY));
+        SolveResult result = solver.solve(SolveRequest.of(THURSDAY, SEVEN, NIGHT).withAbsences(half)
+                .withBus(TROOPER_E).withTurnout(5));
+
+        assertTrue(result.isSolved(), () -> "did not solve: " + result.reason());
+        assertKeepsTheRules(result.schedule(), 5);
+    }
+
+    @Test
+    @DisplayName("crossover room is not silent room")
+    void nightHalfOnNight() {
+        // B is free only 0800-0959, which can't help the silent hours.
+        List<Absence> half = List.of(Absence.nightHalf(TROOPER_B, AbsenceKind.OL, THURSDAY.date()));
+        SolveResult result = solver.solve(SolveRequest.of(THURSDAY, SEVEN, NIGHT).withAbsences(half).withTurnout(6));
+
+        assertFalse(result.isSolved());
+        assertEquals("The silent hours need 16 Trooper-hours, and the night group at 6h, or 7h, each can give only 12."
+                + " Add someone to the night group, or use full coverage.", result.reason());
     }
 
     @Test
