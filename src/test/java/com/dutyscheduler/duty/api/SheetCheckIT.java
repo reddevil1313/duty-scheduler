@@ -1,5 +1,7 @@
 package com.dutyscheduler.duty.api;
 
+import com.dutyscheduler.duty.domain.Absence;
+import com.dutyscheduler.duty.persistence.AbsenceEntity;
 import com.dutyscheduler.duty.persistence.AbsenceRepository;
 import com.dutyscheduler.duty.persistence.DutySheetRepository;
 import com.dutyscheduler.duty.persistence.TrooperEntity;
@@ -19,6 +21,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 
@@ -26,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -103,6 +108,24 @@ class SheetCheckIT {
             }
         }
         throw new AssertionError("not on duty at all");
+    }
+
+    @Test
+    @DisplayName("away lists the roster's leave and ticks before any sheet")
+    void awayBeforeGenerating() throws Exception {
+        TrooperEntity d = troopers.findByNameAndActiveTrue("TROOPER_D").orElseThrow();
+        absences.save(new AbsenceEntity(d, Absence.appointment(d.toDomain(), LocalDate.of(2026, 9, 11),
+                LocalTime.of(9, 0), LocalTime.of(11, 0)), "admin"));
+
+        mvc.perform(get("/api/schedules/" + DATE + "/away").param("out", "TROOPER_E:MC"))
+                .andExpect(status().isOk())
+                // 0900 is slot 13.
+                .andExpect(jsonPath("$.TROOPER_D[12]").doesNotExist())
+                .andExpect(jsonPath("$.TROOPER_D[13]").value("MA"))
+                .andExpect(jsonPath("$.TROOPER_D[14]").value("MA"))
+                .andExpect(jsonPath("$.TROOPER_E", hasSize(24)))
+                .andExpect(jsonPath("$.TROOPER_E[0]").value("MC"))
+                .andExpect(jsonPath("$.TROOPER_F").doesNotExist());
     }
 
     @Test

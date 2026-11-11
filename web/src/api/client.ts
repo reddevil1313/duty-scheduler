@@ -85,6 +85,10 @@ async function errorFor(response: Response): Promise<ApiError> {
   return new ApiError(response.status, `Request failed (${response.status}).`)
 }
 
+/** Ticks as out=NAME:KIND, since a check's body is the sheet. */
+const tickParams = (ticks: Ticks) =>
+  new URLSearchParams(Object.entries(ticks).map(([name, kind]) => ['out', `${name}:${kind}`]))
+
 export const api = {
   /** Call again after sign-in and sign-out: the CSRF token rotates. */
   session: () => request<Session>('/api/session'),
@@ -126,12 +130,14 @@ export const api = {
   image: (date: string) => requestBlob(`/api/schedules/${date}/image`),
 
   check: (date: string, schedule: Schedule, ticks: Ticks = {}) =>
-    // Ticks go as out=NAME:KIND since the body is the sheet.
-    request<SheetCheck>(`/api/schedules/${date}/check?${new URLSearchParams(
-      Object.entries(ticks).map(([name, kind]) => ['out', `${name}:${kind}`]))}`, {
+    request<SheetCheck>(`/api/schedules/${date}/check?${tickParams(ticks)}`, {
       method: 'POST',
       body: JSON.stringify(schedule),
     }),
+
+  /** Who on the roster is away on this sheet, and why. */
+  away: (date: string, ticks: Ticks = {}) =>
+    request<SheetCheck['away']>(`/api/schedules/${date}/away?${tickParams(ticks)}`),
 
   credit: (date: string, hours: Record<string, number>) =>
     request<void>(`/api/schedules/${date}/credits`, {

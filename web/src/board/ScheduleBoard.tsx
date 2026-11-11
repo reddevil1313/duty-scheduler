@@ -6,6 +6,7 @@ import { useSession } from '../auth/session-context'
 import { shortDate } from '../dates'
 import { download } from '../download'
 import type { RosterState } from '../roster/useRoster'
+import { AvailabilityPanel } from './AvailabilityPanel'
 import { boardOrder, mpShortfall, setCell, swapRows } from './edit'
 import { SheetGrid, type Mode } from './SheetGrid'
 import { isSilent } from './slots'
@@ -321,14 +322,7 @@ export function ScheduleBoard({ date, onDateChange, rosterState }: Props) {
         )}
       </section>
 
-      {isAdmin && (
-        Object.keys(ticks).length > 0 && (
-          <p className="ticks note">
-            Ticked out on the Roster tab, for generating only — not booked:{' '}
-            {Object.entries(ticks).map(([name, kind]) => `${name} (${kind})`).join(', ')}
-          </p>
-        )
-      )}
+      <AvailabilityPanel date={date} roster={roster} nightGroup={nightGroup} ticks={ticks} />
 
       {/* Always rendered so the layout doesn't jump. */}
       <p className={`message${error ? ' error' : ' note'}`} role={error ? 'alert' : 'status'}>

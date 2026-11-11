@@ -153,6 +153,17 @@ public class ScheduleController {
         return SheetCheck.of(schedule, validator.validate(schedule), leaveClashes(schedule, absences), absences);
     }
 
+    /** Who on the roster is away on this sheet, by hour and why, as the check reports it. */
+    @GetMapping("/{date}/away")
+    public Map<String, List<String>> away(@PathVariable LocalDate date,
+            @RequestParam(name = "out", required = false) List<String> out) {
+        DutyDay day = DutyDay.of(date);
+        List<Trooper> roster = troopers.findByActiveTrueOrderByIdAsc().stream().map(TrooperEntity::toDomain).toList();
+        List<Absence> absences = new ArrayList<>(store.absencesTouching(day));
+        absences.addAll(ticked(day, parseTicks(out)));
+        return SheetCheck.away(day, absences, roster);
+    }
+
     /** Roster ticks as whole-sheet leave, for this request only. */
     private List<Absence> ticked(DutyDay day, List<QuickLeave> out) {
         if (out == null) {

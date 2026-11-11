@@ -102,7 +102,21 @@ button, select, input { font: inherit; color: inherit; }
 .panel-hd h2 { font-size: 11px; font-weight: 600; letter-spacing: .11em; text-transform: uppercase; color: var(--muted); }
 .panel-hd .meta { font-size: 11px; color: var(--muted); margin-right: auto; }
 .panel-body { padding: 13px; }
-.panel > .message, .panel > p.note, .panel > p.ticks { margin-left: 13px; margin-right: 13px; }
+.panel > .message, .panel > p.note, .panel > /* Who is free for the sheet, above the grid. */
+.availability > summary { cursor: pointer; list-style: none; justify-content: flex-start; }
+.availability > summary::-webkit-details-marker { display: none; }
+.availability > summary h2::before { content: "▸ "; }
+.availability[open] > summary h2::before { content: "▾ "; }
+.availability:not([open]) > summary { border-bottom: 0; }
+.availability .panel-body { display: flex; flex-direction: column; gap: 7px; }
+.avail-row { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.avail-label {
+  width: 5.5rem; flex: none; font-size: 10.5px; font-weight: 600; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--muted);
+}
+.availability .pill { display: inline-flex; cursor: default; }
+
+p.ticks { margin-left: 13px; margin-right: 13px; }
 
 /* ---------- buttons and fields ---------- */
 button {

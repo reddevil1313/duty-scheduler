@@ -224,6 +224,10 @@ class TeamIsolationIT {
         mvc.perform(as("alpha_admin", post("/api/schedules/" + DATE + "/check"))
                         .content(body(as("alpha_admin", get("/api/schedules/" + DATE)))))
                 .andExpect(jsonPath("$.away.TROOPER_D").exists());
+        mvc.perform(as("bravo_admin", get("/api/schedules/" + DATE + "/away")))
+                .andExpect(jsonPath("$.TROOPER_D").doesNotExist());
+        mvc.perform(as("alpha_admin", get("/api/schedules/" + DATE + "/away")))
+                .andExpect(jsonPath("$.TROOPER_D").exists());
     }
 
     @Test
